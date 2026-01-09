@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Workout Tracker Pro</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <button id="global-back" class="back-btn" onclick="handleGlobalBack()">↩ חזור</button>
+
+        <div id="ui-week" class="screen active">
+            <h1 class="main-title">Workout Tracker</h1>
+            <p class="subtitle">בחר שבוע בבלוק:</p>
+            <div class="grid-menu">
+                <button class="menu-item" onclick="selectWeek(1)">שבוע 1</button>
+                <button class="menu-item" onclick="selectWeek(2)">שבוע 2</button>
+                <button class="menu-item" onclick="selectWeek(3)">שבוע 3</button>
+            </div>
+        </div>
+
+        <div id="ui-workout-type" class="screen">
+            <h2>איזה אימון היום?</h2>
+            <div class="grid-menu">
+                <button class="menu-item" onclick="selectWorkout('A')">A - חזה וכתפיים</button>
+                <button class="menu-item" onclick="selectWorkout('B')">B - רגליים וגב</button>
+                <button class="menu-item" onclick="selectWorkout('C')">C - כתפיים וגב</button>
+            </div>
+        </div>
+
+        <div id="ui-1rm" class="screen">
+            <h2 id="rm-title">הזן 1RM</h2>
+            <div class="control-group">
+                <select id="rm-picker" class="modern-select"></select>
+            </div>
+            <button class="btn-primary" onclick="save1RM()">המשך</button>
+        </div>
+
+        <div id="ui-confirm" class="screen">
+            <h2 id="confirm-ex-name" class="english-title">Exercise</h2>
+            <p>לבצע את התרגיל?</p>
+            <div class="action-btns">
+                <button class="btn-primary" onclick="confirmExercise(true)">כן</button>
+                <button class="btn-secondary" onclick="confirmExercise(false)">דלג</button>
+            </div>
+        </div>
+
+        <div id="ui-variation" class="screen">
+            <h2 id="variation-title">בחר סוג תרגיל:</h2>
+            <div id="variation-options" class="grid-menu"></div>
+        </div>
+
+        <div id="ui-main" class="screen">
+            <div class="exercise-header">
+                <h2 id="ex-display-name" class="english-title">...</h2>
+                <span id="set-counter" class="set-badge">Set 1/5</span>
+            </div>
+            
+            <div class="log-card">
+                <div class="input-row">
+                    <label>משקל (ק"ג):</label>
+                    <select id="weight-picker" class="modern-select"></select>
+                </div>
+                <div class="input-row">
+                    <label>חזרות:</label>
+                    <select id="reps-picker" class="modern-select"></select>
+                </div>
+                <div class="input-row">
+                    <label>RIR:</label>
+                    <select id="rir-picker" class="modern-select"></select>
+                </div>
+            </div>
+            <button class="btn-primary" onclick="nextStep()">תעד סט</button>
+        </div>
+
+        <div id="ui-extra" class="screen">
+            <h2>הסט הסתיים!</h2>
+            <div class="action-btns-vertical">
+                <button class="btn-success" onclick="handleExtra(true)">הוסף סט נוסף</button>
+                <button class="btn-primary" onclick="handleExtra(false)">עבור לתרגיל הבא</button>
+            </div>
+        </div>
+
+        <div id="ui-summary" class="screen">
+            <h2 class="success-msg">האימון הושלם! ✅</h2>
+            <div id="summary-area" class="summary-box"></div>
+            <button class="btn-primary" onclick="copyResult()">העתק וחזור לתפריט</button>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
