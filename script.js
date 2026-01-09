@@ -1,0 +1,163 @@
+let state = {
+    week: 1, type: '', rm: 100, exIdx: 0, setIdx: 0, 
+    log: [], currentEx: null, history: ['ui-week']
+};
+
+const workouts = {
+    'A': [
+        { name: "Bench Press (Main)", isCalc: true, baseRM: 122.5, rmRange: [110, 160] },
+        { name: "Incline Bench Press", sets: [{w: 65, r: 9}, {w: 65, r: 9}, {w: 65, r: 9}] },
+        { name: "Chest Flyes", hasVariations: true, variations: [
+            { name: "Dumbbell Peck Fly", sets: [{w: 14, r: 11}, {w: 14, r: 11}, {w: 14, r: 11}], step: 2 },
+            { name: "Machine Peck Fly", sets: [{w: 45, r: 11}, {w: 45, r: 11}, {w: 45, r: 11}], step: 1 },
+            { name: "Cable Fly", sets: [{w: 12.5, r: 11}, {w: 12.5, r: 11}, {w: 12.5, r: 11}], step: 2.5 }
+        ]},
+        { name: "Lateral Raises", sets: [{w: 12.5, r: 13}, {w: 12.5, r: 13}, {w: 12.5, r: 11}] }
+    ],
+    'B': [
+        { name: "Leg Press", sets: [{w: 280, r: 8}, {w: 300, r: 8}, {w: 300, r: 7}] },
+        { name: "Leg Curl", hasVariations: true, variations: [
+            { name: "Single Leg Curl", sets: [{w: 25, r: 8}, {w: 30, r: 6}, {w: 25, r: 8}] },
+            { name: "Lying Leg Curl (Double)", sets: [{w: 50, r: 8}, {w: 60, r: 6}, {w: 50, r: 8}] }
+        ]},
+        { name: "Vertical Pull", hasVariations: true, variations: [
+            { name: "Lat Pulldown", sets: [{w: 75, r: 10}, {w: 75, r: 10}, {w: 75, r: 11}] },
+            { name: "Pull Ups", isBW: true, sets: [{w: 0, r: 8}, {w: 0, r: 8}, {w: 0, r: 8}] }
+        ]}
+    ],
+    'C': [
+        { name: "Overhead Press (Main)", isCalc: true, baseRM: 77.5, rmRange: [65, 90] },
+        { name: "Barbell Shrugs", sets: [{w: 140, r: 11}, {w: 140, r: 11}, {w: 140, r: 11}] },
+        { name: "Pull Ups", hasVariations: true, variations: [
+            { name: "Pull Ups (BW)", sets: [{w: 0, r: 8}, {w: 0, r: 7}, {w: 0, r: 7}], isBW: true },
+            { name: "Weighted Pull Ups", sets: [{w: 5, r: 8}, {w: 5, r: 7}, {w: 5, r: 7}], step: 2.5 }
+        ]}
+    ]
+};
+
+function navigate(screenId) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(screenId).classList.add('active');
+    if (state.history[state.history.length - 1] !== screenId) state.history.push(screenId);
+    document.getElementById('global-back').style.display = screenId === 'ui-week' ? 'none' : 'block';
+}
+
+function handleGlobalBack() {
+    if (state.history.length > 1) {
+        state.history.pop();
+        const prevScreen = state.history[state.history.length - 1];
+        
+        // לוגיקת ניקוי נתונים בחזרה אחורה
+        if (prevScreen === 'ui-main' && state.setIdx > 0) { state.setIdx--; state.log.pop(); }
+        else if (prevScreen === 'ui-workout-type') { state.exIdx = 0; state.log = []; }
+        
+        navigate(prevScreen);
+    }
+}
+
+function selectWeek(w) { state.week = w; navigate('ui-workout-type'); }
+
+function selectWorkout(type) {
+    state.type = type;
+    const firstEx = workouts[type][0];
+    if (firstEx.isCalc) {
+        document.getElementById('rm-title').innerText = `מה ה-1RM ב-${firstEx.name.split(' ')[0]}?`;
+        const p = document.getElementById('rm-picker'); p.innerHTML = "";
+        for(let i = firstEx.rmRange[0]; i <= firstEx.rmRange[1]; i += 2.5) {
+            let opt = new Option(i + " kg", i); if(i === firstEx.baseRM) opt.selected = true; p.add(opt);
+        }
+        navigate('ui-1rm');
+    } else { showConfirmScreen(); }
+}
+
+function save1RM() { state.rm = parseFloat(document.getElementById('rm-picker').value); showConfirmScreen(); }
+
+function showConfirmScreen() {
+    document.getElementById('confirm-ex-name').innerText = workouts[state.type][state.exIdx].name;
+    navigate('ui-confirm');
+}
+
+function confirmExercise(doEx) {
+    if (!doEx) { state.log.push({ skip: true, exName: workouts[state.type][state.exIdx].name }); state.exIdx++; checkFlow(); return; }
+    state.currentEx = JSON.parse(JSON.stringify(workouts[state.type][state.exIdx]));
+    
+    if (state.currentEx.isCalc) {
+        const p = { 1: [0.65, 0.75, 0.85, 0.75, 0.65], 2: [0.70, 0.80, 0.90, 0.80, 0.70, 0.70], 3: [0.75, 0.85, 0.95, 0.85, 0.75, 0.75] };
+        const r = { 1: [3, 3, 5, 8, 10], 2: [3, 3, 3, 8, 10, 10], 3: [3, 3, 3, 8, 10, 10] };
+        state.currentEx.sets = p[state.week].map((pct, i) => ({ w: Math.round((state.rm * pct) / 2.5) * 2.5, r: r[state.week][i] }));
+        state.currentExName = state.currentEx.name;
+        startRecording();
+    } else if (state.currentEx.hasVariations) {
+        const opts = document.getElementById('variation-options'); opts.innerHTML = "";
+        state.currentEx.variations.forEach(v => {
+            const btn = document.createElement('button'); btn.className = "menu-item"; btn.innerText = v.name;
+            btn.onclick = () => { 
+                state.currentExName = v.name; state.currentEx.sets = v.sets; 
+                state.currentEx.isBW = v.isBW; startRecording(); 
+            };
+            opts.appendChild(btn);
+        });
+        navigate('ui-variation');
+    } else { state.currentExName = state.currentEx.name; startRecording(); }
+}
+
+function startRecording() { navigate('ui-main'); initPickers(); }
+
+function initPickers() {
+    const target = state.currentEx.sets[state.setIdx];
+    document.getElementById('ex-display-name').innerText = state.currentExName;
+    document.getElementById('set-counter').innerText = `Set ${state.setIdx + 1}/${state.currentEx.sets.length}`;
+    
+    const wPick = document.getElementById('weight-picker'); wPick.innerHTML = "";
+    if (state.currentEx.isBW) { wPick.add(new Option("Bodyweight", 0)); }
+    else {
+        for(let i = target.w - 20; i <= target.w + 20; i += 2.5) {
+            let opt = new Option(i + " kg", i); if(i === target.w) opt.selected = true; wPick.add(opt);
+        }
+    }
+    
+    const rPick = document.getElementById('reps-picker'); rPick.innerHTML = "";
+    for(let i = 1; i <= 20; i++) { let opt = new Option(i, i); if(i === target.r) opt.selected = true; rPick.add(opt); }
+    
+    const rirPick = document.getElementById('rir-picker'); rirPick.innerHTML = "";
+    [0, 0.5, 1, 1.5, 2, 2.5, 3].forEach(v => {
+        let opt = new Option(v, v); if(v === 2) opt.selected = true; rirPick.add(opt);
+    });
+}
+
+function nextStep() {
+    state.log.push({ 
+        exName: state.currentExName, 
+        w: document.getElementById('weight-picker').value, 
+        r: document.getElementById('reps-picker').value, 
+        rir: document.getElementById('rir-picker').value 
+    });
+    if (state.setIdx < state.currentEx.sets.length - 1) { state.setIdx++; initPickers(); } 
+    else { navigate('ui-extra'); }
+}
+
+function handleExtra(isExtra) {
+    if(isExtra) { state.setIdx++; state.currentEx.sets.push({...state.currentEx.sets[state.setIdx-1]}); startRecording(); } 
+    else { state.exIdx++; state.setIdx = 0; checkFlow(); }
+}
+
+function checkFlow() {
+    if (state.exIdx < workouts[state.type].length) showConfirmScreen();
+    else finish();
+}
+
+function finish() {
+    navigate('ui-summary');
+    let txt = `Workout Summary - Week ${state.week}\n------------------\n`;
+    state.log.forEach(l => {
+        if(l.skip) txt += `${l.exName}: SKIPPED\n`;
+        else txt += `${l.exName}: ${l.w}kg x ${l.r} (RIR ${l.rir})\n`;
+    });
+    document.getElementById('summary-area').innerText = txt;
+}
+
+function copyResult() {
+    navigator.clipboard.writeText(document.getElementById('summary-area').innerText);
+    alert("הסיכום הועתק!");
+    location.reload();
+}
