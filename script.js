@@ -12,28 +12,45 @@ const workouts = {
             { name: "Machine Peck Fly", sets: [{w: 45, r: 11}, {w: 45, r: 11}, {w: 45, r: 11}], step: 1 },
             { name: "Cable Fly", sets: [{w: 12.5, r: 11}, {w: 12.5, r: 11}, {w: 12.5, r: 11}], step: 2.5 }
         ]},
-        { name: "Lateral Raises", sets: [{w: 12.5, r: 13}, {w: 12.5, r: 13}, {w: 12.5, r: 11}] }
+        { name: "Lateral Raises", sets: [{w: 12.5, r: 13}, {w: 12.5, r: 13}, {w: 12.5, r: 11}] },
+        { name: "Face Pulls", sets: [{w: 40, r: 13}, {w: 40, r: 13}, {w: 40, r: 15}] }
     ],
     'B': [
         { name: "Leg Press", sets: [{w: 280, r: 8}, {w: 300, r: 8}, {w: 300, r: 7}] },
         { name: "Leg Curl", hasVariations: true, variations: [
-            { name: "Single Leg Curl", sets: [{w: 25, r: 8}, {w: 30, r: 6}, {w: 25, r: 8}] },
-            { name: "Lying Leg Curl (Double)", sets: [{w: 50, r: 8}, {w: 60, r: 6}, {w: 50, r: 8}] }
+            { name: "Single Leg Curl", sets: [{w: 25, r: 8}, {w: 30, r: 6}, {w: 25, r: 8}], step: 2.5 },
+            { name: "Lying Leg Curl (Double)", sets: [{w: 50, r: 8}, {w: 60, r: 6}, {w: 50, r: 8}], step: 5 },
+            { name: "Seated Leg Curl (Double)", sets: [{w: 50, r: 8}, {w: 60, r: 6}, {w: 50, r: 8}], step: 5 }
         ]},
         { name: "Vertical Pull", hasVariations: true, variations: [
-            { name: "Lat Pulldown", sets: [{w: 75, r: 10}, {w: 75, r: 10}, {w: 75, r: 11}] },
+            { name: "Lat Pulldown", sets: [{w: 75, r: 10}, {w: 75, r: 10}, {w: 75, r: 11}], step: 2.5 },
             { name: "Pull Ups", isBW: true, sets: [{w: 0, r: 8}, {w: 0, r: 8}, {w: 0, r: 8}] }
-        ]}
+        ]},
+        { name: "Seated Row", hasVariations: true, variations: [
+            { name: "Cable Row", sets: [{w: 65, r: 10}, {w: 65, r: 10}, {w: 65, r: 12}], step: 2.5 },
+            { name: "Machine Row", sets: [{w: 50, r: 10}, {w: 50, r: 10}, {w: 50, r: 12}], step: 5 }
+        ]},
+        { name: "Calf Raise", hasVariations: true, variations: [
+            { name: "Seated Calf Raise", sets: [{w: 70, r: 10}, {w: 70, r: 10}, {w: 70, r: 12}], step: 5 },
+            { name: "Standing Calf Raise", sets: [{w: 110, r: 10}, {w: 110, r: 10}, {w: 110, r: 12}], step: 10 }
+        ]},
+        { name: "Straight Arm Pulldown", sets: [{w: 30, r: 10}, {w: 30, r: 12}, {w: 30, r: 12}], step: 2.5 },
+        { name: "Bicep Curls", sets: [{w: 16, r: 8}, {w: 16, r: 8}, {w: 16, r: 6}], step: 2 }
     ],
     'C': [
         { name: "Overhead Press (Main)", isCalc: true, baseRM: 77.5, rmRange: [65, 90] },
-        { name: "Barbell Shrugs", sets: [{w: 140, r: 11}, {w: 140, r: 11}, {w: 140, r: 11}] },
-        { name: "Pull Ups", hasVariations: true, variations: [
+        { name: "Barbell Shrugs", sets: [{w: 140, r: 11}, {w: 140, r: 11}, {w: 140, r: 11}], step: 5 },
+        { name: "Lateral Raises (DB)", sets: [{w: 12.5, r: 13}, {w: 12.5, r: 13}, {w: 12.5, r: 11}], step: 2.5 },
+        { name: "Face Pull (Cable)", sets: [{w: 37.5, r: 12}, {w: 37.5, r: 12}, {w: 37.5, r: 13}], step: 2.5 },
+        { name: "Pull Ups Variation", hasVariations: true, variations: [
             { name: "Pull Ups (BW)", sets: [{w: 0, r: 8}, {w: 0, r: 7}, {w: 0, r: 7}], isBW: true },
             { name: "Weighted Pull Ups", sets: [{w: 5, r: 8}, {w: 5, r: 7}, {w: 5, r: 7}], step: 2.5 }
-        ]}
+        ]},
+        { name: "Incline Bench Press", sets: [{w: 65, r: 9}, {w: 65, r: 9}, {w: 65, r: 9}], step: 2.5 }
     ]
 };
+
+// --- פונקציות עזר וניהול ניווט ---
 
 function navigate(screenId) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -47,9 +64,13 @@ function handleGlobalBack() {
         state.history.pop();
         const prevScreen = state.history[state.history.length - 1];
         
-        // לוגיקת ניקוי נתונים בחזרה אחורה
-        if (prevScreen === 'ui-main' && state.setIdx > 0) { state.setIdx--; state.log.pop(); }
-        else if (prevScreen === 'ui-workout-type') { state.exIdx = 0; state.log = []; }
+        if (prevScreen === 'ui-main' && state.setIdx > 0) {
+            state.setIdx--;
+            state.log.pop();
+        } else if (prevScreen === 'ui-confirm') {
+            // אם חוזרים לאישור תרגיל, מנקים את הלוג של התרגיל האחרון
+            state.log = state.log.filter(l => l.exIdx !== state.exIdx);
+        }
         
         navigate(prevScreen);
     }
@@ -59,6 +80,8 @@ function selectWeek(w) { state.week = w; navigate('ui-workout-type'); }
 
 function selectWorkout(type) {
     state.type = type;
+    state.exIdx = 0;
+    state.log = [];
     const firstEx = workouts[type][0];
     if (firstEx.isCalc) {
         document.getElementById('rm-title').innerText = `מה ה-1RM ב-${firstEx.name.split(' ')[0]}?`;
@@ -70,21 +93,38 @@ function selectWorkout(type) {
     } else { showConfirmScreen(); }
 }
 
-function save1RM() { state.rm = parseFloat(document.getElementById('rm-picker').value); showConfirmScreen(); }
+function save1RM() { 
+    state.rm = parseFloat(document.getElementById('rm-picker').value); 
+    showConfirmScreen(); 
+}
 
 function showConfirmScreen() {
-    document.getElementById('confirm-ex-name').innerText = workouts[state.type][state.exIdx].name;
+    const ex = workouts[state.type][state.exIdx];
+    document.getElementById('confirm-ex-name').innerText = ex.name;
     navigate('ui-confirm');
 }
 
 function confirmExercise(doEx) {
-    if (!doEx) { state.log.push({ skip: true, exName: workouts[state.type][state.exIdx].name }); state.exIdx++; checkFlow(); return; }
+    if (!doEx) { 
+        state.log.push({ skip: true, exName: workouts[state.type][state.exIdx].name, exIdx: state.exIdx }); 
+        state.exIdx++; 
+        checkFlow(); 
+        return; 
+    }
+    
     state.currentEx = JSON.parse(JSON.stringify(workouts[state.type][state.exIdx]));
     
     if (state.currentEx.isCalc) {
-        const p = { 1: [0.65, 0.75, 0.85, 0.75, 0.65], 2: [0.70, 0.80, 0.90, 0.80, 0.70, 0.70], 3: [0.75, 0.85, 0.95, 0.85, 0.75, 0.75] };
+        const p = { 
+            1: [0.65, 0.75, 0.85, 0.75, 0.65], 
+            2: [0.70, 0.80, 0.90, 0.80, 0.70, 0.70], 
+            3: [0.75, 0.85, 0.95, 0.85, 0.75, 0.75] 
+        };
         const r = { 1: [3, 3, 5, 8, 10], 2: [3, 3, 3, 8, 10, 10], 3: [3, 3, 3, 8, 10, 10] };
-        state.currentEx.sets = p[state.week].map((pct, i) => ({ w: Math.round((state.rm * pct) / 2.5) * 2.5, r: r[state.week][i] }));
+        state.currentEx.sets = p[state.week].map((pct, i) => ({ 
+            w: Math.round((state.rm * pct) / 2.5) * 2.5, 
+            r: r[state.week][i] 
+        }));
         state.currentExName = state.currentEx.name;
         startRecording();
     } else if (state.currentEx.hasVariations) {
@@ -92,16 +132,22 @@ function confirmExercise(doEx) {
         state.currentEx.variations.forEach(v => {
             const btn = document.createElement('button'); btn.className = "menu-item"; btn.innerText = v.name;
             btn.onclick = () => { 
-                state.currentExName = v.name; state.currentEx.sets = v.sets; 
-                state.currentEx.isBW = v.isBW; startRecording(); 
+                state.currentExName = v.name; 
+                state.currentEx.sets = v.sets; 
+                state.currentEx.isBW = v.isBW;
+                state.currentEx.step = v.step || 2.5;
+                startRecording(); 
             };
             opts.appendChild(btn);
         });
         navigate('ui-variation');
-    } else { state.currentExName = state.currentEx.name; startRecording(); }
+    } else { 
+        state.currentExName = state.currentEx.name; 
+        startRecording(); 
+    }
 }
 
-function startRecording() { navigate('ui-main'); initPickers(); }
+function startRecording() { state.setIdx = 0; navigate('ui-main'); initPickers(); }
 
 function initPickers() {
     const target = state.currentEx.sets[state.setIdx];
@@ -109,36 +155,62 @@ function initPickers() {
     document.getElementById('set-counter').innerText = `Set ${state.setIdx + 1}/${state.currentEx.sets.length}`;
     
     const wPick = document.getElementById('weight-picker'); wPick.innerHTML = "";
-    if (state.currentEx.isBW) { wPick.add(new Option("Bodyweight", 0)); }
-    else {
-        for(let i = target.w - 20; i <= target.w + 20; i += 2.5) {
-            let opt = new Option(i + " kg", i); if(i === target.w) opt.selected = true; wPick.add(opt);
+    if (state.currentEx.isBW) { 
+        wPick.add(new Option("Bodyweight (BW)", 0)); 
+    } else {
+        const step = state.currentEx.step || 2.5;
+        for(let i = Math.max(0, target.w - 30); i <= target.w + 30; i += step) {
+            let val = parseFloat(i.toFixed(1));
+            let opt = new Option(val + " kg", val); 
+            if(val === target.w) opt.selected = true; 
+            wPick.add(opt);
         }
     }
     
     const rPick = document.getElementById('reps-picker'); rPick.innerHTML = "";
-    for(let i = 1; i <= 20; i++) { let opt = new Option(i, i); if(i === target.r) opt.selected = true; rPick.add(opt); }
+    for(let i = 1; i <= 25; i++) { 
+        let opt = new Option(i, i); 
+        if(i === target.r) opt.selected = true; 
+        rPick.add(opt); 
+    }
     
     const rirPick = document.getElementById('rir-picker'); rirPick.innerHTML = "";
-    [0, 0.5, 1, 1.5, 2, 2.5, 3].forEach(v => {
-        let opt = new Option(v, v); if(v === 2) opt.selected = true; rirPick.add(opt);
+    [0, 0.5, 1, 1.5, 2, 2.5, 3, 4, 5].forEach(v => {
+        let opt = new Option(v === 0 ? "0 (Fail)" : v, v); 
+        if(v === 2) opt.selected = true; 
+        rirPick.add(opt);
     });
 }
 
 function nextStep() {
     state.log.push({ 
+        exIdx: state.exIdx,
         exName: state.currentExName, 
         w: document.getElementById('weight-picker').value, 
         r: document.getElementById('reps-picker').value, 
-        rir: document.getElementById('rir-picker').value 
+        rir: document.getElementById('rir-picker').value,
+        isBW: state.currentEx.isBW
     });
-    if (state.setIdx < state.currentEx.sets.length - 1) { state.setIdx++; initPickers(); } 
-    else { navigate('ui-extra'); }
+    
+    if (state.setIdx < state.currentEx.sets.length - 1) { 
+        state.setIdx++; 
+        initPickers(); 
+    } else { 
+        navigate('ui-extra'); 
+    }
 }
 
 function handleExtra(isExtra) {
-    if(isExtra) { state.setIdx++; state.currentEx.sets.push({...state.currentEx.sets[state.setIdx-1]}); startRecording(); } 
-    else { state.exIdx++; state.setIdx = 0; checkFlow(); }
+    if(isExtra) { 
+        state.setIdx++; 
+        state.currentEx.sets.push({...state.currentEx.sets[state.setIdx-1]}); 
+        initPickers();
+        navigate('ui-main');
+    } else { 
+        state.exIdx++; 
+        state.setIdx = 0; 
+        checkFlow(); 
+    }
 }
 
 function checkFlow() {
@@ -148,16 +220,25 @@ function checkFlow() {
 
 function finish() {
     navigate('ui-summary');
-    let txt = `Workout Summary - Week ${state.week}\n------------------\n`;
+    const names = {'A':'חזה וכתפיים','B':'רגליים וגב','C':'כתפיים וגב'};
+    let txt = `אימון ${names[state.type]} - שבוע ${state.week}\n`;
+    if (workouts[state.type][0].isCalc) txt += `(1RM: ${state.rm}kg)\n`;
+    txt += `------------------\n`;
+    
     state.log.forEach(l => {
-        if(l.skip) txt += `${l.exName}: SKIPPED\n`;
-        else txt += `${l.exName}: ${l.w}kg x ${l.r} (RIR ${l.rir})\n`;
+        if(l.skip) txt += `${l.exName}: דלג\n`;
+        else {
+            const weightDisplay = (l.isBW && l.w == 0) ? "BW" : `${l.w}kg`;
+            txt += `${l.exName}: ${weightDisplay} x ${l.r} (RIR ${l.rir})\n`;
+        }
     });
     document.getElementById('summary-area').innerText = txt;
 }
 
 function copyResult() {
-    navigator.clipboard.writeText(document.getElementById('summary-area').innerText);
-    alert("הסיכום הועתק!");
-    location.reload();
+    const text = document.getElementById('summary-area').innerText;
+    navigator.clipboard.writeText(text).then(() => {
+        alert("הסיכום הועתק בהצלחה!");
+        location.reload();
+    });
 }
