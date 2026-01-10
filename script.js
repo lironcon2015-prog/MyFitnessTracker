@@ -115,7 +115,7 @@ function updateTimerUI(target) {
     const s = (state.seconds % 60).toString().padStart(2, '0');
     document.getElementById('rest-timer').innerText = `${m}:${s}`;
     const progress = Math.min((state.seconds / target) * 100, 100);
-    document.getElementById('timer-bar').style.width = progress + "%";
+    if(document.getElementById('timer-bar')) document.getElementById('timer-bar').style.width = progress + "%";
 }
 
 function stopRestTimer() { 
@@ -129,7 +129,6 @@ function navigate(id) {
     document.getElementById(id).classList.add('active');
     if (id !== 'ui-main') stopRestTimer();
     
-    // ניהול היסטוריה
     if (state.historyStack[state.historyStack.length - 1] !== id) {
         state.historyStack.push(id);
     }
@@ -138,9 +137,25 @@ function navigate(id) {
 }
 
 function handleBackClick() {
+    const currentScreen = state.historyStack[state.historyStack.length - 1];
+
+    if (currentScreen === 'ui-main') {
+        if (state.setIdx > 0) {
+            // אם אנחנו בתוך תרגיל, "חזור" מבטל את הסט האחרון שנרשם בלוג
+            state.log.pop();
+            state.setIdx--;
+            // עדכון ה-lastLoggedSet לסט שקדם לסט שמחקנו כרגע
+            const currentExName = state.currentExName;
+            const previousLogs = state.log.filter(l => l.exName && l.exName.includes(currentExName));
+            state.lastLoggedSet = previousLogs.length > 0 ? previousLogs[previousLogs.length-1] : null;
+            initPickers();
+            return;
+        }
+    }
+    
     if (state.historyStack.length <= 1) return;
-    state.historyStack.pop(); // מסיר מסך נוכחי
-    const prevScreen = state.historyStack.pop(); // שולף את הקודם
+    state.historyStack.pop(); 
+    const prevScreen = state.historyStack.pop(); 
     navigate(prevScreen);
 }
 
@@ -173,9 +188,29 @@ function confirmExercise(doEx) {
     state.currentEx = JSON.parse(JSON.stringify(workouts[state.type][state.exIdx]));
     
     if (state.currentEx.isCalc) {
-        const p = { 1: [0.65, 0.75, 0.85, 0.75, 0.65], 2: [0.70, 0.80, 0.90, 0.80, 0.70, 0.70], 3: [0.75, 0.85, 0.95, 0.85, 0.75, 0.75] };
-        const r = { 1: [3, 3, 5, 8, 10], 2: [3, 3, 3, 8, 10, 10], 3: [3, 3, 3, 8, 10, 10] };
-        state.currentEx.sets = p[state.week].map((pct, i) => ({ w: Math.round((state.rm * pct) / 2.5) * 2.5, r: r[state.week][i] }));
+        // חישוב אחוזי משקל
+        const p = { 
+            1: [0.65, 0.75, 0.85, 0.75, 0.65], 
+            2: [0.70, 0.80, 0.90, 0.80, 0.70, 0.70], 
+            3: [0.75, 0.85, 0.95, 0.85, 0.75, 0.75] 
+        };
+        
+        // הגדרת חזרות חדשה לפי שבועות
+        let reps;
+        if (state.currentEx.name === "Leg Press") {
+             reps = [8, 8, 7]; // שמירה על המקורי של לג פרס
+        } else {
+             // Bench Press & OHP
+             if (state.week === 1) reps = [5, 5, 5, 8, 10];
+             else if (state.week === 2) reps = [3, 3, 3, 8, 10, 10];
+             else reps = [5, 3, 1, 8, 10, 10]; // שבוע 3
+        }
+
+        state.currentEx.sets = p[state.week].map((pct, i) => ({ 
+            w: Math.round((state.rm * pct) / 2.5) * 2.5, 
+            r: reps[i] || 10 
+        }));
+        
         state.currentExName = state.currentEx.name;
         startRecording();
     } else if (state.currentEx.hasVariations) {
@@ -253,11 +288,13 @@ function initPickers() {
 
     const wPick = document.getElementById('weight-picker'); wPick.innerHTML = "";
     const step = state.currentEx.step || 2.5;
-    for(let i = (state.currentEx.minW || Math.max(0, target.w - 40)); i <= (state.currentEx.maxW || target.w + 40); i = parseFloat((i + step).toFixed(2))) {
-        let o = new Option(i + " kg", i); if(i === target.w) o.selected = true; wPick.add(o);
+    const currentW = target ? target.w : 0;
+    for(let i = (state.currentEx.minW || Math.max(0, currentW - 40)); i <= (state.currentEx.maxW || currentW + 40); i = parseFloat((i + step).toFixed(2))) {
+        let o = new Option(i + " kg", i); if(i === currentW) o.selected = true; wPick.add(o);
     }
     const rPick = document.getElementById('reps-picker'); rPick.innerHTML = "";
-    for(let i = 1; i <= 25; i++) { let o = new Option(i, i); if(i === target.r) o.selected = true; rPick.add(o); }
+    const currentR = target ? target.r : 8;
+    for(let i = 1; i <= 25; i++) { let o = new Option(i, i); if(i === currentR) o.selected = true; rPick.add(o); }
     const rirPick = document.getElementById('rir-picker'); rirPick.innerHTML = "";
     [0, 0.5, 1, 1.5, 2, 2.5, 3, 4, 5].forEach(v => {
         let o = new Option(v === 0 ? "0 (Fail)" : v, v); if(v === (state.currentEx.rir || 2)) o.selected = true; rirPick.add(o);
