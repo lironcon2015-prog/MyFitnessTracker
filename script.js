@@ -1,6 +1,7 @@
 let state = {
     week: 1, type: '', rm: 100, exIdx: 0, setIdx: 0, 
-    log: [], currentEx: null, history: ['ui-week'],
+    log: [], currentEx: null,
+    historyStack: ['ui-week'],
     timerInterval: null, seconds: 0, startTime: null,
     isArmPhase: false, armGroup: 'biceps', 
     completedArmEx: [],
@@ -11,7 +12,7 @@ let state = {
 let audioContext;
 let wakeLock = null;
 
-const unilateralExercises = ["Machine Row", "Cable Row", "Dumbbell Peck Fly", "Lateral Raises", "Lateral Raises (DB)", "Single Leg Curl", "Dumbbell Bicep Curls", "Cable Fly"];
+const unilateralExercises = ["Dumbbell Peck Fly", "Lateral Raises", "Lateral Raises (DB)", "Single Leg Curl", "Dumbbell Bicep Curls", "Cable Fly"];
 
 const armExercises = {
     biceps: [
@@ -120,7 +121,7 @@ function updateTimerUI(target) {
 function stopRestTimer() { 
     if (state.timerInterval) clearInterval(state.timerInterval); 
     state.timerInterval = null; 
-    document.getElementById('timer-bar').style.width = "0%";
+    if(document.getElementById('timer-bar')) document.getElementById('timer-bar').style.width = "0%";
 }
 
 function navigate(id) {
@@ -128,27 +129,19 @@ function navigate(id) {
     document.getElementById(id).classList.add('active');
     if (id !== 'ui-main') stopRestTimer();
     
-    // מניעת כפילויות בהיסטוריה
-    if (state.history[state.history.length - 1] !== id) {
-        state.history.push(id);
+    // ניהול היסטוריה
+    if (state.historyStack[state.historyStack.length - 1] !== id) {
+        state.historyStack.push(id);
     }
     
     document.getElementById('global-back').style.visibility = (id === 'ui-week') ? 'hidden' : 'visible';
 }
 
-function handleGlobalBack() {
-    if (state.history.length <= 1) return;
-    
-    state.history.pop(); // מסיר את המסך הנוכחי
-    const prev = state.history[state.history.length - 1];
-    
-    // אם המסך הקודם הוא "אישור תרגיל", דלג עליו צעד אחד נוסף אחורה
-    if (prev === 'ui-confirm' || prev === 'ui-variation' || prev === 'ui-1rm') {
-        state.history.pop();
-        navigate(state.history.pop());
-    } else {
-        navigate(state.history.pop());
-    }
+function handleBackClick() {
+    if (state.historyStack.length <= 1) return;
+    state.historyStack.pop(); // מסיר מסך נוכחי
+    const prevScreen = state.historyStack.pop(); // שולף את הקודם
+    navigate(prevScreen);
 }
 
 function selectWeek(w) { state.week = w; navigate('ui-workout-type'); }
@@ -274,7 +267,12 @@ function initPickers() {
 function nextStep() {
     const isUni = unilateralExercises.some(u => state.currentExName.includes(u));
     const finalExName = state.currentExName + (isUni && state.currentExName === "Dumbbell Bicep Curls" ? " (בכל יד)" : (isUni ? " (לצד אחד)" : ""));
-    const currentSetData = { exName: finalExName, w: document.getElementById('weight-picker').value, r: document.getElementById('reps-picker').value, rir: document.getElementById('rir-picker').value };
+    const currentSetData = { 
+        exName: finalExName, 
+        w: parseFloat(document.getElementById('weight-picker').value), 
+        r: parseInt(document.getElementById('reps-picker').value), 
+        rir: document.getElementById('rir-picker').value 
+    };
     state.log.push(currentSetData);
     state.lastLoggedSet = currentSetData;
     if (state.setIdx < state.currentEx.sets.length - 1) { state.setIdx++; initPickers(); } else { navigate('ui-extra'); }
@@ -290,12 +288,30 @@ function checkFlow() { if (state.exIdx < workouts[state.type].length) showConfir
 function finish() {
     state.workoutDurationMins = Math.floor((Date.now() - state.workoutStartTime) / 60000);
     navigate('ui-summary');
+    
     let summaryText = `סיכום אימון ${workoutDisplayNames[state.type]}\nשבוע ${state.week} | משך: ${state.workoutDurationMins} דקות\n\n`;
-    state.log.forEach(l => {
-        if(l.skip) summaryText += `${l.exName}: לא בוצע\n`;
-        else summaryText += `${l.exName}: ${l.w}kg x ${l.r} (RIR ${l.rir})\n`;
+    
+    let groupedLog = {};
+    state.log.forEach(entry => {
+        if (!groupedLog[entry.exName]) groupedLog[entry.exName] = { sets: [], totalVol: 0, skipped: false };
+        if (entry.skip) { groupedLog[entry.exName].skipped = true; }
+        else {
+            groupedLog[entry.exName].sets.push(`${entry.w}kg x ${entry.r} (RIR ${entry.rir})`);
+            groupedLog[entry.exName].totalVol += (entry.w * entry.r);
+        }
     });
-    document.getElementById('summary-area').innerText = summaryText;
+
+    for (let ex in groupedLog) {
+        summaryText += `${ex}:\n`;
+        if (groupedLog[ex].skipped) {
+            summaryText += `לא בוצע\n\n`;
+        } else {
+            summaryText += groupedLog[ex].sets.join('\n') + `\n`;
+            summaryText += `נפח כולל: ${groupedLog[ex].totalVol} ק"ג\n\n`;
+        }
+    }
+    
+    document.getElementById('summary-area').innerText = summaryText.trim();
 }
 
 function copyResult() {
