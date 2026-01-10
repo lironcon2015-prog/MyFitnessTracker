@@ -219,4 +219,138 @@ function showArmSelection() {
         btn.onclick = () => { 
             state.currentEx = JSON.parse(JSON.stringify(ex));
             state.currentExName = ex.name;
-            state.currentEx
+            state.currentEx.sets = [ex.sets[0], ex.sets[0], ex.sets[0]];
+            startRecording();
+        };
+        opts.appendChild(btn);
+    });
+    const skipBtn = document.getElementById('btn-skip-arm-group');
+    skipBtn.innerText = state.armGroup === 'biceps' ? "דלג לטרייספס" : "סיים אימון";
+    skipBtn.onclick = () => {
+        if (state.armGroup === 'biceps') { state.armGroup = 'triceps'; showArmSelection(); }
+        else finish();
+    };
+    navigate('ui-arm-selection');
+}
+
+function startRecording() { 
+    state.setIdx = 0; 
+    stopRestTimer(); 
+    state.seconds = 0;
+    updateTimerDisplay();
+    navigate('ui-main'); 
+    initPickers(); 
+}
+
+function initPickers() {
+    const target = state.currentEx.sets[state.setIdx];
+    document.getElementById('ex-display-name').innerText = state.currentExName;
+    document.getElementById('set-counter').innerText = `Set ${state.setIdx + 1}/${state.currentEx.sets.length}`;
+    
+    const timerArea = document.getElementById('timer-area');
+    if (state.setIdx > 0) {
+        timerArea.style.visibility = 'visible';
+        startRestTimer();
+    } else {
+        timerArea.style.visibility = 'hidden';
+        stopRestTimer();
+    }
+
+    const isUnilateral = unilateralExercises.some(u => state.currentExName.includes(u));
+    document.getElementById('unilateral-note').style.display = isUnilateral ? 'block' : 'none';
+
+    const wPick = document.getElementById('weight-picker'); wPick.innerHTML = "";
+    const step = state.currentEx.step || 2.5;
+    const min = state.currentEx.minW || Math.max(0, target.w - 40);
+    const max = state.currentEx.maxW || target.w + 40;
+    for(let i = min; i <= max; i = parseFloat((i + step).toFixed(2))) {
+        let o = new Option(i + " kg", i); if(i === target.w) o.selected = true; wPick.add(o);
+    }
+    const rPick = document.getElementById('reps-picker'); rPick.innerHTML = "";
+    for(let i = 1; i <= 25; i++) { let o = new Option(i, i); if(i === target.r) o.selected = true; rPick.add(o); }
+    const rirPick = document.getElementById('rir-picker'); rirPick.innerHTML = "";
+    [0, 0.5, 1, 1.5, 2, 2.5, 3, 4, 5].forEach(v => {
+        let o = new Option(v === 0 ? "0 (Fail)" : v, v); if(v === (state.currentEx.rir || 2)) o.selected = true; rirPick.add(o);
+    });
+}
+
+function nextStep() {
+    const isUni = unilateralExercises.some(u => state.currentExName.includes(u));
+    const finalExName = state.currentExName + (isUni && state.currentExName === "Dumbbell Bicep Curls" ? " (בכל יד)" : (isUni ? " (לצד אחד)" : ""));
+    
+    state.log.push({ 
+        exName: finalExName, 
+        w: document.getElementById('weight-picker').value, 
+        r: document.getElementById('reps-picker').value, 
+        rir: document.getElementById('rir-picker').value,
+        isArm: state.isArmPhase
+    });
+
+    if (state.setIdx < state.currentEx.sets.length - 1) { 
+        state.setIdx++; initPickers(); 
+    } else { 
+        navigate('ui-extra'); 
+    }
+}
+
+function handleExtra(extra) {
+    if(extra) { 
+        state.setIdx++; 
+        state.currentEx.sets.push({...state.currentEx.sets[state.setIdx-1]}); 
+        initPickers(); 
+        navigate('ui-main'); 
+    } else { 
+        if (state.isArmPhase) {
+            state.completedArmEx.push(state.currentExName);
+            showArmSelection();
+        } else {
+            state.exIdx++; 
+            checkFlow(); 
+        }
+    }
+}
+
+function checkFlow() { 
+    if (state.exIdx < workouts[state.type].length) showConfirmScreen(); 
+    else navigate('ui-ask-arms'); 
+}
+
+function finish() {
+    const now = Date.now();
+    state.workoutDurationMins = Math.floor((now - state.workoutStartTime) / 60000);
+    
+    navigate('ui-summary');
+    let summaryText = `סיכום אימון ${workoutDisplayNames[state.type]} - שבוע ${state.week}\n---\n`;
+    
+    state.log.forEach(l => {
+        if(l.skip) summaryText += `${l.exName}: לא בוצע היום\n`;
+        else summaryText += `${l.exName}: ${l.w}kg x ${l.r} (RIR ${l.rir})\n`;
+    });
+
+    summaryText += `---\nמשך אימון כולל: ${state.workoutDurationMins} דקות`;
+
+    document.getElementById('summary-area').innerText = summaryText;
+}
+
+function copyResult() {
+    const text = document.getElementById('summary-area').innerText;
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(() => {
+            alert("הסיכום הועתק ללוח!");
+            location.reload();
+        });
+    } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+            document.execCommand('copy');
+            alert("הסיכום הועתק ללוח!");
+        } catch (err) {
+            alert("שגיאה בהעתקה, אנא העתק ידנית");
+        }
+        document.body.removeChild(textArea);
+        location.reload();
+    }
+}
