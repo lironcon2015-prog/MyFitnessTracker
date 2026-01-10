@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="style.css">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Workout">
 </head>
 <body>
     <div class="app-container">
@@ -17,11 +18,11 @@
 
         <div id="ui-week" class="screen active">
             <h1 class="main-title">Workout Tracker</h1>
-            <p style="text-align: center; color: #666; font-size: 0.8em; margin-top: -10px;">Version 5.8</p>
+            <p style="text-align: center; color: #666; font-size: 0.8em; margin-top: -10px;">Version 5.9</p>
             
             <div style="text-align: center; margin-bottom: 20px;">
-                <button onclick="initAudioAndNotifications()" id="audio-init-btn" style="background: #007AFF; color: white; border: none; padding: 15px; border-radius: 12px; font-size: 1em; cursor: pointer; width: 100%; font-weight: bold; box-shadow: 0 4px 10px rgba(0,122,255,0.3);">🔊 הפעל סאונד והתראות רקע</button>
-                <p style="font-size: 0.7em; color: #888; margin-top: 8px;">חובה ללחוץ כדי שהטיימר יצפצף בנעילה</p>
+                <button onclick="initAudioAndNotifications()" id="audio-init-btn" style="background: #007AFF; color: white; border: none; padding: 18px; border-radius: 12px; font-size: 1.1em; cursor: pointer; width: 100%; font-weight: bold; box-shadow: 0 4px 15px rgba(0,122,255,0.4);">🔊 הפעל סאונד והתראות</button>
+                <p style="font-size: 0.75em; color: #d9534f; margin-top: 10px; font-weight: bold;">חובה ללחוץ כאן בכל פעם שמתחילים!</p>
             </div>
 
             <p class="subtitle">בחר שבוע בבלוק:</p>
@@ -70,16 +71,16 @@
             </div>
 
             <div class="log-card">
-                <div class="input-row"><label>משקל (ק"ג):</label><select id="weight-picker" class="modern-select"></select></div>
+                <div class="input-row"><label>משקל:</label><select id="weight-picker" class="modern-select"></select></div>
                 <div class="input-row"><label>חזרות:</label><select id="reps-picker" class="modern-select"></select></div>
                 <div class="input-row"><label>RIR:</label><select id="rir-picker" class="modern-select"></select></div>
             </div>
 
-            <button class="btn-primary" id="btn-submit-set" onclick="nextStep()" style="font-size: 1.2em; margin-top: 10px;">תעד סט</button>
+            <button class="btn-primary" id="btn-submit-set" onclick="nextStep()" style="font-size: 1.2em; padding: 15px;">תעד סט</button>
 
-            <div style="text-align: center; margin-top: 40px; border-top: 1px solid #eee; pt: 20px;">
-                <div style="font-size: 1em; color: #666; margin-bottom: 5px; font-weight: bold;">זמן מנוחה:</div>
-                <div id="rest-timer" style="font-family: 'Courier New', monospace; font-weight: 900; color: #007AFF; font-size: 3em; letter-spacing: 3px; background: #f0f4ff; display: inline-block; padding: 10px 30px; border-radius: 15px;">00:00</div>
+            <div style="text-align: center; margin-top: 35px; border-top: 2px solid #f0f0f0; padding-top: 20px;">
+                <div style="font-size: 1.1em; color: #555; margin-bottom: 8px; font-weight: 600;">זמן מנוחה:</div>
+                <div id="rest-timer" style="font-family: 'Courier New', monospace; font-weight: 900; color: #007AFF; font-size: 2.8em; letter-spacing: 3px; background: #f0f4ff; display: inline-block; padding: 12px 35px; border-radius: 18px; border: 2px solid #d0e0ff;">00:00</div>
             </div>
         </div>
 
@@ -94,7 +95,7 @@
         <div id="ui-summary" class="screen">
             <h2 class="success-msg">האימון הושלם! ✅</h2>
             <div id="summary-area" class="summary-box"></div>
-            <button class="btn-primary" onclick="copyResult()">העתק וחזור לתפריט</button>
+            <button class="btn-primary" onclick="copyResult()">העתק וחזור</button>
         </div>
     </div>
     <script src="script.js"></script>
