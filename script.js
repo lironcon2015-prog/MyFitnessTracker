@@ -4,13 +4,15 @@ let state = {
     timerInterval: null, seconds: 0, startTime: null,
     isArmPhase: false, armGroup: 'biceps', 
     completedArmEx: [],
-    workoutStartTime: null, workoutDurationMins: 0
+    workoutStartTime: null, workoutDurationMins: 0,
+    lastLoggedSet: null // לשמירת היסטוריה תוך כדי אימון
 };
 
 let audioContext;
 let wakeLock = null;
 
 const unilateralExercises = ["Machine Row", "Cable Row", "Dumbbell Peck Fly", "Lateral Raises", "Lateral Raises (DB)", "Single Leg Curl", "Dumbbell Bicep Curls", "Cable Fly"];
+
 const armExercises = {
     biceps: [
         { name: "Dumbbell Bicep Curls", sets: [{w: 12, r: 8}], step: 0.5, minW: 8, maxW: 25, rir: 2 },
@@ -22,53 +24,8 @@ const armExercises = {
         { name: "Lying Triceps Extension (French Press)", sets: [{w: 35, r: 8}], step: 2.5, minW: 25, maxW: 50, rir: 2 }
     ]
 };
+
 const workoutDisplayNames = { 'A': 'חזה וכתפיים', 'B': 'רגליים וגב', 'C': 'כתפיים, חזה וגב' };
-
-function playBeep(times = 1) {
-    if (!audioContext) { const AudioCtx = window.AudioContext || window.webkitAudioContext; audioContext = new AudioCtx(); }
-    if (audioContext.state === 'suspended') audioContext.resume();
-    for (let i = 0; i < times; i++) {
-        setTimeout(() => {
-            const o = audioContext.createOscillator();
-            const g = audioContext.createGain();
-            o.type = 'sine'; o.frequency.setValueAtTime(880, audioContext.currentTime);
-            g.gain.setValueAtTime(0.3, audioContext.currentTime);
-            g.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
-            o.connect(g); g.connect(audioContext.destination);
-            o.start(); o.stop(audioContext.currentTime + 0.4);
-        }, i * 500);
-    }
-}
-
-async function initAudio() {
-    playBeep(1);
-    document.getElementById('audio-init-btn').innerText = "⚡ מצב אימון פעיל";
-    document.getElementById('audio-init-btn').style.backgroundColor = "#32d74b";
-    try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
-}
-
-function startRestTimer() {
-    stopRestTimer();
-    state.seconds = 0;
-    updateTimerDisplay();
-    const isFirstEx = (state.exIdx === 0 && !state.isArmPhase);
-    const target = isFirstEx ? 120 : 90;
-    document.getElementById('rest-target-display').innerText = isFirstEx ? "2:00" : "1:30";
-    state.startTime = Date.now();
-    state.timerInterval = setInterval(() => {
-        state.seconds = Math.floor((Date.now() - state.startTime) / 1000);
-        updateTimerDisplay();
-        if (state.seconds === target) playBeep(2);
-    }, 1000);
-}
-
-function updateTimerDisplay() {
-    const m = Math.floor(state.seconds / 60).toString().padStart(2, '0');
-    const s = (state.seconds % 60).toString().padStart(2, '0');
-    document.getElementById('rest-timer').innerText = `${m}:${s}`;
-}
-
-function stopRestTimer() { if (state.timerInterval) clearInterval(state.timerInterval); state.timerInterval = null; }
 
 const workouts = {
     'A': [
@@ -115,6 +72,58 @@ const workouts = {
         { name: "Incline Bench Press", sets: [{w: 65, r: 9}, {w: 65, r: 9}, {w: 65, r: 9}], step: 2.5 }
     ]
 };
+
+function playBeep(times = 1) {
+    if (!audioContext) { const AudioCtx = window.AudioContext || window.webkitAudioContext; audioContext = new AudioCtx(); }
+    if (audioContext.state === 'suspended') audioContext.resume();
+    for (let i = 0; i < times; i++) {
+        setTimeout(() => {
+            const o = audioContext.createOscillator();
+            const g = audioContext.createGain();
+            o.type = 'sine'; o.frequency.setValueAtTime(880, audioContext.currentTime);
+            g.gain.setValueAtTime(0.3, audioContext.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+            o.connect(g); g.connect(audioContext.destination);
+            o.start(); o.stop(audioContext.currentTime + 0.4);
+        }, i * 500);
+    }
+}
+
+async function initAudio() {
+    playBeep(1);
+    document.getElementById('audio-init-btn').innerText = "⚡ מצב אימון פעיל";
+    document.getElementById('audio-init-btn').style.backgroundColor = "#32d74b";
+    try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
+}
+
+function startRestTimer() {
+    stopRestTimer();
+    state.seconds = 0;
+    const isFirstEx = (state.exIdx === 0 && !state.isArmPhase);
+    const target = isFirstEx ? 120 : 90;
+    document.getElementById('rest-target-display').innerText = isFirstEx ? "2:00" : "1:30";
+    state.startTime = Date.now();
+    
+    state.timerInterval = setInterval(() => {
+        state.seconds = Math.floor((Date.now() - state.startTime) / 1000);
+        updateTimerUI(target);
+        if (state.seconds === target) playBeep(2);
+    }, 1000);
+}
+
+function updateTimerUI(target) {
+    const m = Math.floor(state.seconds / 60).toString().padStart(2, '0');
+    const s = (state.seconds % 60).toString().padStart(2, '0');
+    document.getElementById('rest-timer').innerText = `${m}:${s}`;
+    const progress = Math.min((state.seconds / target) * 100, 100);
+    document.getElementById('timer-bar').style.width = progress + "%";
+}
+
+function stopRestTimer() { 
+    if (state.timerInterval) clearInterval(state.timerInterval); 
+    state.timerInterval = null; 
+    document.getElementById('timer-bar').style.width = "0%";
+}
 
 function navigate(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -213,13 +222,22 @@ function showArmSelection() {
     navigate('ui-arm-selection');
 }
 
-function startRecording() { state.setIdx = 0; stopRestTimer(); state.seconds = 0; updateTimerDisplay(); navigate('ui-main'); initPickers(); }
+function startRecording() { state.setIdx = 0; state.lastLoggedSet = null; stopRestTimer(); navigate('ui-main'); initPickers(); }
 
 function initPickers() {
     const target = state.currentEx.sets[state.setIdx];
     document.getElementById('ex-display-name').innerText = state.currentExName;
     document.getElementById('set-counter').innerText = `SET ${state.setIdx + 1}/${state.currentEx.sets.length}`;
     
+    // הצגת היסטוריה של הסט הקודם
+    const histDiv = document.getElementById('last-set-info');
+    if (state.lastLoggedSet) {
+        histDiv.innerText = `⏮ סט קודם: ${state.lastLoggedSet.w}kg x ${state.lastLoggedSet.r} (RIR ${state.lastLoggedSet.rir})`;
+        histDiv.style.display = 'block';
+    } else {
+        histDiv.style.display = 'none';
+    }
+
     const timerArea = document.getElementById('timer-area');
     if (state.setIdx > 0) { timerArea.style.visibility = 'visible'; startRestTimer(); } 
     else { timerArea.style.visibility = 'hidden'; stopRestTimer(); }
@@ -243,13 +261,37 @@ function initPickers() {
 function nextStep() {
     const isUni = unilateralExercises.some(u => state.currentExName.includes(u));
     const finalExName = state.currentExName + (isUni && state.currentExName === "Dumbbell Bicep Curls" ? " (בכל יד)" : (isUni ? " (לצד אחד)" : ""));
-    state.log.push({ exName: finalExName, w: document.getElementById('weight-picker').value, r: document.getElementById('reps-picker').value, rir: document.getElementById('rir-picker').value, isArm: state.isArmPhase });
-    if (state.setIdx < state.currentEx.sets.length - 1) { state.setIdx++; initPickers(); } else { navigate('ui-extra'); }
+    
+    const currentSetData = { 
+        exName: finalExName, 
+        w: document.getElementById('weight-picker').value, 
+        r: document.getElementById('reps-picker').value, 
+        rir: document.getElementById('rir-picker').value, 
+        isArm: state.isArmPhase 
+    };
+    
+    state.log.push(currentSetData);
+    state.lastLoggedSet = currentSetData; // שמירה להיסטוריה בתוך התרגיל
+
+    if (state.setIdx < state.currentEx.sets.length - 1) { 
+        state.setIdx++; 
+        initPickers(); 
+    } else { 
+        navigate('ui-extra'); 
+    }
 }
 
 function handleExtra(extra) {
-    if(extra) { state.setIdx++; state.currentEx.sets.push({...state.currentEx.sets[state.setIdx-1]}); initPickers(); navigate('ui-main'); } 
-    else { if (state.isArmPhase) { state.completedArmEx.push(state.currentExName); showArmSelection(); } else { state.exIdx++; checkFlow(); } }
+    if(extra) { 
+        state.setIdx++; 
+        state.currentEx.sets.push({...state.currentEx.sets[state.setIdx-1]}); 
+        initPickers(); 
+        navigate('ui-main'); 
+    } 
+    else { 
+        if (state.isArmPhase) { state.completedArmEx.push(state.currentExName); showArmSelection(); } 
+        else { state.exIdx++; checkFlow(); } 
+    }
 }
 
 function checkFlow() { if (state.exIdx < workouts[state.type].length) showConfirmScreen(); else navigate('ui-ask-arms'); }
@@ -257,12 +299,11 @@ function checkFlow() { if (state.exIdx < workouts[state.type].length) showConfir
 function finish() {
     state.workoutDurationMins = Math.floor((Date.now() - state.workoutStartTime) / 60000);
     navigate('ui-summary');
-    let summaryText = `סיכום אימון ${workoutDisplayNames[state.type]} - שבוע ${state.week}\n---\n`;
+    let summaryText = `🏋️ סיכום אימון ${workoutDisplayNames[state.type]}\n📅 שבוע ${state.week} | ⏱ ${state.workoutDurationMins} דקות\n\n`;
     state.log.forEach(l => {
-        if(l.skip) summaryText += `${l.exName}: לא בוצע היום\n`;
-        else summaryText += `${l.exName}: ${l.w}kg x ${l.r} (RIR ${l.rir})\n`;
+        if(l.skip) summaryText += `❌ ${l.exName}: לא בוצע\n`;
+        else summaryText += `✅ ${l.exName}: ${l.w}kg x ${l.r} (RIR ${l.rir})\n`;
     });
-    summaryText += `---\nמשך אימון כולל: ${state.workoutDurationMins} דקות`;
     document.getElementById('summary-area').innerText = summaryText;
 }
 
