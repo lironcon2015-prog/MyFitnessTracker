@@ -42,8 +42,8 @@ function playBeep(times = 1) {
 
 async function initAudio() {
     playBeep(1);
-    document.getElementById('audio-init-btn').innerText = "⚡ מצב אימון פעיל";
-    document.getElementById('audio-init-btn').style.background = "#32D74B";
+    document.getElementById('audio-init-btn').innerText = "⚡ Ready to Train";
+    document.getElementById('audio-init-btn').style.background = "linear-gradient(135deg, #32D74B, #248f32)";
     try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
 }
 
@@ -135,7 +135,7 @@ function selectWorkout(t) {
     state.workoutStartTime = Date.now();
     const ex = workouts[t][0];
     if (ex.isCalc) {
-        document.getElementById('rm-title').innerText = `1RM ב-${ex.name.split(' ')[0]}?`;
+        document.getElementById('rm-title').innerText = `${ex.name.split(' ')[0]} 1RM`;
         const p = document.getElementById('rm-picker'); p.innerHTML = "";
         for(let i = ex.rmRange[0]; i <= ex.rmRange[1]; i += 2.5) {
             let o = new Option(i + " kg", i); if(i === ex.baseRM) o.selected = true; p.add(o);
@@ -178,9 +178,9 @@ function confirmExercise(doEx) {
 }
 
 function showGripSelection() {
-    document.getElementById('variation-title').innerText = "בחר סוג אחיזה:";
+    document.getElementById('variation-title').innerText = "Grip Type:";
     const opts = document.getElementById('variation-options'); opts.innerHTML = "";
-    ['אחיזה צרה', 'אחיזה רחבה'].forEach(g => {
+    ['Narrow Grip', 'Wide Grip'].forEach(g => {
         const btn = document.createElement('button'); btn.className = "menu-item"; btn.innerText = g;
         btn.onclick = () => { state.currentExName += ` (${g})`; startRecording(); };
         opts.appendChild(btn);
@@ -197,7 +197,7 @@ function showArmSelection() {
         if (state.armGroup === 'biceps') { state.armGroup = 'triceps'; showArmSelection(); }
         else finish(); return;
     }
-    document.getElementById('arm-selection-title').innerText = state.armGroup === 'biceps' ? "בחר בייספס" : "בחר טרייספס";
+    document.getElementById('arm-selection-title').innerText = state.armGroup === 'biceps' ? "Biceps" : "Triceps";
     const opts = document.getElementById('arm-options'); opts.innerHTML = "";
     remaining.forEach(ex => {
         const btn = document.createElement('button'); btn.className = "menu-item"; btn.innerText = ex.name;
@@ -208,7 +208,8 @@ function showArmSelection() {
         opts.appendChild(btn);
     });
     const skipBtn = document.getElementById('btn-skip-arm-group');
-    skipBtn.innerText = state.armGroup === 'biceps' ? "דלג לטרייספס" : "סיים אימון";
+    skipBtn.className = "btn-secondary";
+    skipBtn.innerText = state.armGroup === 'biceps' ? "Skip to Triceps" : "Finish Workout";
     skipBtn.onclick = () => { if (state.armGroup === 'biceps') { state.armGroup = 'triceps'; showArmSelection(); } else finish(); };
     navigate('ui-arm-selection');
 }
@@ -218,7 +219,7 @@ function startRecording() { state.setIdx = 0; stopRestTimer(); state.seconds = 0
 function initPickers() {
     const target = state.currentEx.sets[state.setIdx];
     document.getElementById('ex-display-name').innerText = state.currentExName;
-    document.getElementById('set-counter').innerText = `Set ${state.setIdx + 1}/${state.currentEx.sets.length}`;
+    document.getElementById('set-counter').innerText = `SET ${state.setIdx + 1} / ${state.currentEx.sets.length}`;
     
     const timerArea = document.getElementById('timer-area');
     if (state.setIdx > 0) { timerArea.style.visibility = 'visible'; startRestTimer(); } 
@@ -242,7 +243,7 @@ function initPickers() {
 
 function nextStep() {
     const isUni = unilateralExercises.some(u => state.currentExName.includes(u));
-    const finalExName = state.currentExName + (isUni && state.currentExName === "Dumbbell Bicep Curls" ? " (בכל יד)" : (isUni ? " (לצד אחד)" : ""));
+    const finalExName = state.currentExName + (isUni && state.currentExName === "Dumbbell Bicep Curls" ? " (Per Arm)" : (isUni ? " (Single Side)" : ""));
     state.log.push({ exName: finalExName, w: document.getElementById('weight-picker').value, r: document.getElementById('reps-picker').value, rir: document.getElementById('rir-picker').value, isArm: state.isArmPhase });
     if (state.setIdx < state.currentEx.sets.length - 1) { state.setIdx++; initPickers(); } else { navigate('ui-extra'); }
 }
