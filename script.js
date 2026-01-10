@@ -1,8 +1,36 @@
 let state = {
     week: 1, type: '', rm: 100, exIdx: 0, setIdx: 0, 
     log: [], currentEx: null, history: ['ui-week'],
-    timerInterval: null, seconds: 0
+    timerInterval: null, seconds: 0, startTime: null
 };
+
+let audioContext;
+let wakeLock = null;
+
+// פונקציה להפעלת סאונד ומניעת נעילת מסך
+async function initAudio() {
+    try {
+        // הפעלת סאונד
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        audioContext = new AudioCtx();
+        const osc = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        gain.gain.value = 0.001;
+        osc.connect(gain);
+        gain.connect(audioContext.destination);
+        osc.start(); osc.stop(0.1);
+        
+        // ניסיון למנוע נעילת מסך (Wake Lock)
+        if ('wakeLock' in navigator) {
+            try {
+                wakeLock = await navigator.wakeLock.request('screen');
+            } catch (err) { console.log("WakeLock error"); }
+        }
+
+        document.getElementById('audio-init-btn').innerText = "✅ צלילים פעילים + מסך דולק";
+        document.getElementById('audio-init-btn').style.background = "#e6ffed";
+    } catch(e) { alert("יש ללחוץ שוב לאישור"); }
+}
 
 const workouts = {
     'A': [
@@ -28,12 +56,12 @@ const workouts = {
             { name: "Pull Ups", isBW: true, sets: [{w: 0, r: 8}, {w: 0, r: 8}, {w: 0, r: 8}] }
         ]},
         { name: "Seated Row", hasVariations: true, variations: [
-            { name: "Cable Row", sets: [{w: 65, r: 10}, {w: 65, r: 10}, {w: 12}, {w: 65, r: 12}], step: 2.5 },
-            { name: "Machine Row", sets: [{w: 50, r: 10}, {w: 50, r: 10}, {w: 12}, {w: 50, r: 12}], step: 5 }
+            { name: "Cable Row", sets: [{w: 65, r: 10}, {w: 65, r: 10}, {w: 65, r: 12}], step: 2.5 },
+            { name: "Machine Row", sets: [{w: 50, r: 10}, {w: 50, r: 10}, {w: 50, r: 12}], step: 5 }
         ]},
         { name: "Calf Raise", hasVariations: true, variations: [
-            { name: "Seated Calf Raise", sets: [{w: 70, r: 10}, {w: 70, r: 10}, {w: 12}, {w: 70, r: 12}], step: 5 },
-            { name: "Standing Calf Raise", sets: [{w: 110, r: 10}, {w: 110, r: 10}, {w: 12}, {w: 110, r: 12}], step: 10 }
+            { name: "Seated Calf Raise", sets: [{w: 70, r: 10}, {w: 70, r: 10}, {w: 70, r: 12}], step: 5 },
+            { name: "Standing Calf Raise", sets: [{w: 110, r: 10}, {w: 110, r: 10}, {w: 110, r: 12}], step: 10 }
         ]},
         { name: "Straight Arm Pulldown", sets: [{w: 30, r: 10}, {w: 30, r: 12}, {w: 30, r: 12}], step: 2.5 },
         { name: "Bicep Curls", sets: [{w: 16, r: 8}, {w: 16, r: 8}, {w: 16, r: 6}], step: 2 }
@@ -52,21 +80,18 @@ const workouts = {
 };
 
 function playBeep(times = 1) {
-    try {
-        const AudioCtx = window.AudioContext || window.webkitAudioContext;
-        const ctx = new AudioCtx();
-        for (let i = 0; i < times; i++) {
-            setTimeout(() => {
-                const o = ctx.createOscillator();
-                const g = ctx.createGain();
-                o.type = 'sine'; o.frequency.value = 880;
-                g.gain.setValueAtTime(0.1, ctx.currentTime);
-                g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
-                o.connect(g); g.connect(ctx.destination);
-                o.start(); o.stop(ctx.currentTime + 0.2);
-            }, i * 300);
-        }
-    } catch(e) {}
+    if (!audioContext) return;
+    for (let i = 0; i < times; i++) {
+        setTimeout(() => {
+            const o = audioContext.createOscillator();
+            const g = audioContext.createGain();
+            o.type = 'sine'; o.frequency.value = 880;
+            g.gain.setValueAtTime(0.3, audioContext.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+            o.connect(g); g.connect(audioContext.destination);
+            o.start(); o.stop(audioContext.currentTime + 0.2);
+        }, i * 300);
+    }
 }
 
 function updateTimerDisplay() {
@@ -76,21 +101,31 @@ function updateTimerDisplay() {
     if (el) el.innerText = `${m}:${s}`;
 }
 
+// ניהול טיימר חכם שבודק את השעה האמיתית
 function startRestTimer() {
     stopRestTimer();
+    state.startTime = Date.now(); // שמירת רגע ההתחלה
     state.seconds = 0;
     updateTimerDisplay();
+    
+    let lastBeeped = 0;
+
     state.timerInterval = setInterval(() => {
-        state.seconds++;
+        // חישוב מחדש של השניות לפי השעה האמיתית (למקרה שהמסך ננעל)
+        const now = Date.now();
+        state.seconds = Math.floor((now - state.startTime) / 1000);
         updateTimerDisplay();
-        if (state.seconds === 90) playBeep(1);
-        if (state.seconds === 120) playBeep(2);
+        
+        // בדיקת צפצופים
+        if (state.seconds >= 90 && lastBeeped < 90) { playBeep(1); lastBeeped = 90; }
+        if (state.seconds >= 120 && lastBeeped < 120) { playBeep(2); lastBeeped = 120; }
     }, 1000);
 }
 
 function stopRestTimer() {
     if (state.timerInterval) clearInterval(state.timerInterval);
     state.timerInterval = null;
+    state.startTime = null;
 }
 
 function navigate(id) {
@@ -162,9 +197,7 @@ function initPickers() {
     const target = state.currentEx.sets[state.setIdx];
     document.getElementById('ex-display-name').innerText = state.currentExName;
     document.getElementById('set-counter').innerText = `Set ${state.setIdx + 1}/${state.currentEx.sets.length}`;
-    
     if (state.setIdx > 0) { startRestTimer(); } else { stopRestTimer(); state.seconds = 0; updateTimerDisplay(); }
-
     const wPick = document.getElementById('weight-picker'); wPick.innerHTML = "";
     if (state.currentEx.isBW) { wPick.add(new Option("BW", 0)); } 
     else {
