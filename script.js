@@ -5,47 +5,46 @@ let state = {
 };
 
 let audioContext;
-let swRegistration = null;
+let wakeLock = null;
 
-// רישום ותחזוקת ה-Service Worker
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js').then(reg => {
-            swRegistration = reg;
-            console.log('SW Active');
-        });
-    });
-}
-
+// פונקציית צליל משופרת
 function playBeep(times = 1) {
     if (!audioContext) {
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         audioContext = new AudioCtx();
     }
     if (audioContext.state === 'suspended') audioContext.resume();
+    
     for (let i = 0; i < times; i++) {
         setTimeout(() => {
             const o = audioContext.createOscillator();
             const g = audioContext.createGain();
-            o.type = 'sine'; o.frequency.setValueAtTime(880, audioContext.currentTime);
-            g.gain.setValueAtTime(0.5, audioContext.currentTime);
+            o.type = 'sine';
+            o.frequency.setValueAtTime(880, audioContext.currentTime);
+            g.gain.setValueAtTime(0.6, audioContext.currentTime);
             g.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
-            o.connect(g); g.connect(audioContext.destination);
-            o.start(); o.stop(audioContext.currentTime + 0.4);
-        }, i * 450);
+            o.connect(g);
+            g.connect(audioContext.destination);
+            o.start();
+            o.stop(audioContext.currentTime + 0.4);
+        }, i * 500);
     }
 }
 
-async function initAudioAndNotifications() {
+// הפעלה ראשונית ומניעת כיבוי מסך
+async function initAudio() {
     playBeep(1);
-    if ("Notification" in window) {
-        const permission = await Notification.requestPermission();
-        if (permission === "granted" && swRegistration) {
-            swRegistration.showNotification("Workout Tracker", { body: "התראות רקע מוכנות ✅" });
-        }
-    }
-    document.getElementById('audio-init-btn').innerText = "✅ סאונד והתראות פעילים";
+    document.getElementById('audio-init-btn').innerText = "✅ סאונד פעיל";
     document.getElementById('audio-init-btn').style.background = "#28a745";
+    
+    try {
+        if ('wakeLock' in navigator) {
+            wakeLock = await navigator.wakeLock.request('screen');
+            console.log("Wake Lock Active");
+        }
+    } catch (err) {
+        console.log("Wake Lock error: ", err);
+    }
 }
 
 function startRestTimer() {
@@ -54,29 +53,16 @@ function startRestTimer() {
     state.seconds = 0;
     updateTimerDisplay();
 
-    // שלח הוראת תזמון ל-Service Worker מיד עם תחילת המנוחה
-    if (Notification.permission === "granted" && navigator.serviceWorker.controller) {
-        // התראה ראשונה
-        navigator.serviceWorker.controller.postMessage({
-            type: 'SCHEDULE_NOTIF',
-            title: "זמן מנוחה",
-            message: "עברו 90 שניות! הסט הבא מחכה.",
-            delay: 90000
-        });
-        // התראה שנייה
-        navigator.serviceWorker.controller.postMessage({
-            type: 'SCHEDULE_NOTIF',
-            title: "זמן מנוחה",
-            message: "עברו 2 דקות! חזרה לעבודה!",
-            delay: 120000
-        });
-    }
-
     state.timerInterval = setInterval(() => {
         state.seconds = Math.floor((Date.now() - state.startTime) / 1000);
         updateTimerDisplay();
-        if (state.seconds === 90) playBeep(2);
-        if (state.seconds === 120) playBeep(3);
+        
+        if (state.seconds === 90) {
+            playBeep(2); 
+        }
+        if (state.seconds === 120) {
+            playBeep(3); 
+        }
     }, 1000);
 }
 
@@ -92,7 +78,6 @@ function stopRestTimer() {
     state.timerInterval = null; 
 }
 
-// נתוני האימונים עם השמות המלאים
 const workoutDisplayNames = { 'A': 'חזה וכתפיים', 'B': 'רגליים וגב', 'C': 'כתפיים, חזה וגב' };
 
 const workouts = {
@@ -142,7 +127,6 @@ const workouts = {
     ]
 };
 
-// ניווט
 function navigate(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById(id).classList.add('active');
@@ -176,6 +160,7 @@ function selectWorkout(t) {
 }
 
 function save1RM() { state.rm = parseFloat(document.getElementById('rm-picker').value); showConfirmScreen(); }
+
 function showConfirmScreen() {
     const ex = workouts[state.type][state.exIdx];
     document.getElementById('confirm-ex-name').innerText = ex.name;
