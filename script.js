@@ -26,6 +26,8 @@ const armExercises = {
     ]
 };
 
+const workoutDisplayNames = { 'A': 'חזה וכתפיים', 'B': 'רגליים וגב', 'C': 'כתפיים, חזה וגב' };
+
 function playBeep(times = 1) {
     if (!audioContext) {
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -56,12 +58,10 @@ async function initAudio() {
 function startRestTimer() {
     stopRestTimer();
     state.seconds = 0;
-    updateTimerDisplay(); // איפוס תצוגה מיידי ל-00:00
-    
+    updateTimerDisplay();
     const isFirstExerciseInWorkout = (state.exIdx === 0 && !state.isArmPhase);
     const target = isFirstExerciseInWorkout ? 120 : 90;
     document.getElementById('rest-target-display').innerText = isFirstExerciseInWorkout ? "2:00" : "1:30";
-    
     state.startTime = Date.now();
     state.timerInterval = setInterval(() => {
         state.seconds = Math.floor((Date.now() - state.startTime) / 1000);
@@ -76,10 +76,7 @@ function updateTimerDisplay() {
     document.getElementById('rest-timer').innerText = `${m}:${s}`;
 }
 
-function stopRestTimer() { 
-    if (state.timerInterval) clearInterval(state.timerInterval); 
-    state.timerInterval = null; 
-}
+function stopRestTimer() { if (state.timerInterval) clearInterval(state.timerInterval); state.timerInterval = null; }
 
 const workouts = {
     'A': [
@@ -144,7 +141,7 @@ function handleGlobalBack() {
 
 function selectWeek(w) { state.week = w; navigate('ui-workout-type'); }
 function selectWorkout(t) {
-    state.type = t; state.exIdx = 0; state.log = []; state.completedArmEx = [];
+    state.type = t; state.exIdx = 0; state.log = []; state.completedArmEx = []; state.isArmPhase = false;
     const ex = workouts[t][0];
     if (ex.isCalc) {
         document.getElementById('rm-title').innerText = `1RM ב-${ex.name.split(' ')[0]}?`;
@@ -246,7 +243,6 @@ function initPickers() {
     document.getElementById('ex-display-name').innerText = state.currentExName;
     document.getElementById('set-counter').innerText = `Set ${state.setIdx + 1}/${state.currentEx.sets.length}`;
     
-    // ניהול תצוגת טיימר: רק מהסט השני ואילך
     const timerArea = document.getElementById('timer-area');
     if (state.setIdx > 0) {
         timerArea.style.visibility = 'visible';
@@ -277,9 +273,20 @@ function initPickers() {
 function nextStep() {
     const isUni = unilateralExercises.some(u => state.currentExName.includes(u));
     const finalExName = state.currentExName + (isUni && state.currentExName === "Dumbbell Bicep Curls" ? " (בכל יד)" : (isUni ? " (לצד אחד)" : ""));
-    state.log.push({ exName: finalExName, w: document.getElementById('weight-picker').value, r: document.getElementById('reps-picker').value, rir: document.getElementById('rir-picker').value });
-    if (state.setIdx < state.currentEx.sets.length - 1) { state.setIdx++; initPickers(); } 
-    else { navigate('ui-extra'); }
+    
+    state.log.push({ 
+        exName: finalExName, 
+        w: document.getElementById('weight-picker').value, 
+        r: document.getElementById('reps-picker').value, 
+        rir: document.getElementById('rir-picker').value,
+        isArm: state.isArmPhase
+    });
+
+    if (state.setIdx < state.currentEx.sets.length - 1) { 
+        state.setIdx++; initPickers(); 
+    } else { 
+        navigate('ui-extra'); 
+    }
 }
 
 function handleExtra(extra) {
@@ -299,13 +306,46 @@ function handleExtra(extra) {
     }
 }
 
-function checkFlow() { if (state.exIdx < workouts[state.type].length) showConfirmScreen(); else navigate('ui-ask-arms'); }
+function checkFlow() { 
+    if (state.exIdx < workouts[state.type].length) showConfirmScreen(); 
+    else navigate('ui-ask-arms'); 
+}
 
 function finish() {
     navigate('ui-summary');
-    let t = `סיכום אימון ${workoutDisplayNames[state.type]} - שבוע ${state.week}\n---\n`;
-    state.log.forEach(l => { if(l.skip) t += `${l.exName}: דלג\n`; else t += `${l.exName}: ${l.w}kg x ${l.r} (RIR ${l.rir})\n`; });
-    document.getElementById('summary-area').innerText = t;
+    let summaryText = `סיכום אימון ${workoutDisplayNames[state.type]} - שבוע ${state.week}\n---\n`;
+    
+    // קבוצה ראשונה: תרגילי הבסיס
+    state.log.forEach(l => {
+        if(l.skip) summaryText += `${l.exName}: דלג\n`;
+        else summaryText += `${l.exName}: ${l.w}kg x ${l.r} (RIR ${l.rir})\n`;
+    });
+
+    document.getElementById('summary-area').innerText = summaryText;
 }
 
-function copyResult() { navigator.clipboard.writeText(document.getElementById('summary-area').innerText).then(() => { alert("הועתק!"); location.reload(); }); }
+function copyResult() {
+    const text = document.getElementById('summary-area').innerText;
+    
+    // ניסיון העתקה משופר למובייל
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(() => {
+            alert("הסיכום הועתק ללוח!");
+            location.reload();
+        });
+    } else {
+        // שיטת גיבוי למכשירים ישנים
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+            document.execCommand('copy');
+            alert("הסיכום הועתק ללוח!");
+        } catch (err) {
+            alert("שגיאה בהעתקה, אנא העתק ידנית מהמסך");
+        }
+        document.body.removeChild(textArea);
+        location.reload();
+    }
+}
