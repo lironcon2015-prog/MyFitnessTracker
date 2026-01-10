@@ -4,20 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Workout Tracker Pro</title>
-    <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="icon.png">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#007AFF">
     <link rel="stylesheet" href="style.css">
+    <meta name="apple-mobile-web-app-capable" content="yes">
 </head>
 <body>
     <div class="app-container">
-        <button id="global-back" class="back-btn" onclick="handleGlobalBack()">↩ חזור</button>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <button id="global-back" class="back-btn" onclick="handleGlobalBack()">↩ חזור</button>
+            <button onclick="location.reload(true)" style="background: none; border: none; font-size: 0.7em; color: #ccc;">רענן אפליקציה ↻</button>
+        </div>
 
         <div id="ui-week" class="screen active">
             <h1 class="main-title">Workout Tracker</h1>
-            <p style="text-align: center; color: #666; font-size: 0.8em; margin-top: -10px;">Version 5.3</p>
+            <p style="text-align: center; color: #666; font-size: 0.8em; margin-top: -10px;">Version 5.4</p>
             <p class="subtitle">בחר שבוע בבלוק:</p>
             <div class="grid-menu">
                 <button class="menu-item" onclick="selectWeek(1)">שבוע 1</button>
@@ -62,7 +61,7 @@
                 <h2 id="ex-display-name" class="english-title">...</h2>
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
                     <span id="set-counter" class="set-badge">Set 1/5</span>
-                    <span id="rest-timer" style="font-family: monospace; font-weight: bold; color: #007AFF; font-size: 1.4em; background: #eef2ff; padding: 4px 10px; border-radius: 8px; min-width: 60px; text-align: center;">00:00</span>
+                    <span id="rest-timer" style="font-family: monospace; font-weight: bold; color: #007AFF; font-size: 1.4em; background: #eef2ff; padding: 4px 10px; border-radius: 8px; min-width: 70px; text-align: center; display: inline-block;">00:00</span>
                 </div>
             </div>
             
