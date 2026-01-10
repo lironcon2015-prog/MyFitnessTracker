@@ -141,16 +141,33 @@ function handleBackClick() {
 
     if (currentScreen === 'ui-main') {
         if (state.setIdx > 0) {
-            // אם אנחנו בתוך תרגיל, "חזור" מבטל את הסט האחרון שנרשם בלוג
             state.log.pop();
+            // אם היינו בסט בונוס, נסיר אותו מהמערך המקורי
+            if (state.currentEx.isBonusActive && state.setIdx === state.currentEx.sets.length - 1) {
+                state.currentEx.sets.pop();
+                state.currentEx.isBonusActive = false;
+                state.setIdx--;
+                state.historyStack.pop(); 
+                navigate('ui-extra');
+                return;
+            }
             state.setIdx--;
-            // עדכון ה-lastLoggedSet לסט שקדם לסט שמחקנו כרגע
-            const currentExName = state.currentExName;
-            const previousLogs = state.log.filter(l => l.exName && l.exName.includes(currentExName));
+            const previousLogs = state.log.filter(l => l.exName && l.exName.includes(state.currentExName));
             state.lastLoggedSet = previousLogs.length > 0 ? previousLogs[previousLogs.length-1] : null;
             initPickers();
             return;
         }
+    }
+
+    if (currentScreen === 'ui-extra') {
+        state.log.pop();
+        state.setIdx--;
+        const previousLogs = state.log.filter(l => l.exName && l.exName.includes(state.currentExName));
+        state.lastLoggedSet = previousLogs.length > 0 ? previousLogs[previousLogs.length-1] : null;
+        state.historyStack.pop(); 
+        navigate('ui-main');
+        initPickers();
+        return;
     }
     
     if (state.historyStack.length <= 1) return;
@@ -186,24 +203,22 @@ function showConfirmScreen() {
 function confirmExercise(doEx) {
     if (!doEx) { state.log.push({ skip: true, exName: workouts[state.type][state.exIdx].name }); state.exIdx++; checkFlow(); return; }
     state.currentEx = JSON.parse(JSON.stringify(workouts[state.type][state.exIdx]));
-    
+    state.currentEx.isBonusActive = false;
+
     if (state.currentEx.isCalc) {
-        // חישוב אחוזי משקל
         const p = { 
             1: [0.65, 0.75, 0.85, 0.75, 0.65], 
             2: [0.70, 0.80, 0.90, 0.80, 0.70, 0.70], 
             3: [0.75, 0.85, 0.95, 0.85, 0.75, 0.75] 
         };
         
-        // הגדרת חזרות חדשה לפי שבועות
         let reps;
         if (state.currentEx.name === "Leg Press") {
-             reps = [8, 8, 7]; // שמירה על המקורי של לג פרס
+             reps = [8, 8, 7];
         } else {
-             // Bench Press & OHP
              if (state.week === 1) reps = [5, 5, 5, 8, 10];
              else if (state.week === 2) reps = [3, 3, 3, 8, 10, 10];
-             else reps = [5, 3, 1, 8, 10, 10]; // שבוע 3
+             else reps = [5, 3, 1, 8, 10, 10]; 
         }
 
         state.currentEx.sets = p[state.week].map((pct, i) => ({ 
@@ -288,12 +303,12 @@ function initPickers() {
 
     const wPick = document.getElementById('weight-picker'); wPick.innerHTML = "";
     const step = state.currentEx.step || 2.5;
-    const currentW = target ? target.w : 0;
+    const currentW = target ? target.w : (state.lastLoggedSet ? state.lastLoggedSet.w : 0);
     for(let i = (state.currentEx.minW || Math.max(0, currentW - 40)); i <= (state.currentEx.maxW || currentW + 40); i = parseFloat((i + step).toFixed(2))) {
         let o = new Option(i + " kg", i); if(i === currentW) o.selected = true; wPick.add(o);
     }
     const rPick = document.getElementById('reps-picker'); rPick.innerHTML = "";
-    const currentR = target ? target.r : 8;
+    const currentR = target ? target.r : (state.lastLoggedSet ? state.lastLoggedSet.r : 8);
     for(let i = 1; i <= 25; i++) { let o = new Option(i, i); if(i === currentR) o.selected = true; rPick.add(o); }
     const rirPick = document.getElementById('rir-picker'); rirPick.innerHTML = "";
     [0, 0.5, 1, 1.5, 2, 2.5, 3, 4, 5].forEach(v => {
@@ -316,7 +331,13 @@ function nextStep() {
 }
 
 function handleExtra(extra) {
-    if(extra) { state.setIdx++; state.currentEx.sets.push({...state.currentEx.sets[state.setIdx-1]}); initPickers(); navigate('ui-main'); } 
+    if(extra) { 
+        state.setIdx++; 
+        state.currentEx.sets.push({...state.currentEx.sets[state.setIdx-1]}); 
+        state.currentEx.isBonusActive = true;
+        initPickers(); 
+        navigate('ui-main'); 
+    } 
     else { if (state.isArmPhase) { state.completedArmEx.push(state.currentExName); showArmSelection(); } else { state.exIdx++; checkFlow(); } }
 }
 
