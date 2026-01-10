@@ -7,12 +7,12 @@ let state = {
 let audioContext;
 let swRegistration = null;
 
-// רישום ה-Service Worker
+// רישום ותחזוקת ה-Service Worker
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('sw.js').then(reg => {
             swRegistration = reg;
-            console.log('SW Registered');
+            console.log('SW Active');
         });
     });
 }
@@ -41,18 +41,11 @@ async function initAudioAndNotifications() {
     if ("Notification" in window) {
         const permission = await Notification.requestPermission();
         if (permission === "granted" && swRegistration) {
-            swRegistration.showNotification("Workout Tracker", { body: "התראות רקע הופעלו בהצלחה!" });
+            swRegistration.showNotification("Workout Tracker", { body: "התראות רקע מוכנות ✅" });
         }
     }
     document.getElementById('audio-init-btn').innerText = "✅ סאונד והתראות פעילים";
     document.getElementById('audio-init-btn').style.background = "#28a745";
-}
-
-function updateTimerDisplay() {
-    const m = Math.floor(state.seconds / 60).toString().padStart(2, '0');
-    const s = (state.seconds % 60).toString().padStart(2, '0');
-    const el = document.getElementById('rest-timer');
-    if (el) el.innerText = `${m}:${s}`;
 }
 
 function startRestTimer() {
@@ -61,18 +54,20 @@ function startRestTimer() {
     state.seconds = 0;
     updateTimerDisplay();
 
-    // תזמון התראות רקע דרך ה-Service Worker
+    // שלח הוראת תזמון ל-Service Worker מיד עם תחילת המנוחה
     if (Notification.permission === "granted" && navigator.serviceWorker.controller) {
+        // התראה ראשונה
         navigator.serviceWorker.controller.postMessage({
             type: 'SCHEDULE_NOTIF',
             title: "זמן מנוחה",
-            message: "עברו 90 שניות! הסט מחכה.",
+            message: "עברו 90 שניות! הסט הבא מחכה.",
             delay: 90000
         });
+        // התראה שנייה
         navigator.serviceWorker.controller.postMessage({
             type: 'SCHEDULE_NOTIF',
             title: "זמן מנוחה",
-            message: "עברו 2 דקות! קדימה לסט!",
+            message: "עברו 2 דקות! חזרה לעבודה!",
             delay: 120000
         });
     }
@@ -85,12 +80,21 @@ function startRestTimer() {
     }, 1000);
 }
 
+function updateTimerDisplay() {
+    const m = Math.floor(state.seconds / 60).toString().padStart(2, '0');
+    const s = (state.seconds % 60).toString().padStart(2, '0');
+    const el = document.getElementById('rest-timer');
+    if (el) el.innerText = `${m}:${s}`;
+}
+
 function stopRestTimer() { 
     if (state.timerInterval) clearInterval(state.timerInterval); 
     state.timerInterval = null; 
 }
 
-// לוגיקת אימונים מלאה
+// נתוני האימונים עם השמות המלאים
+const workoutDisplayNames = { 'A': 'חזה וכתפיים', 'B': 'רגליים וגב', 'C': 'כתפיים, חזה וגב' };
+
 const workouts = {
     'A': [
         { name: "Bench Press (Main)", isCalc: true, baseRM: 122.5, rmRange: [110, 160] },
@@ -138,6 +142,7 @@ const workouts = {
     ]
 };
 
+// ניווט
 function navigate(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById(id).classList.add('active');
@@ -145,6 +150,7 @@ function navigate(id) {
     if (state.history[state.history.length - 1] !== id) state.history.push(id);
     document.getElementById('global-back').style.display = (id === 'ui-week') ? 'none' : 'block';
 }
+
 function handleGlobalBack() {
     if (state.history.length > 1) {
         state.history.pop();
@@ -153,7 +159,9 @@ function handleGlobalBack() {
         navigate(prev);
     }
 }
+
 function selectWeek(w) { state.week = w; navigate('ui-workout-type'); }
+
 function selectWorkout(t) {
     state.type = t; state.exIdx = 0; state.log = [];
     const ex = workouts[t][0];
@@ -166,12 +174,14 @@ function selectWorkout(t) {
         navigate('ui-1rm');
     } else { showConfirmScreen(); }
 }
+
 function save1RM() { state.rm = parseFloat(document.getElementById('rm-picker').value); showConfirmScreen(); }
 function showConfirmScreen() {
     const ex = workouts[state.type][state.exIdx];
     document.getElementById('confirm-ex-name').innerText = ex.name;
     navigate('ui-confirm');
 }
+
 function confirmExercise(doEx) {
     if (!doEx) { state.log.push({ skip: true, exName: workouts[state.type][state.exIdx].name }); state.exIdx++; checkFlow(); return; }
     state.currentEx = JSON.parse(JSON.stringify(workouts[state.type][state.exIdx]));
@@ -191,7 +201,9 @@ function confirmExercise(doEx) {
         navigate('ui-variation');
     } else { state.currentExName = state.currentEx.name; startRecording(); }
 }
+
 function startRecording() { state.setIdx = 0; stopRestTimer(); state.seconds = 0; updateTimerDisplay(); navigate('ui-main'); initPickers(); }
+
 function initPickers() {
     const target = state.currentEx.sets[state.setIdx];
     document.getElementById('ex-display-name').innerText = state.currentExName;
@@ -213,19 +225,24 @@ function initPickers() {
         let o = new Option(v === 0 ? "0 (Fail)" : v, v); if(v === 2) o.selected = true; rirPick.add(o);
     });
 }
+
 function nextStep() {
     state.log.push({ exName: state.currentExName, w: document.getElementById('weight-picker').value, r: document.getElementById('reps-picker').value, rir: document.getElementById('rir-picker').value, isBW: state.currentEx.isBW });
     if (state.setIdx < state.currentEx.sets.length - 1) { state.setIdx++; initPickers(); } else { navigate('ui-extra'); }
 }
+
 function handleExtra(extra) {
     if(extra) { state.setIdx++; state.currentEx.sets.push({...state.currentEx.sets[state.setIdx-1]}); initPickers(); navigate('ui-main'); } 
     else { state.exIdx++; checkFlow(); }
 }
+
 function checkFlow() { if (state.exIdx < workouts[state.type].length) showConfirmScreen(); else finish(); }
+
 function finish() {
     navigate('ui-summary');
-    let t = `סיכום אימון ${state.type} - שבוע ${state.week}\n---\n`;
+    let t = `סיכום אימון ${workoutDisplayNames[state.type]} - שבוע ${state.week}\n---\n`;
     state.log.forEach(l => { if(l.skip) t += `${l.exName}: דלג\n`; else t += `${l.exName}: ${l.isBW ? 'BW' : l.w+'kg'} x ${l.r} (RIR ${l.rir})\n`; });
     document.getElementById('summary-area').innerText = t;
 }
+
 function copyResult() { navigator.clipboard.writeText(document.getElementById('summary-area').innerText).then(() => { alert("הועתק!"); location.reload(); }); }
