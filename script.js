@@ -1,237 +1,278 @@
-const state = {
-    week: 1, type: '', rm: 0, exIdx: 0, setIdx: 0, history: ['ui-week'],
-    log: [], currentEx: null, timer: null, startTime: null, duration: 0,
-    unilateral: ["Machine Row", "Dumbbell Peck Fly", "Lateral Raises", "Lateral Raises (DB)", "Single Leg Curl", "Dumbbell Bicep Curls", "Cable Fly"]
+let state = {
+    week: 1, type: '', rm: 100, exIdx: 0, setIdx: 0, 
+    log: [], currentEx: null, history: ['ui-week'],
+    timerInterval: null, seconds: 0, startTime: null,
+    isArmPhase: false, armGroup: 'biceps', 
+    completedArmEx: [],
+    workoutStartTime: null, workoutDurationMins: 0
 };
 
-const workouts = {
-    'A': [
-        { name: "Bench Press", isCalc: true, baseRM: 122.5, range: [110, 160] },
-        { name: "Incline Bench Press", sets: [9,9,9], weight: 65, step: 2.5 },
-        { name: "Chest Flyes", vars: [
-            { name: "Dumbbell Peck Fly", weight: 14, sets: [11,11,11], step: 2 },
-            { name: "Machine Peck Fly", weight: 45, sets: [11,11,11], step: 5 },
-            { name: "Cable Fly", weight: 12.5, sets: [11,11,11], step: 2.5 }
-        ]},
-        { name: "Lateral Raises", sets: [13,13,11], weight: 12.5, step: 0.5 },
-        { name: "Face Pulls", sets: [13,13,15], weight: 40, step: 2.5 }
+let audioContext;
+let wakeLock = null;
+
+const unilateralExercises = ["Machine Row", "Cable Row", "Dumbbell Peck Fly", "Lateral Raises", "Lateral Raises (DB)", "Single Leg Curl", "Dumbbell Bicep Curls", "Cable Fly"];
+const armExercises = {
+    biceps: [
+        { name: "Dumbbell Bicep Curls", sets: [{w: 12, r: 8}], step: 0.5, minW: 8, maxW: 25, rir: 2 },
+        { name: "Barbell Bicep Curls", sets: [{w: 25, r: 8}], step: 1, minW: 15, maxW: 40, rir: 2 },
+        { name: "Reverse Bicep Curls", sets: [{w: 15, r: 8}], step: 1, minW: 10, maxW: 25, rir: 2 }
     ],
-    'B': [
-        { name: "Leg Press", sets: [8,8,7], weight: 300, step: 5 },
-        { name: "Leg Curl", vars: [
-            { name: "Single Leg Curl", weight: 25, sets: [8,6,8], step: 2.5 },
-            { name: "Lying Leg Curl", weight: 55, sets: [8,6,8], step: 5 }
-        ]},
-        { name: "Vertical Pull", vars: [
-            { name: "Lat Pulldown", weight: 75, sets: [10,10,11], step: 2.5 },
-            { name: "Pull Ups", weight: 0, sets: [8,8,8], isBW: true }
-        ]},
-        { name: "Seated Row", vars: [
-            { name: "Cable Row", weight: 65, sets: [10,10,12], step: 2.5 },
-            { name: "Machine Row", weight: 50, sets: [10,10,12], step: 5 }
-        ]},
-        { name: "Straight Arm Pulldown", sets: [10,12,12], weight: 30, step: 2.5 }
-    ],
-    'C': [
-        { name: "Overhead Press", isCalc: true, baseRM: 77.5, range: [65, 95] },
-        { name: "Barbell Shrugs", sets: [11,11,11], weight: 140, step: 5 },
-        { name: "Lateral Raises (DB)", sets: [13,13,11], weight: 12.5, step: 0.5 },
-        { name: "Face Pull (Cable)", sets: [12,12,13], weight: 37.5, step: 2.5 },
-        { name: "Pull Ups", weight: 0, sets: [8,7,7], isBW: true }
+    triceps: [
+        { name: "Triceps Pushdown", sets: [{w: 35, r: 8}], step: 2.5, minW: 25, maxW: 50, rir: 2 },
+        { name: "Lying Triceps Extension (French Press)", sets: [{w: 35, r: 8}], step: 2.5, minW: 25, maxW: 50, rir: 2 }
     ]
 };
+const workoutDisplayNames = { 'A': 'חזה וכתפיים', 'B': 'רגליים וגב', 'C': 'כתפיים, חזה וגב' };
 
-function navigate(id, push = true) {
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById(id).classList.add('active');
-    if (push) state.history.push(id);
-    document.getElementById('global-back').style.visibility = state.history.length > 1 ? 'visible' : 'hidden';
-    window.scrollTo(0,0);
-}
-
-function handleBack() {
-    if (state.history.length > 1) {
-        state.history.pop();
-        navigate(state.history[state.history.length-1], false);
+function playBeep(times = 1) {
+    if (!audioContext) { const AudioCtx = window.AudioContext || window.webkitAudioContext; audioContext = new AudioCtx(); }
+    if (audioContext.state === 'suspended') audioContext.resume();
+    for (let i = 0; i < times; i++) {
+        setTimeout(() => {
+            const o = audioContext.createOscillator();
+            const g = audioContext.createGain();
+            o.type = 'sine'; o.frequency.setValueAtTime(880, audioContext.currentTime);
+            g.gain.setValueAtTime(0.3, audioContext.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+            o.connect(g); g.connect(audioContext.destination);
+            o.start(); o.stop(audioContext.currentTime + 0.4);
+        }, i * 500);
     }
 }
 
-let audioCtx;
-function initAudio() {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    document.getElementById('audio-btn').innerText = "✅ סאונד מוכן";
-    document.getElementById('audio-btn').style.background = "var(--success)";
+async function initAudio() {
+    playBeep(1);
+    document.getElementById('audio-init-btn').innerText = "⚡ מצב אימון פעיל";
+    document.getElementById('audio-init-btn').style.backgroundColor = "#32d74b";
+    try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
 }
 
-function beep() {
-    if (!audioCtx) return;
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.connect(gain); gain.connect(audioCtx.destination);
-    osc.frequency.value = 880; gain.gain.value = 0.1;
-    osc.start(); osc.stop(audioCtx.currentTime + 0.2);
+function startRestTimer() {
+    stopRestTimer();
+    state.seconds = 0;
+    updateTimerDisplay();
+    const isFirstEx = (state.exIdx === 0 && !state.isArmPhase);
+    const target = isFirstEx ? 120 : 90;
+    document.getElementById('rest-target-display').innerText = isFirstEx ? "2:00" : "1:30";
+    state.startTime = Date.now();
+    state.timerInterval = setInterval(() => {
+        state.seconds = Math.floor((Date.now() - state.startTime) / 1000);
+        updateTimerDisplay();
+        if (state.seconds === target) playBeep(2);
+    }, 1000);
+}
+
+function updateTimerDisplay() {
+    const m = Math.floor(state.seconds / 60).toString().padStart(2, '0');
+    const s = (state.seconds % 60).toString().padStart(2, '0');
+    document.getElementById('rest-timer').innerText = `${m}:${s}`;
+}
+
+function stopRestTimer() { if (state.timerInterval) clearInterval(state.timerInterval); state.timerInterval = null; }
+
+const workouts = {
+    'A': [
+        { name: "Bench Press (Main)", isCalc: true, baseRM: 122.5, rmRange: [110, 160] },
+        { name: "Incline Bench Press", sets: [{w: 65, r: 9}, {w: 65, r: 9}, {w: 65, r: 9}], step: 2.5 },
+        { name: "Chest Flyes", hasVariations: true, variations: [
+            { name: "Dumbbell Peck Fly", sets: [{w: 14, r: 11}, {w: 14, r: 11}, {w: 14, r: 11}], step: 2 },
+            { name: "Machine Peck Fly", sets: [{w: 45, r: 11}, {w: 45, r: 11}, {w: 45, r: 11}], step: 1 },
+            { name: "Cable Fly", sets: [{w: 12.5, r: 11}, {w: 12.5, r: 11}, {w: 12.5, r: 11}], step: 2.5 }
+        ]},
+        { name: "Lateral Raises", sets: [{w: 12.5, r: 13}, {w: 12.5, r: 13}, {w: 12.5, r: 11}], step: 0.5 },
+        { name: "Face Pulls", sets: [{w: 40, r: 13}, {w: 40, r: 13}, {w: 40, r: 15}], step: 2.5 }
+    ],
+    'B': [
+        { name: "Leg Press", sets: [{w: 280, r: 8}, {w: 300, r: 8}, {w: 300, r: 7}], step: 5 },
+        { name: "Leg Curl", hasVariations: true, variations: [
+            { name: "Single Leg Curl", sets: [{w: 25, r: 8}, {w: 30, r: 6}, {w: 25, r: 8}], step: 2.5 },
+            { name: "Lying Leg Curl (Double)", sets: [{w: 50, r: 8}, {w: 60, r: 6}, {w: 50, r: 8}], step: 5 },
+            { name: "Seated Leg Curl (Double)", sets: [{w: 50, r: 8}, {w: 60, r: 6}, {w: 50, r: 8}], step: 5 }
+        ]},
+        { name: "Vertical Pull", hasVariations: true, variations: [
+            { name: "Lat Pulldown", sets: [{w: 75, r: 10}, {w: 75, r: 10}, {w: 75, r: 11}], step: 2.5 },
+            { name: "Pull Ups", isBW: true, sets: [{w: 0, r: 8}, {w: 0, r: 8}, {w: 0, r: 8}] }
+        ]},
+        { name: "Seated Row", hasVariations: true, variations: [
+            { name: "Cable Row", sets: [{w: 65, r: 10}, {w: 65, r: 10}, {w: 65, r: 12}], step: 2.5, askGrip: true },
+            { name: "Machine Row", sets: [{w: 50, r: 10}, {w: 50, r: 10}, {w: 50, r: 12}], step: 5 }
+        ]},
+        { name: "Calf Raise", hasVariations: true, variations: [
+            { name: "Seated Calf Raise", sets: [{w: 70, r: 10}, {w: 70, r: 10}, {w: 70, r: 12}], step: 5 },
+            { name: "Standing Calf Raise", sets: [{w: 110, r: 10}, {w: 110, r: 10}, {w: 110, r: 12}], step: 10 }
+        ]},
+        { name: "Straight Arm Pulldown", sets: [{w: 30, r: 10}, {w: 30, r: 12}, {w: 30, r: 12}], step: 2.5 }
+    ],
+    'C': [
+        { name: "Overhead Press (Main)", isCalc: true, baseRM: 77.5, rmRange: [65, 90] },
+        { name: "Barbell Shrugs", sets: [{w: 140, r: 11}, {w: 140, r: 11}, {w: 140, r: 11}], step: 5 },
+        { name: "Lateral Raises (DB)", sets: [{w: 12.5, r: 13}, {w: 12.5, r: 13}, {w: 12.5, r: 11}], step: 0.5 },
+        { name: "Face Pull (Cable)", sets: [{w: 37.5, r: 12}, {w: 37.5, r: 12}, {w: 37.5, r: 13}], step: 2.5 },
+        { name: "Pull Ups Variation", hasVariations: true, variations: [
+            { name: "Pull Ups (BW)", sets: [{w: 0, r: 8}, {w: 0, r: 7}, {w: 0, r: 7}], isBW: true },
+            { name: "Weighted Pull Ups", sets: [{w: 5, r: 8}, {w: 5, r: 7}, {w: 5, r: 7}], step: 2.5 }
+        ]},
+        { name: "Incline Bench Press", sets: [{w: 65, r: 9}, {w: 65, r: 9}, {w: 65, r: 9}], step: 2.5 }
+    ]
+};
+
+function navigate(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    if (id !== 'ui-main') stopRestTimer();
+    state.history.push(id);
+    document.getElementById('global-back').style.visibility = (id === 'ui-week') ? 'hidden' : 'visible';
+}
+
+function handleGlobalBack() {
+    if (state.history.length > 1) { state.history.pop(); navigate(state.history.pop()); }
 }
 
 function selectWeek(w) { state.week = w; navigate('ui-workout-type'); }
 
 function selectWorkout(t) {
-    state.type = t; state.exIdx = 0; state.log = []; state.startTime = Date.now();
-    const first = workouts[t][0];
-    if (first.isCalc) {
+    state.type = t; state.exIdx = 0; state.log = []; state.completedArmEx = []; state.isArmPhase = false;
+    state.workoutStartTime = Date.now();
+    const ex = workouts[t][0];
+    if (ex.isCalc) {
+        document.getElementById('rm-title').innerText = `${ex.name.split(' ')[0]} 1RM`;
         const p = document.getElementById('rm-picker'); p.innerHTML = "";
-        for(let i=first.range[0]; i<=first.range[1]; i+=2.5) {
-            p.add(new Option(i+" kg", i));
-            if(i === first.baseRM) p.selectedIndex = p.options.length-1;
+        for(let i = ex.rmRange[0]; i <= ex.rmRange[1]; i += 2.5) {
+            let o = new Option(i + " kg", i); if(i === ex.baseRM) o.selected = true; p.add(o);
         }
         navigate('ui-1rm');
-    } else { prepConfirm(); }
+    } else { showConfirmScreen(); }
 }
 
-function save1RM() { state.rm = parseFloat(document.getElementById('rm-picker').value); prepConfirm(); }
+function save1RM() { state.rm = parseFloat(document.getElementById('rm-picker').value); showConfirmScreen(); }
 
-function prepConfirm() {
+function showConfirmScreen() {
     const ex = workouts[state.type][state.exIdx];
     document.getElementById('confirm-ex-name').innerText = ex.name;
     navigate('ui-confirm');
 }
 
-function startExercise(doIt) {
-    if (!doIt) { state.log.push({ name: workouts[state.type][state.exIdx].name, skipped: true }); nextEx(); return; }
-    const ex = workouts[state.type][state.exIdx];
-    if (ex.vars) {
-        const list = document.getElementById('var-list'); list.innerHTML = "";
-        ex.vars.forEach(v => {
-            const b = document.createElement('button'); b.className = "menu-item";
-            b.innerText = v.name; b.onclick = () => { state.currentEx = {...v}; loadMain(); };
-            list.appendChild(b);
+function confirmExercise(doEx) {
+    if (!doEx) { state.log.push({ skip: true, exName: workouts[state.type][state.exIdx].name }); state.exIdx++; checkFlow(); return; }
+    state.currentEx = JSON.parse(JSON.stringify(workouts[state.type][state.exIdx]));
+    
+    if (state.currentEx.isCalc) {
+        const p = { 1: [0.65, 0.75, 0.85, 0.75, 0.65], 2: [0.70, 0.80, 0.90, 0.80, 0.70, 0.70], 3: [0.75, 0.85, 0.95, 0.85, 0.75, 0.75] };
+        const r = { 1: [3, 3, 5, 8, 10], 2: [3, 3, 3, 8, 10, 10], 3: [3, 3, 3, 8, 10, 10] };
+        state.currentEx.sets = p[state.week].map((pct, i) => ({ w: Math.round((state.rm * pct) / 2.5) * 2.5, r: r[state.week][i] }));
+        state.currentExName = state.currentEx.name;
+        startRecording();
+    } else if (state.currentEx.hasVariations) {
+        const opts = document.getElementById('variation-options'); opts.innerHTML = "";
+        state.currentEx.variations.forEach(v => {
+            const btn = document.createElement('button'); btn.className = "btn-secondary"; btn.innerText = v.name;
+            btn.onclick = () => { 
+                state.currentExName = v.name; state.currentEx.sets = v.sets; 
+                state.currentEx.isBW = v.isBW; state.currentEx.step = v.step || 2.5;
+                if (v.askGrip) showGripSelection(); else startRecording();
+            };
+            opts.appendChild(btn);
         });
         navigate('ui-variation');
-    } else {
-        state.currentEx = ex.isCalc ? calcMain(ex) : {...ex};
-        loadMain();
+    } else { state.currentExName = state.currentEx.name; startRecording(); }
+}
+
+function showGripSelection() {
+    document.getElementById('variation-title').innerText = "בחר סוג אחיזה:";
+    const opts = document.getElementById('variation-options'); opts.innerHTML = "";
+    ['אחיזה צרה', 'אחיזה רחבה'].forEach(g => {
+        const btn = document.createElement('button'); btn.className = "btn-secondary"; btn.innerText = g;
+        btn.onclick = () => { state.currentExName += ` (${g})`; startRecording(); };
+        opts.appendChild(btn);
+    });
+    navigate('ui-variation');
+}
+
+function startArmWorkout() { state.isArmPhase = true; state.armGroup = 'biceps'; showArmSelection(); }
+
+function showArmSelection() {
+    const list = armExercises[state.armGroup];
+    const remaining = list.filter(ex => !state.completedArmEx.includes(ex.name));
+    if (remaining.length === 0) {
+        if (state.armGroup === 'biceps') { state.armGroup = 'triceps'; showArmSelection(); }
+        else finish(); return;
     }
+    document.getElementById('arm-selection-title').innerText = state.armGroup === 'biceps' ? "בחר בייספס" : "בחר טרייספס";
+    const opts = document.getElementById('arm-options'); opts.innerHTML = "";
+    remaining.forEach(ex => {
+        const btn = document.createElement('button'); btn.className = "btn-secondary"; btn.innerText = ex.name;
+        btn.onclick = () => { 
+            state.currentEx = JSON.parse(JSON.stringify(ex)); state.currentExName = ex.name;
+            state.currentEx.sets = [ex.sets[0], ex.sets[0], ex.sets[0]]; startRecording();
+        };
+        opts.appendChild(btn);
+    });
+    const skipBtn = document.getElementById('btn-skip-arm-group');
+    skipBtn.innerText = state.armGroup === 'biceps' ? "דלג לטרייספס" : "סיים אימון";
+    skipBtn.onclick = () => { if (state.armGroup === 'biceps') { state.armGroup = 'triceps'; showArmSelection(); } else finish(); };
+    navigate('ui-arm-selection');
 }
 
-function calcMain(ex) {
-    const pct = {1: [0.65, 0.75, 0.85, 0.75, 0.65], 2: [0.7, 0.8, 0.9, 0.8, 0.7, 0.7], 3: [0.75, 0.85, 0.95, 0.85, 0.75, 0.75]}[state.week];
-    const reps = {1: [3,3,5,8,10], 2: [3,3,3,8,10,10], 3: [3,3,3,8,10,10]}[state.week];
-    return { name: ex.name, sets: reps, weights: pct.map(p => Math.round((state.rm * p)/2.5)*2.5) };
-}
+function startRecording() { state.setIdx = 0; stopRestTimer(); state.seconds = 0; updateTimerDisplay(); navigate('ui-main'); initPickers(); }
 
-function loadMain() {
-    state.setIdx = 0;
-    updateUI();
-    navigate('ui-main');
-}
-
-function updateUI() {
-    const ex = state.currentEx;
-    document.getElementById('active-ex-name').innerText = ex.name;
-    document.getElementById('set-info').innerText = `SET ${state.setIdx + 1} / ${ex.sets.length}`;
-    document.getElementById('uni-label').style.display = state.unilateral.includes(ex.name) ? "block" : "none";
+function initPickers() {
+    const target = state.currentEx.sets[state.setIdx];
+    document.getElementById('ex-display-name').innerText = state.currentExName;
+    document.getElementById('set-counter').innerText = `SET ${state.setIdx + 1}/${state.currentEx.sets.length}`;
     
-    const wp = document.getElementById('w-picker'); wp.innerHTML = "";
-    const startW = ex.weights ? ex.weights[state.setIdx] : ex.weight;
-    for(let i=Math.max(0, startW-20); i<=startW+30; i+=(ex.step || 2.5)) {
-        wp.add(new Option(i+" kg", i));
-        if(i === startW) wp.selectedIndex = wp.options.length-1;
+    const timerArea = document.getElementById('timer-area');
+    if (state.setIdx > 0) { timerArea.style.visibility = 'visible'; startRestTimer(); } 
+    else { timerArea.style.visibility = 'hidden'; stopRestTimer(); }
+
+    const isUni = unilateralExercises.some(u => state.currentExName.includes(u));
+    document.getElementById('unilateral-note').style.display = isUni ? 'block' : 'none';
+
+    const wPick = document.getElementById('weight-picker'); wPick.innerHTML = "";
+    const step = state.currentEx.step || 2.5;
+    for(let i = (state.currentEx.minW || Math.max(0, target.w - 40)); i <= (state.currentEx.maxW || target.w + 40); i = parseFloat((i + step).toFixed(2))) {
+        let o = new Option(i + " kg", i); if(i === target.w) o.selected = true; wPick.add(o);
     }
-
-    const rp = document.getElementById('r-picker'); rp.innerHTML = "";
-    const targetR = ex.sets[state.setIdx];
-    for(let i=1; i<=25; i++) {
-        rp.add(new Option(i, i));
-        if(i === targetR) rp.selectedIndex = i-1;
-    }
-
-    const rir = document.getElementById('rir-picker'); rir.innerHTML = "";
-    [0,1,2,3,4].forEach(v => rir.add(new Option(v, v)));
-    rir.selectedIndex = 2;
-
-    document.getElementById('timer-box').style.display = "none";
-    document.getElementById('submit-set-btn').style.display = "flex";
-}
-
-function submitSet() {
-    if (!state.log[state.exIdx]) state.log[state.exIdx] = { name: state.currentEx.name, sets: [] };
-    state.log[state.exIdx].sets.push({
-        w: document.getElementById('w-picker').value,
-        r: document.getElementById('r-picker').value,
-        rir: document.getElementById('rir-picker').value
+    const rPick = document.getElementById('reps-picker'); rPick.innerHTML = "";
+    for(let i = 1; i <= 25; i++) { let o = new Option(i, i); if(i === target.r) o.selected = true; rPick.add(o); }
+    const rirPick = document.getElementById('rir-picker'); rirPick.innerHTML = "";
+    [0, 0.5, 1, 1.5, 2, 2.5, 3, 4, 5].forEach(v => {
+        let o = new Option(v === 0 ? "0 (Fail)" : v, v); if(v === (state.currentEx.rir || 2)) o.selected = true; rirPick.add(o);
     });
-
-    state.setIdx++;
-    if (state.setIdx < state.currentEx.sets.length) {
-        startTimer();
-    } else {
-        navigate('ui-extra');
-    }
 }
 
-function startTimer() {
-    document.getElementById('timer-box').style.display = "block";
-    document.getElementById('submit-set-btn').style.display = "none";
-    let sec = 0;
-    const goal = state.exIdx === 0 ? 120 : 90;
-    clearInterval(state.timer);
-    state.timer = setInterval(() => {
-        sec++;
-        const m = Math.floor(sec/60).toString().padStart(2,'0');
-        const s = (sec%60).toString().padStart(2,'0');
-        document.getElementById('timer-val').innerText = `${m}:${s}`;
-        if (sec === goal) { beep(); document.getElementById('timer-val').style.color = "var(--success)"; }
-        if (sec > goal + 30) { updateUI(); clearInterval(state.timer); }
-    }, 1000);
+function nextStep() {
+    const isUni = unilateralExercises.some(u => state.currentExName.includes(u));
+    const finalExName = state.currentExName + (isUni && state.currentExName === "Dumbbell Bicep Curls" ? " (בכל יד)" : (isUni ? " (לצד אחד)" : ""));
+    state.log.push({ exName: finalExName, w: document.getElementById('weight-picker').value, r: document.getElementById('reps-picker').value, rir: document.getElementById('rir-picker').value, isArm: state.isArmPhase });
+    if (state.setIdx < state.currentEx.sets.length - 1) { state.setIdx++; initPickers(); } else { navigate('ui-extra'); }
 }
 
-function addExtraSet() {
-    state.currentEx.sets.push(state.currentEx.sets[state.currentEx.sets.length-1]);
-    if (state.currentEx.weights) state.currentEx.weights.push(state.currentEx.weights[state.currentEx.weights.length-1]);
-    updateUI();
-    navigate('ui-main');
+function handleExtra(extra) {
+    if(extra) { state.setIdx++; state.currentEx.sets.push({...state.currentEx.sets[state.setIdx-1]}); initPickers(); navigate('ui-main'); } 
+    else { if (state.isArmPhase) { state.completedArmEx.push(state.currentExName); showArmSelection(); } else { state.exIdx++; checkFlow(); } }
 }
 
-function endExercise() {
-    clearInterval(state.timer);
-    state.exIdx++;
-    nextEx();
-}
+function checkFlow() { if (state.exIdx < workouts[state.type].length) showConfirmScreen(); else navigate('ui-ask-arms'); }
 
-function nextEx() {
-    if (state.exIdx < workouts[state.type].length) {
-        prepConfirm();
-    } else {
-        showSummary();
-    }
-}
-
-function showSummary() {
-    state.duration = Math.round((Date.now() - state.startTime)/60000);
-    let txt = `🏋️ *GymPro v8.1 - אימון ${state.type}*\nשבוע ${state.week} | ${state.duration} דקות\n\n`;
-    state.log.forEach(ex => {
-        if (ex.skipped) { txt += `❌ ${ex.name} (דלג)\n`; }
-        else {
-            txt += `*${ex.name}*\n`;
-            ex.sets.forEach((s, i) => txt += `${i+1}. ${s.w}kg x ${s.r} (RIR ${s.rir})\n`);
-        }
-        txt += `\n`;
-    });
-    document.getElementById('summary-text').innerText = txt;
+function finish() {
+    state.workoutDurationMins = Math.floor((Date.now() - state.workoutStartTime) / 60000);
     navigate('ui-summary');
+    let summaryText = `סיכום אימון ${workoutDisplayNames[state.type]} - שבוע ${state.week}\n---\n`;
+    state.log.forEach(l => {
+        if(l.skip) summaryText += `${l.exName}: לא בוצע היום\n`;
+        else summaryText += `${l.exName}: ${l.w}kg x ${l.r} (RIR ${l.rir})\n`;
+    });
+    summaryText += `---\nמשך אימון כולל: ${state.workoutDurationMins} דקות`;
+    document.getElementById('summary-area').innerText = summaryText;
 }
 
-function copyResults() {
-    const content = document.getElementById('summary-text').innerText;
-    const tank = document.getElementById('clipboard-tank');
-    tank.value = content;
-    tank.select();
-    tank.setSelectionRange(0, 99999);
-    try {
-        document.execCommand('copy');
-        const btn = document.querySelector('#ui-summary .btn-primary');
-        btn.innerText = "✅ הועתק!";
-        setTimeout(() => btn.innerText = "📋 העתק לווצאפ", 2000);
-    } catch (e) {
-        console.error("Copy failed", e);
+function copyResult() {
+    const text = document.getElementById('summary-area').innerText;
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(() => { alert("הסיכום הועתק!"); location.reload(); });
+    } else {
+        const textArea = document.createElement("textarea"); textArea.value = text; document.body.appendChild(textArea); textArea.select();
+        try { document.execCommand('copy'); alert("הסיכום הועתק!"); } catch (err) { alert("שגיאה בהעתקה"); }
+        document.body.removeChild(textArea); location.reload();
     }
 }
