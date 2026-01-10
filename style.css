@@ -55,24 +55,12 @@ body {
     align-items: center;
     transition: background 0.2s;
     box-sizing: border-box;
+    text-align: center;
 }
 
-.btn-primary { 
-    background-color: var(--primary-blue); 
-    color: white; 
-}
-
-.btn-secondary { 
-    background-color: var(--card-bg); 
-    color: var(--text-main); 
-    border: 1px solid var(--border-color); 
-}
-
-.btn-danger { 
-    background-color: rgba(255, 69, 58, 0.25); 
-    color: #ff6961; 
-    border: 1px solid rgba(255, 69, 58, 0.4); 
-}
+.btn-primary { background-color: var(--primary-blue); color: white; }
+.btn-secondary { background-color: var(--card-bg); color: var(--text-main); border: 1px solid var(--border-color); }
+.btn-danger { background-color: rgba(255, 69, 58, 0.25); color: #ff6961; border: 1px solid rgba(255, 69, 58, 0.4); }
 
 .menu-item {
     background-color: var(--card-bg);
@@ -80,8 +68,6 @@ body {
     border: 1px solid var(--border-color);
     justify-content: space-between;
 }
-
-.btn-primary:active { transform: scale(0.98); opacity: 0.9; }
 
 .log-card {
     background-color: var(--card-bg);
@@ -133,6 +119,15 @@ body {
     font-family: monospace;
     font-size: 0.9em;
     margin-bottom: 20px;
-    line-height: 1.5;
+    line-height: 1.6;
     border: 1px solid var(--border-color);
+    white-space: pre-wrap;
+}
+
+.professional-title {
+    font-size: 1.8em;
+    font-weight: 800;
+    text-align: center;
+    color: var(--text-main);
+    margin-bottom: 30px;
 }
