@@ -378,3 +378,11 @@ function copyResult() {
     try { document.execCommand('copy'); alert("הסיכום הועתק"); } catch (err) { alert("שגיאה בהעתקה"); }
     document.body.removeChild(textArea); location.reload();
 }
+
+// הגנה מפני יציאה/רענון בטעות
+window.addEventListener('beforeunload', function (e) {
+    if (state.log.length > 0 && document.getElementById('ui-summary').style.display !== 'flex') {
+        e.preventDefault();
+        e.returnValue = '';
+    }
+});
