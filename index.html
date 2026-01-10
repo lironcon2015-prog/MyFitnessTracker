@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Workout Tracker Pro</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="data:application/json;base64,ewogICJkZWZhdWx0X2xvY2FsZSI6ICJoZSIsCiAgIm5hbWUiOiAiV29ya291dCBUcmFja2VyIiwKICAic2hvcnRfbmFtZSI6ICJXb3Jrb3V0IiwKICAic3RhcnRfdXJsIjogIi4iLAogICJkaXNwbGF5IjogInN0YW5kYWxvbmUiLAogICJiYWNrZ3JvdW5kX2NvbG9yIjogIiNmZmZmZmYiLAogICJ0aGVtZV9jb2xvciI6ICIjMDA3QUZGIgp9">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Workout">
 </head>
 <body>
     <div class="app-container">
@@ -18,14 +18,13 @@
 
         <div id="ui-week" class="screen active">
             <h1 class="main-title">Workout Tracker</h1>
-            <p style="text-align: center; color: #666; font-size: 0.8em; margin-top: -10px;">Version 5.9</p>
+            <p style="text-align: center; color: #666; font-size: 0.8em; margin-top: -10px;">Version 6.0</p>
             
             <div style="text-align: center; margin-bottom: 20px;">
-                <button onclick="initAudioAndNotifications()" id="audio-init-btn" style="background: #007AFF; color: white; border: none; padding: 18px; border-radius: 12px; font-size: 1.1em; cursor: pointer; width: 100%; font-weight: bold; box-shadow: 0 4px 15px rgba(0,122,255,0.4);">🔊 הפעל סאונד והתראות</button>
-                <p style="font-size: 0.75em; color: #d9534f; margin-top: 10px; font-weight: bold;">חובה ללחוץ כאן בכל פעם שמתחילים!</p>
+                <button onclick="initAudioAndNotifications()" id="audio-init-btn" style="background: #007AFF; color: white; border: none; padding: 18px; border-radius: 12px; font-size: 1.1em; cursor: pointer; width: 100%; font-weight: bold; box-shadow: 0 4px 15px rgba(0,122,255,0.4);">🔊 הפעל סאונד והתראות רקע</button>
             </div>
 
-            <p class="subtitle">בחר שבוע בבלוק:</p>
+            <p class="subtitle">בחר שבוע:</p>
             <div class="grid-menu">
                 <button class="menu-item" onclick="selectWeek(1)">שבוע 1</button>
                 <button class="menu-item" onclick="selectWeek(2)">שבוע 2</button>
@@ -34,25 +33,22 @@
         </div>
 
         <div id="ui-workout-type" class="screen">
-            <h2>איזה אימון היום?</h2>
+            <h2>איזה אימון?</h2>
             <div class="grid-menu">
-                <button class="menu-item" onclick="selectWorkout('A')">A - חזה וכתפיים</button>
-                <button class="menu-item" onclick="selectWorkout('B')">B - רגליים וגב</button>
-                <button class="menu-item" onclick="selectWorkout('C')">C - כתפיים וגב</button>
+                <button class="menu-item" onclick="selectWorkout('A')">A</button>
+                <button class="menu-item" onclick="selectWorkout('B')">B</button>
+                <button class="menu-item" onclick="selectWorkout('C')">C</button>
             </div>
         </div>
 
         <div id="ui-1rm" class="screen">
-            <h2 id="rm-title">הזן 1RM</h2>
-            <div class="control-group">
-                <select id="rm-picker" class="modern-select"></select>
-            </div>
+            <h2 id="rm-title">1RM</h2>
+            <select id="rm-picker" class="modern-select"></select>
             <button class="btn-primary" onclick="save1RM()">המשך</button>
         </div>
 
         <div id="ui-confirm" class="screen">
-            <h2 id="confirm-ex-name" class="english-title">Exercise</h2>
-            <p>לבצע את התרגיל?</p>
+            <h2 id="confirm-ex-name" class="english-title"></h2>
             <div class="action-btns">
                 <button class="btn-primary" onclick="confirmExercise(true)">כן</button>
                 <button class="btn-secondary" onclick="confirmExercise(false)">דלג</button>
@@ -60,7 +56,7 @@
         </div>
 
         <div id="ui-variation" class="screen">
-            <h2 id="variation-title">בחר סוג תרגיל:</h2>
+            <h2>בחר סוג:</h2>
             <div id="variation-options" class="grid-menu"></div>
         </div>
 
@@ -69,33 +65,28 @@
                 <h2 id="ex-display-name" class="english-title">...</h2>
                 <span id="set-counter" class="set-badge">Set 1/5</span>
             </div>
-
             <div class="log-card">
                 <div class="input-row"><label>משקל:</label><select id="weight-picker" class="modern-select"></select></div>
                 <div class="input-row"><label>חזרות:</label><select id="reps-picker" class="modern-select"></select></div>
                 <div class="input-row"><label>RIR:</label><select id="rir-picker" class="modern-select"></select></div>
             </div>
-
-            <button class="btn-primary" id="btn-submit-set" onclick="nextStep()" style="font-size: 1.2em; padding: 15px;">תעד סט</button>
-
-            <div style="text-align: center; margin-top: 35px; border-top: 2px solid #f0f0f0; padding-top: 20px;">
-                <div style="font-size: 1.1em; color: #555; margin-bottom: 8px; font-weight: 600;">זמן מנוחה:</div>
-                <div id="rest-timer" style="font-family: 'Courier New', monospace; font-weight: 900; color: #007AFF; font-size: 2.8em; letter-spacing: 3px; background: #f0f4ff; display: inline-block; padding: 12px 35px; border-radius: 18px; border: 2px solid #d0e0ff;">00:00</div>
+            <button class="btn-primary" id="btn-submit-set" onclick="nextStep()" style="font-size: 1.2em;">תעד סט</button>
+            <div style="text-align: center; margin-top: 35px; border-top: 1px solid #eee; pt: 20px;">
+                <div style="font-size: 1em; color: #666; mb: 5px;">זמן מנוחה:</div>
+                <div id="rest-timer" style="font-family: 'Courier New', monospace; font-weight: 900; color: #007AFF; font-size: 3em; letter-spacing: 3px; background: #f0f4ff; display: inline-block; padding: 10px 30px; border-radius: 15px;">00:00</div>
             </div>
         </div>
 
         <div id="ui-extra" class="screen">
             <h2>הסט הסתיים!</h2>
-            <div class="action-btns-vertical">
-                <button class="btn-success" onclick="handleExtra(true)">הוסף סט נוסף</button>
-                <button class="btn-primary" onclick="handleExtra(false)">עבור לתרגיל הבא</button>
-            </div>
+            <button class="btn-success" onclick="handleExtra(true)">הוסף סט</button>
+            <button class="btn-primary" onclick="handleExtra(false)">הבא</button>
         </div>
 
         <div id="ui-summary" class="screen">
-            <h2 class="success-msg">האימון הושלם! ✅</h2>
+            <h2 class="success-msg">בוצע! ✅</h2>
             <div id="summary-area" class="summary-box"></div>
-            <button class="btn-primary" onclick="copyResult()">העתק וחזור</button>
+            <button class="btn-primary" onclick="copyResult()">העתק</button>
         </div>
     </div>
     <script src="script.js"></script>
