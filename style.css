@@ -1,108 +1,149 @@
 :root {
-    --bg-color: #000000;
-    --card-bg: rgba(28, 28, 30, 0.7); /* שקיפות זכוכית */
+    /* צבעי Slate & Steel - פחות שחור, יותר יוקרתי */
+    --bg-color: #1c1c1e; 
+    --card-bg: #2c2c2e;
     --primary-blue: #0A84FF;
-    --accent-blue: #5AC8FA;
     --text-main: #FFFFFF;
-    --text-dim: #8E8E93;
-    --danger: #FF453A;
-    --success: #32D74B;
-    --safe-top: env(safe-area-inset-top);
+    --text-dim: #aeaeb2;
+    --danger: #ff453a;
+    --success: #32d74b;
+    --border-color: rgba(255, 255, 255, 0.1);
 }
 
 body {
     margin: 0;
     padding: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background-color: var(--bg-color);
     color: var(--text-main);
     direction: rtl;
-    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+    /* מונע גלילה מיותרת באייפון */
     overscroll-behavior: none;
 }
 
 .app-container {
     max-width: 500px;
     margin: 0 auto;
-    padding: calc(var(--safe-top) + 20px) 20px 40px 20px;
+    padding: calc(env(safe-area-inset-top) + 10px) 20px 40px 20px;
     min-height: 100vh;
     box-sizing: border-box;
-    background: radial-gradient(circle at top left, #1c1c1e 0%, #000000 50%);
+    display: flex;
+    flex-direction: column;
 }
 
-.screen { display: none; }
-.screen.active { display: flex; flex-direction: column; animation: fadeIn 0.4s ease-out; }
+.screen { display: none; flex-direction: column; flex-grow: 1; }
+.screen.active { display: flex; animation: fadeIn 0.3s ease; }
 
-@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-/* כרטיסיות בעיצוב Glassmorphism */
-.log-card, .menu-item, .summary-box {
-    background: var(--card-bg);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 24px;
-    padding: 24px;
-    margin-bottom: 20px;
+/* מערכת כפתורים אחידה - כולם רחבים וגדולים */
+.btn-primary, .btn-secondary, .menu-item, .btn-danger {
+    width: 100%;
+    padding: 18px;
+    border-radius: 16px;
+    font-size: 1.1em;
+    font-weight: 700;
+    border: none;
+    cursor: pointer;
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: transform 0.1s, opacity 0.2s;
+    box-sizing: border-box;
+}
+
+.btn-primary {
+    background-color: var(--primary-blue);
+    color: white;
+}
+
+.btn-secondary {
+    background-color: var(--card-bg);
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
+}
+
+.btn-danger {
+    background-color: rgba(255, 69, 58, 0.15);
+    color: var(--danger);
+    border: 1px solid rgba(255, 69, 58, 0.3);
 }
 
 .menu-item {
-    text-align: right;
-    width: 100%;
-    font-size: 1.2em;
-    font-weight: 600;
+    background-color: var(--card-bg);
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
+    justify-content: space-between;
+}
+
+.btn-primary:active, .btn-secondary:active, .menu-item:active {
+    transform: scale(0.98);
+    opacity: 0.9;
+}
+
+/* כרטיסיות נתונים */
+.log-card {
+    background-color: var(--card-bg);
+    border-radius: 20px;
+    padding: 20px;
+    margin-bottom: 20px;
+    border: 1px solid var(--border-color);
+}
+
+.input-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    padding: 12px 0;
 }
 
-.menu-item::after { content: '→'; opacity: 0.3; font-size: 0.8em; }
-
-.btn-primary {
-    background: linear-gradient(135deg, var(--primary-blue), #0056b3);
-    color: white;
-    border: none;
-    padding: 20px;
-    border-radius: 20px;
-    font-size: 1.2em;
-    font-weight: 700;
-    box-shadow: 0 10px 20px rgba(0, 132, 255, 0.3);
-    transition: all 0.2s;
+.input-row:not(:last-child) {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
-
-.btn-primary:active { transform: scale(0.96); opacity: 0.9; }
 
 .modern-select {
-    background: rgba(255, 255, 255, 0.05);
+    background-color: #3a3a3c;
     color: white;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 14px;
-    border-radius: 12px;
-    font-size: 1.1em;
-    appearance: none;
-    text-align: center;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 1em;
+    font-weight: 600;
 }
 
 .timer-display {
-    font-variant-numeric: tabular-nums;
-    font-size: 4.5em;
-    font-weight: 200; /* מראה דק ויוקרתי */
-    color: var(--accent-blue);
+    font-family: -apple-system, sans-serif;
+    font-size: 5em;
+    font-weight: 200;
+    color: var(--primary-blue);
+    text-align: center;
     margin: 20px 0;
 }
 
 .set-badge {
-    background: rgba(10, 132, 255, 0.2);
-    color: var(--accent-blue);
-    padding: 6px 14px;
-    border-radius: 10px;
+    background-color: rgba(10, 132, 255, 0.15);
+    color: var(--primary-blue);
+    padding: 4px 12px;
+    border-radius: 80px;
     font-size: 0.85em;
-    font-weight: 600;
+    font-weight: bold;
 }
 
-.main-title {
-    font-size: 2.8em;
+h1.main-title {
+    font-size: 2.5em;
     font-weight: 800;
+    margin: 20px 0 40px 0;
     line-height: 1.1;
-    margin-bottom: 40px;
+}
+
+.summary-box {
+    background-color: #000;
+    color: #32d74b;
+    padding: 20px;
+    border-radius: 16px;
+    font-family: monospace;
+    font-size: 0.9em;
+    margin-bottom: 20px;
 }
