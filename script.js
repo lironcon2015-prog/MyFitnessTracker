@@ -5,23 +5,98 @@ let state = {
 };
 
 let audioContext;
-let wakeLock = null;
 
-async function initAudio() {
-    try {
-        const AudioCtx = window.AudioContext || window.webkitAudioContext;
-        audioContext = new AudioCtx();
-        // צליל אישור ראשוני
-        playBeep(1);
-        
-        if ('wakeLock' in navigator) {
-            wakeLock = await navigator.wakeLock.request('screen');
+// בקשת אישור להתראות וסאונד
+async function initAudioAndNotifications() {
+    // 1. אישור סאונד
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    audioContext = new AudioCtx();
+    
+    // 2. אישור התראות (בשביל רקע)
+    if ("Notification" in window) {
+        const permission = await Notification.requestPermission();
+        if (permission === "granted") {
+            new Notification("ההתראות הופעלו!", { body: "עכשיו תקבל צפצוף גם כשהאפליקציה ברקע." });
         }
+    }
 
-        document.getElementById('audio-init-btn').innerText = "✅ סאונד ונעילה פעילים";
-        document.getElementById('audio-init-btn').style.background = "#28a745";
-    } catch(e) { console.log(e); }
+    document.getElementById('audio-init-btn').innerText = "✅ הכל מוכן!";
+    document.getElementById('audio-init-btn').style.background = "#28a745";
 }
+
+function playBeep(times = 1) {
+    if (!audioContext) return;
+    for (let i = 0; i < times; i++) {
+        setTimeout(() => {
+            const o = audioContext.createOscillator();
+            const g = audioContext.createGain();
+            o.type = 'sine'; o.frequency.value = 880;
+            g.gain.setValueAtTime(0.5, audioContext.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+            o.connect(g); g.connect(audioContext.destination);
+            o.start(); o.stop(audioContext.currentTime + 0.4);
+        }, i * 400);
+    }
+}
+
+function sendBackgroundNotification(message) {
+    if (Notification.permission === "granted" && document.hidden) {
+        new Notification("Workout Tracker", { body: message });
+    }
+}
+
+function updateTimerDisplay() {
+    const m = Math.floor(state.seconds / 60).toString().padStart(2, '0');
+    const s = (state.seconds % 60).toString().padStart(2, '0');
+    const el = document.getElementById('rest-timer');
+    if (el) el.innerText = `${m}:${s}`;
+}
+
+function startRestTimer() {
+    stopRestTimer();
+    state.startTime = Date.now();
+    state.seconds = 0;
+    updateTimerDisplay();
+    let beep90 = false, beep120 = false;
+
+    state.timerInterval = setInterval(() => {
+        state.seconds = Math.floor((Date.now() - state.startTime) / 1000);
+        updateTimerDisplay();
+
+        if (state.seconds === 90 && !beep90) {
+            playBeep(2);
+            sendBackgroundNotification("עברה דקה וחצי! הסט הבא מחכה.");
+            beep90 = true;
+        }
+        if (state.seconds === 120 && !beep120) {
+            playBeep(3);
+            sendBackgroundNotification("שתי דקות עברו! קדימה לסט!");
+            beep120 = true;
+        }
+    }, 1000);
+}
+
+function stopRestTimer() { if (state.timerInterval) clearInterval(state.timerInterval); state.timerInterval = null; }
+
+// פונקציות הניווט והלוגיקה (זהות לגרסה קודמת)
+function navigate(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    if (id !== 'ui-main') stopRestTimer();
+    if (state.history[state.history.length - 1] !== id) state.history.push(id);
+    document.getElementById('global-back').style.display = id === 'ui-week' ? 'none' : 'block';
+}
+
+function handleGlobalBack() {
+    if (state.history.length > 1) {
+        state.history.pop();
+        const prev = state.history[state.history.length - 1];
+        if (prev === 'ui-main' && state.setIdx > 0) { state.setIdx--; state.log.pop(); }
+        navigate(prev);
+    }
+}
+
+function selectWeek(w) { state.week = w; navigate('ui-workout-type'); }
 
 const workouts = {
     'A': [
@@ -70,63 +145,6 @@ const workouts = {
     ]
 };
 
-function playBeep(times = 1) {
-    if (!audioContext) return;
-    for (let i = 0; i < times; i++) {
-        setTimeout(() => {
-            const o = audioContext.createOscillator();
-            const g = audioContext.createGain();
-            o.type = 'sine';
-            o.frequency.setValueAtTime(880, audioContext.currentTime);
-            g.gain.setValueAtTime(0.5, audioContext.currentTime);
-            g.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
-            o.connect(g); g.connect(audioContext.destination);
-            o.start(); o.stop(audioContext.currentTime + 0.4);
-        }, i * 400);
-    }
-}
-
-function updateTimerDisplay() {
-    const m = Math.floor(state.seconds / 60).toString().padStart(2, '0');
-    const s = (state.seconds % 60).toString().padStart(2, '0');
-    const el = document.getElementById('rest-timer');
-    if (el) el.innerText = `${m}:${s}`;
-}
-
-function startRestTimer() {
-    stopRestTimer();
-    state.startTime = Date.now();
-    state.seconds = 0;
-    updateTimerDisplay();
-    let beep90 = false, beep120 = false;
-    state.timerInterval = setInterval(() => {
-        state.seconds = Math.floor((Date.now() - state.startTime) / 1000);
-        updateTimerDisplay();
-        if (state.seconds >= 90 && !beep90) { playBeep(2); beep90 = true; }
-        if (state.seconds >= 120 && !beep120) { playBeep(3); beep120 = true; }
-    }, 1000);
-}
-
-function stopRestTimer() { if (state.timerInterval) clearInterval(state.timerInterval); state.timerInterval = null; }
-
-function navigate(id) {
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById(id).classList.add('active');
-    if (id !== 'ui-main') stopRestTimer();
-    if (state.history[state.history.length - 1] !== id) state.history.push(id);
-    document.getElementById('global-back').style.display = id === 'ui-week' ? 'none' : 'block';
-}
-
-function handleGlobalBack() {
-    if (state.history.length > 1) {
-        state.history.pop();
-        const prev = state.history[state.history.length - 1];
-        if (prev === 'ui-main' && state.setIdx > 0) { state.setIdx--; state.log.pop(); }
-        navigate(prev);
-    }
-}
-
-function selectWeek(w) { state.week = w; navigate('ui-workout-type'); }
 function selectWorkout(t) {
     state.type = t; state.exIdx = 0; state.log = [];
     const ex = workouts[t][0];
