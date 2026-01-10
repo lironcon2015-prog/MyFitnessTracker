@@ -6,17 +6,23 @@
     <title>Workout Tracker Pro</title>
     <link rel="stylesheet" href="style.css">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 </head>
 <body>
     <div class="app-container">
         <div style="display: flex; justify-content: space-between; align-items: center;">
             <button id="global-back" class="back-btn" onclick="handleGlobalBack()">↩ חזור</button>
-            <button onclick="location.reload(true)" style="background: none; border: none; font-size: 0.7em; color: #ccc;">רענן אפליקציה ↻</button>
+            <button onclick="location.reload(true)" style="background: none; border: none; font-size: 0.7em; color: #ccc;">רענן ↻</button>
         </div>
 
         <div id="ui-week" class="screen active">
             <h1 class="main-title">Workout Tracker</h1>
-            <p style="text-align: center; color: #666; font-size: 0.8em; margin-top: -10px;">Version 5.4</p>
+            <p style="text-align: center; color: #666; font-size: 0.8em; margin-top: -10px;">Version 5.6</p>
+            
+            <div style="text-align: center; margin-bottom: 20px;">
+                <button onclick="initAudio()" id="audio-init-btn" style="background: #f0f0f0; border: 1px solid #ccc; padding: 12px; border-radius: 8px; font-size: 0.9em; cursor: pointer; width: 100%;">🔊 הפעל צלילים ומנע נעילה</button>
+            </div>
+
             <p class="subtitle">בחר שבוע בבלוק:</p>
             <div class="grid-menu">
                 <button class="menu-item" onclick="selectWeek(1)">שבוע 1</button>
@@ -64,20 +70,10 @@
                     <span id="rest-timer" style="font-family: monospace; font-weight: bold; color: #007AFF; font-size: 1.4em; background: #eef2ff; padding: 4px 10px; border-radius: 8px; min-width: 70px; text-align: center; display: inline-block;">00:00</span>
                 </div>
             </div>
-            
             <div class="log-card">
-                <div class="input-row">
-                    <label>משקל (ק"ג):</label>
-                    <select id="weight-picker" class="modern-select"></select>
-                </div>
-                <div class="input-row">
-                    <label>חזרות:</label>
-                    <select id="reps-picker" class="modern-select"></select>
-                </div>
-                <div class="input-row">
-                    <label>RIR:</label>
-                    <select id="rir-picker" class="modern-select"></select>
-                </div>
+                <div class="input-row"><label>משקל (ק"ג):</label><select id="weight-picker" class="modern-select"></select></div>
+                <div class="input-row"><label>חזרות:</label><select id="reps-picker" class="modern-select"></select></div>
+                <div class="input-row"><label>RIR:</label><select id="rir-picker" class="modern-select"></select></div>
             </div>
             <button class="btn-primary" onclick="nextStep()">תעד סט</button>
         </div>
