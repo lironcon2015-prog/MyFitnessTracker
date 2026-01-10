@@ -2,7 +2,7 @@ let state = {
     week: 1, type: '', rm: 100, exIdx: 0, setIdx: 0, 
     log: [], currentEx: null, history: ['ui-week'],
     timerInterval: null, seconds: 0, startTime: null,
-    isArmPhase: false, armGroup: 'biceps', // 'biceps' or 'triceps'
+    isArmPhase: false, armGroup: 'biceps', 
     completedArmEx: []
 };
 
@@ -55,10 +55,14 @@ async function initAudio() {
 
 function startRestTimer() {
     stopRestTimer();
+    state.seconds = 0;
+    updateTimerDisplay(); // איפוס תצוגה מיידי ל-00:00
+    
+    const isFirstExerciseInWorkout = (state.exIdx === 0 && !state.isArmPhase);
+    const target = isFirstExerciseInWorkout ? 120 : 90;
+    document.getElementById('rest-target-display').innerText = isFirstExerciseInWorkout ? "2:00" : "1:30";
+    
     state.startTime = Date.now();
-    const isFirst = (state.exIdx === 0 && !state.isArmPhase);
-    const target = isFirst ? 120 : 90;
-    document.getElementById('rest-target-display').innerText = isFirst ? "2:00" : "1:30";
     state.timerInterval = setInterval(() => {
         state.seconds = Math.floor((Date.now() - state.startTime) / 1000);
         updateTimerDisplay();
@@ -72,7 +76,10 @@ function updateTimerDisplay() {
     document.getElementById('rest-timer').innerText = `${m}:${s}`;
 }
 
-function stopRestTimer() { if (state.timerInterval) clearInterval(state.timerInterval); state.timerInterval = null; }
+function stopRestTimer() { 
+    if (state.timerInterval) clearInterval(state.timerInterval); 
+    state.timerInterval = null; 
+}
 
 const workouts = {
     'A': [
@@ -150,7 +157,6 @@ function selectWorkout(t) {
 }
 
 function save1RM() { state.rm = parseFloat(document.getElementById('rm-picker').value); showConfirmScreen(); }
-
 function showConfirmScreen() {
     const ex = workouts[state.type][state.exIdx];
     document.getElementById('confirm-ex-name').innerText = ex.name;
@@ -195,22 +201,16 @@ function showGripSelection() {
     navigate('ui-variation');
 }
 
-function startArmWorkout() {
-    state.isArmPhase = true;
-    state.armGroup = 'biceps';
-    showArmSelection();
-}
+function startArmWorkout() { state.isArmPhase = true; state.armGroup = 'biceps'; showArmSelection(); }
 
 function showArmSelection() {
     const list = armExercises[state.armGroup];
     const remaining = list.filter(ex => !state.completedArmEx.includes(ex.name));
-    
     if (remaining.length === 0) {
         if (state.armGroup === 'biceps') { state.armGroup = 'triceps'; showArmSelection(); }
         else finish();
         return;
     }
-
     document.getElementById('arm-selection-title').innerText = state.armGroup === 'biceps' ? "בחר תרגיל בייספס:" : "בחר תרגיל טרייספס:";
     const opts = document.getElementById('arm-options'); opts.innerHTML = "";
     remaining.forEach(ex => {
@@ -218,12 +218,11 @@ function showArmSelection() {
         btn.onclick = () => { 
             state.currentEx = JSON.parse(JSON.stringify(ex));
             state.currentExName = ex.name;
-            state.currentEx.sets = [ex.sets[0], ex.sets[0], ex.sets[0]]; // 3 sets
+            state.currentEx.sets = [ex.sets[0], ex.sets[0], ex.sets[0]];
             startRecording();
         };
         opts.appendChild(btn);
     });
-
     const skipBtn = document.getElementById('btn-skip-arm-group');
     skipBtn.innerText = state.armGroup === 'biceps' ? "דלג לטרייספס" : "סיים אימון";
     skipBtn.onclick = () => {
@@ -233,54 +232,54 @@ function showArmSelection() {
     navigate('ui-arm-selection');
 }
 
-function startRecording() { state.setIdx = 0; stopRestTimer(); updateTimerDisplay(); navigate('ui-main'); initPickers(); }
+function startRecording() { 
+    state.setIdx = 0; 
+    stopRestTimer(); 
+    state.seconds = 0;
+    updateTimerDisplay();
+    navigate('ui-main'); 
+    initPickers(); 
+}
 
 function initPickers() {
     const target = state.currentEx.sets[state.setIdx];
     document.getElementById('ex-display-name').innerText = state.currentExName;
     document.getElementById('set-counter').innerText = `Set ${state.setIdx + 1}/${state.currentEx.sets.length}`;
     
+    // ניהול תצוגת טיימר: רק מהסט השני ואילך
+    const timerArea = document.getElementById('timer-area');
+    if (state.setIdx > 0) {
+        timerArea.style.visibility = 'visible';
+        startRestTimer();
+    } else {
+        timerArea.style.visibility = 'hidden';
+        stopRestTimer();
+    }
+
     const isUnilateral = unilateralExercises.some(u => state.currentExName.includes(u));
     document.getElementById('unilateral-note').style.display = isUnilateral ? 'block' : 'none';
 
-    if (state.setIdx > 0) startRestTimer();
-    
     const wPick = document.getElementById('weight-picker'); wPick.innerHTML = "";
     const step = state.currentEx.step || 2.5;
     const min = state.currentEx.minW || Math.max(0, target.w - 40);
     const max = state.currentEx.maxW || target.w + 40;
-
     for(let i = min; i <= max; i = parseFloat((i + step).toFixed(2))) {
         let o = new Option(i + " kg", i); if(i === target.w) o.selected = true; wPick.add(o);
     }
-    
     const rPick = document.getElementById('reps-picker'); rPick.innerHTML = "";
     for(let i = 1; i <= 25; i++) { let o = new Option(i, i); if(i === target.r) o.selected = true; rPick.add(o); }
-    
     const rirPick = document.getElementById('rir-picker'); rirPick.innerHTML = "";
     [0, 0.5, 1, 1.5, 2, 2.5, 3, 4, 5].forEach(v => {
-        let o = new Option(v === 0 ? "0 (Fail)" : v, v); 
-        if(v === (state.currentEx.rir || 2)) o.selected = true; 
-        rirPick.add(o);
+        let o = new Option(v === 0 ? "0 (Fail)" : v, v); if(v === (state.currentEx.rir || 2)) o.selected = true; rirPick.add(o);
     });
 }
 
 function nextStep() {
     const isUni = unilateralExercises.some(u => state.currentExName.includes(u));
     const finalExName = state.currentExName + (isUni && state.currentExName === "Dumbbell Bicep Curls" ? " (בכל יד)" : (isUni ? " (לצד אחד)" : ""));
-    
-    state.log.push({ 
-        exName: finalExName, 
-        w: document.getElementById('weight-picker').value, 
-        r: document.getElementById('reps-picker').value, 
-        rir: document.getElementById('rir-picker').value 
-    });
-
-    if (state.setIdx < state.currentEx.sets.length - 1) { 
-        state.setIdx++; initPickers(); 
-    } else { 
-        navigate('ui-extra'); 
-    }
+    state.log.push({ exName: finalExName, w: document.getElementById('weight-picker').value, r: document.getElementById('reps-picker').value, rir: document.getElementById('rir-picker').value });
+    if (state.setIdx < state.currentEx.sets.length - 1) { state.setIdx++; initPickers(); } 
+    else { navigate('ui-extra'); }
 }
 
 function handleExtra(extra) {
@@ -300,18 +299,12 @@ function handleExtra(extra) {
     }
 }
 
-function checkFlow() { 
-    if (state.exIdx < workouts[state.type].length) showConfirmScreen(); 
-    else navigate('ui-ask-arms');
-}
+function checkFlow() { if (state.exIdx < workouts[state.type].length) showConfirmScreen(); else navigate('ui-ask-arms'); }
 
 function finish() {
     navigate('ui-summary');
     let t = `סיכום אימון ${workoutDisplayNames[state.type]} - שבוע ${state.week}\n---\n`;
-    state.log.forEach(l => { 
-        if(l.skip) t += `${l.exName}: דלג\n`; 
-        else t += `${l.exName}: ${l.w}kg x ${l.r} (RIR ${l.rir})\n`; 
-    });
+    state.log.forEach(l => { if(l.skip) t += `${l.exName}: דלג\n`; else t += `${l.exName}: ${l.w}kg x ${l.r} (RIR ${l.rir})\n`; });
     document.getElementById('summary-area').innerText = t;
 }
 
