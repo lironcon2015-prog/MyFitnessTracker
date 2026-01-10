@@ -56,7 +56,8 @@ const workouts = {
 // --- פונקציית צליל ---
 function playBeep(times = 1) {
     try {
-        const context = new (window.AudioContext || window.webkitAudioContext)();
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        const context = new AudioCtx();
         for (let i = 0; i < times; i++) {
             setTimeout(() => {
                 const osc = context.createOscillator();
@@ -71,7 +72,7 @@ function playBeep(times = 1) {
                 osc.stop(context.currentTime + 0.2);
             }, i * 300);
         }
-    } catch(e) { console.log("Audio error", e); }
+    } catch(e) { console.error("Audio error", e); }
 }
 
 // --- ניהול טיימר ---
@@ -87,7 +88,12 @@ function startRestTimer() {
     }, 1000);
 }
 
-function stopRestTimer() { if (state.timerInterval) clearInterval(state.timerInterval); }
+function stopRestTimer() {
+    if (state.timerInterval) {
+        clearInterval(state.timerInterval);
+        state.timerInterval = null;
+    }
+}
 
 function updateTimerDisplay() {
     const min = Math.floor(state.seconds / 60);
@@ -173,14 +179,21 @@ function initPickers() {
     document.getElementById('ex-display-name').innerText = state.currentExName;
     document.getElementById('set-counter').innerText = `Set ${state.setIdx + 1}/${state.currentEx.sets.length}`;
     
-    if (state.setIdx > 0) { startRestTimer(); } 
-    else { stopRestTimer(); const el = document.getElementById('rest-timer'); if (el) el.innerText = "00:00"; }
+    // בסט הראשון של תרגיל - הטיימר תמיד על אפס
+    if (state.setIdx === 0) {
+        stopRestTimer();
+        state.seconds = 0;
+        updateTimerDisplay();
+    } else {
+        // בסטים הבאים - מפעילים טיימר
+        startRestTimer();
+    }
 
     const wPick = document.getElementById('weight-picker'); wPick.innerHTML = "";
     if (state.currentEx.isBW) { wPick.add(new Option("Bodyweight (BW)", 0)); } 
     else {
         const step = state.currentEx.step || 2.5;
-        for(let i = Math.max(0, target.w - 30); i <= target.w + 30; i += step) {
+        for(let i = Math.max(0, target.w - 40); i <= target.w + 40; i += step) {
             let val = parseFloat(i.toFixed(1));
             let opt = new Option(val + " kg", val); if(val === target.w) opt.selected = true; wPick.add(opt);
         }
@@ -194,13 +207,34 @@ function initPickers() {
 }
 
 function nextStep() {
-    state.log.push({ exIdx: state.exIdx, exName: state.currentExName, w: document.getElementById('weight-picker').value, r: document.getElementById('reps-picker').value, rir: document.getElementById('rir-picker').value, isBW: state.currentEx.isBW });
-    if (state.setIdx < state.currentEx.sets.length - 1) { state.setIdx++; initPickers(); } else { navigate('ui-extra'); }
+    state.log.push({ 
+        exIdx: state.exIdx, 
+        exName: state.currentExName, 
+        w: document.getElementById('weight-picker').value, 
+        r: document.getElementById('reps-picker').value, 
+        rir: document.getElementById('rir-picker').value, 
+        isBW: state.currentEx.isBW 
+    });
+    
+    if (state.setIdx < state.currentEx.sets.length - 1) { 
+        state.setIdx++; 
+        initPickers(); 
+    } else { 
+        navigate('ui-extra'); 
+    }
 }
 
 function handleExtra(isExtra) {
-    if(isExtra) { state.setIdx++; state.currentEx.sets.push({...state.currentEx.sets[state.setIdx-1]}); initPickers(); navigate('ui-main'); } 
-    else { state.exIdx++; state.setIdx = 0; checkFlow(); }
+    if(isExtra) { 
+        state.setIdx++; 
+        state.currentEx.sets.push({...state.currentEx.sets[state.setIdx-1]}); 
+        initPickers(); 
+        navigate('ui-main'); 
+    } else { 
+        state.exIdx++; 
+        state.setIdx = 0; 
+        checkFlow(); 
+    }
 }
 
 function checkFlow() { if (state.exIdx < workouts[state.type].length) showConfirmScreen(); else finish(); }
