@@ -42,8 +42,8 @@ function playBeep(times = 1) {
 
 async function initAudio() {
     playBeep(1);
-    document.getElementById('audio-init-btn').innerText = "⚡ Ready to Train";
-    document.getElementById('audio-init-btn').style.background = "linear-gradient(135deg, #32D74B, #248f32)";
+    document.getElementById('audio-init-btn').innerText = "⚡ מצב אימון פעיל";
+    document.getElementById('audio-init-btn').style.backgroundColor = "#32d74b";
     try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
 }
 
@@ -165,7 +165,7 @@ function confirmExercise(doEx) {
     } else if (state.currentEx.hasVariations) {
         const opts = document.getElementById('variation-options'); opts.innerHTML = "";
         state.currentEx.variations.forEach(v => {
-            const btn = document.createElement('button'); btn.className = "menu-item"; btn.innerText = v.name;
+            const btn = document.createElement('button'); btn.className = "btn-secondary"; btn.innerText = v.name;
             btn.onclick = () => { 
                 state.currentExName = v.name; state.currentEx.sets = v.sets; 
                 state.currentEx.isBW = v.isBW; state.currentEx.step = v.step || 2.5;
@@ -178,10 +178,10 @@ function confirmExercise(doEx) {
 }
 
 function showGripSelection() {
-    document.getElementById('variation-title').innerText = "Grip Type:";
+    document.getElementById('variation-title').innerText = "בחר סוג אחיזה:";
     const opts = document.getElementById('variation-options'); opts.innerHTML = "";
-    ['Narrow Grip', 'Wide Grip'].forEach(g => {
-        const btn = document.createElement('button'); btn.className = "menu-item"; btn.innerText = g;
+    ['אחיזה צרה', 'אחיזה רחבה'].forEach(g => {
+        const btn = document.createElement('button'); btn.className = "btn-secondary"; btn.innerText = g;
         btn.onclick = () => { state.currentExName += ` (${g})`; startRecording(); };
         opts.appendChild(btn);
     });
@@ -197,10 +197,10 @@ function showArmSelection() {
         if (state.armGroup === 'biceps') { state.armGroup = 'triceps'; showArmSelection(); }
         else finish(); return;
     }
-    document.getElementById('arm-selection-title').innerText = state.armGroup === 'biceps' ? "Biceps" : "Triceps";
+    document.getElementById('arm-selection-title').innerText = state.armGroup === 'biceps' ? "בחר בייספס" : "בחר טרייספס";
     const opts = document.getElementById('arm-options'); opts.innerHTML = "";
     remaining.forEach(ex => {
-        const btn = document.createElement('button'); btn.className = "menu-item"; btn.innerText = ex.name;
+        const btn = document.createElement('button'); btn.className = "btn-secondary"; btn.innerText = ex.name;
         btn.onclick = () => { 
             state.currentEx = JSON.parse(JSON.stringify(ex)); state.currentExName = ex.name;
             state.currentEx.sets = [ex.sets[0], ex.sets[0], ex.sets[0]]; startRecording();
@@ -208,8 +208,7 @@ function showArmSelection() {
         opts.appendChild(btn);
     });
     const skipBtn = document.getElementById('btn-skip-arm-group');
-    skipBtn.className = "btn-secondary";
-    skipBtn.innerText = state.armGroup === 'biceps' ? "Skip to Triceps" : "Finish Workout";
+    skipBtn.innerText = state.armGroup === 'biceps' ? "דלג לטרייספס" : "סיים אימון";
     skipBtn.onclick = () => { if (state.armGroup === 'biceps') { state.armGroup = 'triceps'; showArmSelection(); } else finish(); };
     navigate('ui-arm-selection');
 }
@@ -219,7 +218,7 @@ function startRecording() { state.setIdx = 0; stopRestTimer(); state.seconds = 0
 function initPickers() {
     const target = state.currentEx.sets[state.setIdx];
     document.getElementById('ex-display-name').innerText = state.currentExName;
-    document.getElementById('set-counter').innerText = `SET ${state.setIdx + 1} / ${state.currentEx.sets.length}`;
+    document.getElementById('set-counter').innerText = `SET ${state.setIdx + 1}/${state.currentEx.sets.length}`;
     
     const timerArea = document.getElementById('timer-area');
     if (state.setIdx > 0) { timerArea.style.visibility = 'visible'; startRestTimer(); } 
@@ -243,7 +242,7 @@ function initPickers() {
 
 function nextStep() {
     const isUni = unilateralExercises.some(u => state.currentExName.includes(u));
-    const finalExName = state.currentExName + (isUni && state.currentExName === "Dumbbell Bicep Curls" ? " (Per Arm)" : (isUni ? " (Single Side)" : ""));
+    const finalExName = state.currentExName + (isUni && state.currentExName === "Dumbbell Bicep Curls" ? " (בכל יד)" : (isUni ? " (לצד אחד)" : ""));
     state.log.push({ exName: finalExName, w: document.getElementById('weight-picker').value, r: document.getElementById('reps-picker').value, rir: document.getElementById('rir-picker').value, isArm: state.isArmPhase });
     if (state.setIdx < state.currentEx.sets.length - 1) { state.setIdx++; initPickers(); } else { navigate('ui-extra'); }
 }
