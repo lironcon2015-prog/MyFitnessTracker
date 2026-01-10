@@ -3,11 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Workout Tracker Pro</title>
+    <title>Workout Tracker</title>
     <link rel="stylesheet" href="style.css">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Workout">
 </head>
 <body>
     <div class="app-container">
@@ -18,10 +17,10 @@
 
         <div id="ui-week" class="screen active">
             <h1 class="main-title">Workout Tracker</h1>
-            <p style="text-align: center; color: #666; font-size: 0.8em; margin-top: -10px;">Version 6.2</p>
+            <p style="text-align: center; color: #666; font-size: 0.8em; margin-top: -10px;">Version 6.4</p>
             
             <div style="text-align: center; margin-bottom: 20px;">
-                <button onclick="initAudioAndNotifications()" id="audio-init-btn" style="background: #007AFF; color: white; border: none; padding: 18px; border-radius: 12px; font-size: 1.1em; cursor: pointer; width: 100%; font-weight: bold; box-shadow: 0 4px 15px rgba(0,122,255,0.4);">🔊 הפעל סאונד והתראות רקע</button>
+                <button onclick="initAudio()" id="audio-init-btn" style="background: #007AFF; color: white; border: none; padding: 18px; border-radius: 12px; font-size: 1.1em; cursor: pointer; width: 100%; font-weight: bold; box-shadow: 0 4px 15px rgba(0,122,255,0.4);">🔊 הפעל סאונד ומנע נעילה</button>
             </div>
 
             <p class="subtitle">בחר שבוע:</p>
@@ -72,9 +71,11 @@
             </div>
             <button class="btn-primary" id="btn-submit-set" onclick="nextStep()" style="font-size: 1.2em; padding: 15px;">תעד סט</button>
             
-            <div style="text-align: center; margin-top: 35px; border-top: 1px solid #eee; padding-top: 20px;">
+            <div style="text-align: center; margin-top: 35px; border-top: 1px solid #eee; padding-top: 20px; position: relative;">
                 <div style="font-size: 1em; color: #666; margin-bottom: 5px;">זמן מנוחה:</div>
                 <div id="rest-timer" style="font-family: 'Courier New', monospace; font-weight: 900; color: #007AFF; font-size: 3em; letter-spacing: 3px; background: #f0f4ff; display: inline-block; padding: 10px 30px; border-radius: 15px; border: 2px solid #d0e0ff;">00:00</div>
+                
+                <button onclick="playBeep(1)" style="display: block; margin: 10px auto 0; background: #eee; border: 1px solid #ccc; border-radius: 50%; width: 40px; height: 40px; font-size: 1.2em; cursor: pointer;">🔊</button>
             </div>
         </div>
 
