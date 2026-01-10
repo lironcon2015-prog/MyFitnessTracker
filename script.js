@@ -5,7 +5,7 @@ let state = {
     isArmPhase: false, armGroup: 'biceps', 
     completedArmEx: [],
     workoutStartTime: null, workoutDurationMins: 0,
-    lastLoggedSet: null // לשמירת היסטוריה תוך כדי אימון
+    lastLoggedSet: null 
 };
 
 let audioContext;
@@ -24,8 +24,6 @@ const armExercises = {
         { name: "Lying Triceps Extension (French Press)", sets: [{w: 35, r: 8}], step: 2.5, minW: 25, maxW: 50, rir: 2 }
     ]
 };
-
-const workoutDisplayNames = { 'A': 'חזה וכתפיים', 'B': 'רגליים וגב', 'C': 'כתפיים, חזה וגב' };
 
 const workouts = {
     'A': [
@@ -73,6 +71,8 @@ const workouts = {
     ]
 };
 
+const workoutDisplayNames = { 'A': 'חזה וכתפיים', 'B': 'רגליים וגב', 'C': 'כתפיים, חזה וגב' };
+
 function playBeep(times = 1) {
     if (!audioContext) { const AudioCtx = window.AudioContext || window.webkitAudioContext; audioContext = new AudioCtx(); }
     if (audioContext.state === 'suspended') audioContext.resume();
@@ -91,7 +91,7 @@ function playBeep(times = 1) {
 
 async function initAudio() {
     playBeep(1);
-    document.getElementById('audio-init-btn').innerText = "⚡ מצב אימון פעיל";
+    document.getElementById('audio-init-btn').innerText = "מצב אימון פעיל";
     document.getElementById('audio-init-btn').style.backgroundColor = "#32d74b";
     try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
 }
@@ -101,9 +101,7 @@ function startRestTimer() {
     state.seconds = 0;
     const isFirstEx = (state.exIdx === 0 && !state.isArmPhase);
     const target = isFirstEx ? 120 : 90;
-    document.getElementById('rest-target-display').innerText = isFirstEx ? "2:00" : "1:30";
     state.startTime = Date.now();
-    
     state.timerInterval = setInterval(() => {
         state.seconds = Math.floor((Date.now() - state.startTime) / 1000);
         updateTimerUI(target);
@@ -129,12 +127,28 @@ function navigate(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById(id).classList.add('active');
     if (id !== 'ui-main') stopRestTimer();
-    state.history.push(id);
+    
+    // מניעת כפילויות בהיסטוריה
+    if (state.history[state.history.length - 1] !== id) {
+        state.history.push(id);
+    }
+    
     document.getElementById('global-back').style.visibility = (id === 'ui-week') ? 'hidden' : 'visible';
 }
 
 function handleGlobalBack() {
-    if (state.history.length > 1) { state.history.pop(); navigate(state.history.pop()); }
+    if (state.history.length <= 1) return;
+    
+    state.history.pop(); // מסיר את המסך הנוכחי
+    const prev = state.history[state.history.length - 1];
+    
+    // אם המסך הקודם הוא "אישור תרגיל", דלג עליו צעד אחד נוסף אחורה
+    if (prev === 'ui-confirm' || prev === 'ui-variation' || prev === 'ui-1rm') {
+        state.history.pop();
+        navigate(state.history.pop());
+    } else {
+        navigate(state.history.pop());
+    }
 }
 
 function selectWeek(w) { state.week = w; navigate('ui-workout-type'); }
@@ -187,7 +201,7 @@ function confirmExercise(doEx) {
 }
 
 function showGripSelection() {
-    document.getElementById('variation-title').innerText = "בחר סוג אחיזה:";
+    document.getElementById('variation-title').innerText = "סוג אחיזה";
     const opts = document.getElementById('variation-options'); opts.innerHTML = "";
     ['אחיזה צרה', 'אחיזה רחבה'].forEach(g => {
         const btn = document.createElement('button'); btn.className = "btn-secondary"; btn.innerText = g;
@@ -229,10 +243,9 @@ function initPickers() {
     document.getElementById('ex-display-name').innerText = state.currentExName;
     document.getElementById('set-counter').innerText = `SET ${state.setIdx + 1}/${state.currentEx.sets.length}`;
     
-    // הצגת היסטוריה של הסט הקודם
     const histDiv = document.getElementById('last-set-info');
     if (state.lastLoggedSet) {
-        histDiv.innerText = `⏮ סט קודם: ${state.lastLoggedSet.w}kg x ${state.lastLoggedSet.r} (RIR ${state.lastLoggedSet.rir})`;
+        histDiv.innerText = `סט קודם: ${state.lastLoggedSet.w}kg x ${state.lastLoggedSet.r} (RIR ${state.lastLoggedSet.rir})`;
         histDiv.style.display = 'block';
     } else {
         histDiv.style.display = 'none';
@@ -261,37 +274,15 @@ function initPickers() {
 function nextStep() {
     const isUni = unilateralExercises.some(u => state.currentExName.includes(u));
     const finalExName = state.currentExName + (isUni && state.currentExName === "Dumbbell Bicep Curls" ? " (בכל יד)" : (isUni ? " (לצד אחד)" : ""));
-    
-    const currentSetData = { 
-        exName: finalExName, 
-        w: document.getElementById('weight-picker').value, 
-        r: document.getElementById('reps-picker').value, 
-        rir: document.getElementById('rir-picker').value, 
-        isArm: state.isArmPhase 
-    };
-    
+    const currentSetData = { exName: finalExName, w: document.getElementById('weight-picker').value, r: document.getElementById('reps-picker').value, rir: document.getElementById('rir-picker').value };
     state.log.push(currentSetData);
-    state.lastLoggedSet = currentSetData; // שמירה להיסטוריה בתוך התרגיל
-
-    if (state.setIdx < state.currentEx.sets.length - 1) { 
-        state.setIdx++; 
-        initPickers(); 
-    } else { 
-        navigate('ui-extra'); 
-    }
+    state.lastLoggedSet = currentSetData;
+    if (state.setIdx < state.currentEx.sets.length - 1) { state.setIdx++; initPickers(); } else { navigate('ui-extra'); }
 }
 
 function handleExtra(extra) {
-    if(extra) { 
-        state.setIdx++; 
-        state.currentEx.sets.push({...state.currentEx.sets[state.setIdx-1]}); 
-        initPickers(); 
-        navigate('ui-main'); 
-    } 
-    else { 
-        if (state.isArmPhase) { state.completedArmEx.push(state.currentExName); showArmSelection(); } 
-        else { state.exIdx++; checkFlow(); } 
-    }
+    if(extra) { state.setIdx++; state.currentEx.sets.push({...state.currentEx.sets[state.setIdx-1]}); initPickers(); navigate('ui-main'); } 
+    else { if (state.isArmPhase) { state.completedArmEx.push(state.currentExName); showArmSelection(); } else { state.exIdx++; checkFlow(); } }
 }
 
 function checkFlow() { if (state.exIdx < workouts[state.type].length) showConfirmScreen(); else navigate('ui-ask-arms'); }
@@ -299,21 +290,17 @@ function checkFlow() { if (state.exIdx < workouts[state.type].length) showConfir
 function finish() {
     state.workoutDurationMins = Math.floor((Date.now() - state.workoutStartTime) / 60000);
     navigate('ui-summary');
-    let summaryText = `🏋️ סיכום אימון ${workoutDisplayNames[state.type]}\n📅 שבוע ${state.week} | ⏱ ${state.workoutDurationMins} דקות\n\n`;
+    let summaryText = `סיכום אימון ${workoutDisplayNames[state.type]}\nשבוע ${state.week} | משך: ${state.workoutDurationMins} דקות\n\n`;
     state.log.forEach(l => {
-        if(l.skip) summaryText += `❌ ${l.exName}: לא בוצע\n`;
-        else summaryText += `✅ ${l.exName}: ${l.w}kg x ${l.r} (RIR ${l.rir})\n`;
+        if(l.skip) summaryText += `${l.exName}: לא בוצע\n`;
+        else summaryText += `${l.exName}: ${l.w}kg x ${l.r} (RIR ${l.rir})\n`;
     });
     document.getElementById('summary-area').innerText = summaryText;
 }
 
 function copyResult() {
     const text = document.getElementById('summary-area').innerText;
-    if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(text).then(() => { alert("הסיכום הועתק!"); location.reload(); });
-    } else {
-        const textArea = document.createElement("textarea"); textArea.value = text; document.body.appendChild(textArea); textArea.select();
-        try { document.execCommand('copy'); alert("הסיכום הועתק!"); } catch (err) { alert("שגיאה בהעתקה"); }
-        document.body.removeChild(textArea); location.reload();
-    }
+    const textArea = document.createElement("textarea"); textArea.value = text; document.body.appendChild(textArea); textArea.select();
+    try { document.execCommand('copy'); alert("הסיכום הועתק"); } catch (err) { alert("שגיאה בהעתקה"); }
+    document.body.removeChild(textArea); location.reload();
 }
