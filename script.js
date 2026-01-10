@@ -5,62 +5,47 @@ let state = {
 };
 
 let audioContext;
-let wakeLock = null;
+let swRegistration = null;
 
-// פונקציה להשמעת צפצוף עם התעוררות מנוע הסאונד
+// רישום ה-Service Worker
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').then(reg => {
+            swRegistration = reg;
+            console.log('SW Registered');
+        });
+    });
+}
+
 function playBeep(times = 1) {
     if (!audioContext) {
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         audioContext = new AudioCtx();
     }
     if (audioContext.state === 'suspended') audioContext.resume();
-
     for (let i = 0; i < times; i++) {
         setTimeout(() => {
             const o = audioContext.createOscillator();
             const g = audioContext.createGain();
-            o.type = 'sine';
-            o.frequency.setValueAtTime(880, audioContext.currentTime);
-            g.gain.setValueAtTime(0.6, audioContext.currentTime);
+            o.type = 'sine'; o.frequency.setValueAtTime(880, audioContext.currentTime);
+            g.gain.setValueAtTime(0.5, audioContext.currentTime);
             g.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
-            o.connect(g);
-            g.connect(audioContext.destination);
-            o.start();
-            o.stop(audioContext.currentTime + 0.4);
+            o.connect(g); g.connect(audioContext.destination);
+            o.start(); o.stop(audioContext.currentTime + 0.4);
         }, i * 450);
     }
 }
 
-// הפעלה ראשונית של סאונד, התראות ומניעת נעילה
 async function initAudioAndNotifications() {
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    audioContext = new AudioCtx();
-    playBeep(1); // צפצוף לבדיקה מיידית
-    
-    // מניעת נעילה
-    if ('wakeLock' in navigator) {
-        try { wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
-    }
-
-    // בקשת התראות
+    playBeep(1);
     if ("Notification" in window) {
         const permission = await Notification.requestPermission();
-        if (permission === "granted") {
-            new Notification("Workout Tracker", { body: "התראות פעילות ברקע ✅", silent: false });
+        if (permission === "granted" && swRegistration) {
+            swRegistration.showNotification("Workout Tracker", { body: "התראות רקע הופעלו בהצלחה!" });
         }
     }
-
-    document.getElementById('audio-init-btn').innerText = "✅ הכל מוכן (סאונד + רקע)";
+    document.getElementById('audio-init-btn').innerText = "✅ סאונד והתראות פעילים";
     document.getElementById('audio-init-btn').style.background = "#28a745";
-}
-
-function sendAlert(msg) {
-    // צליל פנימי
-    playBeep(3);
-    // התראת מערכת (לרקע)
-    if (Notification.permission === "granted") {
-        new Notification("Workout Tracker", { body: msg });
-    }
 }
 
 function updateTimerDisplay() {
@@ -75,21 +60,37 @@ function startRestTimer() {
     state.startTime = Date.now();
     state.seconds = 0;
     updateTimerDisplay();
-    let b90 = false, b120 = false;
+
+    // תזמון התראות רקע דרך ה-Service Worker
+    if (Notification.permission === "granted" && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+            type: 'SCHEDULE_NOTIF',
+            title: "זמן מנוחה",
+            message: "עברו 90 שניות! הסט מחכה.",
+            delay: 90000
+        });
+        navigator.serviceWorker.controller.postMessage({
+            type: 'SCHEDULE_NOTIF',
+            title: "זמן מנוחה",
+            message: "עברו 2 דקות! קדימה לסט!",
+            delay: 120000
+        });
+    }
 
     state.timerInterval = setInterval(() => {
         state.seconds = Math.floor((Date.now() - state.startTime) / 1000);
         updateTimerDisplay();
-
-        if (state.seconds === 90 && !b90) { sendAlert("דקה וחצי עברו!"); b90 = true; }
-        if (state.seconds === 120 && !b120) { sendAlert("שתי דקות עברו! צא לסט!"); b120 = true; }
+        if (state.seconds === 90) playBeep(2);
+        if (state.seconds === 120) playBeep(3);
     }, 1000);
 }
 
-function stopRestTimer() { if (state.timerInterval) clearInterval(state.timerInterval); state.timerInterval = null; }
+function stopRestTimer() { 
+    if (state.timerInterval) clearInterval(state.timerInterval); 
+    state.timerInterval = null; 
+}
 
-// --- לוגיקת האפליקציה המלאה ---
-
+// לוגיקת אימונים מלאה
 const workouts = {
     'A': [
         { name: "Bench Press (Main)", isCalc: true, baseRM: 122.5, rmRange: [110, 160] },
@@ -144,7 +145,6 @@ function navigate(id) {
     if (state.history[state.history.length - 1] !== id) state.history.push(id);
     document.getElementById('global-back').style.display = (id === 'ui-week') ? 'none' : 'block';
 }
-
 function handleGlobalBack() {
     if (state.history.length > 1) {
         state.history.pop();
@@ -153,9 +153,7 @@ function handleGlobalBack() {
         navigate(prev);
     }
 }
-
 function selectWeek(w) { state.week = w; navigate('ui-workout-type'); }
-
 function selectWorkout(t) {
     state.type = t; state.exIdx = 0; state.log = [];
     const ex = workouts[t][0];
@@ -168,15 +166,12 @@ function selectWorkout(t) {
         navigate('ui-1rm');
     } else { showConfirmScreen(); }
 }
-
 function save1RM() { state.rm = parseFloat(document.getElementById('rm-picker').value); showConfirmScreen(); }
-
 function showConfirmScreen() {
     const ex = workouts[state.type][state.exIdx];
     document.getElementById('confirm-ex-name').innerText = ex.name;
     navigate('ui-confirm');
 }
-
 function confirmExercise(doEx) {
     if (!doEx) { state.log.push({ skip: true, exName: workouts[state.type][state.exIdx].name }); state.exIdx++; checkFlow(); return; }
     state.currentEx = JSON.parse(JSON.stringify(workouts[state.type][state.exIdx]));
@@ -196,14 +191,12 @@ function confirmExercise(doEx) {
         navigate('ui-variation');
     } else { state.currentExName = state.currentEx.name; startRecording(); }
 }
-
 function startRecording() { state.setIdx = 0; stopRestTimer(); state.seconds = 0; updateTimerDisplay(); navigate('ui-main'); initPickers(); }
-
 function initPickers() {
     const target = state.currentEx.sets[state.setIdx];
     document.getElementById('ex-display-name').innerText = state.currentExName;
     document.getElementById('set-counter').innerText = `Set ${state.setIdx + 1}/${state.currentEx.sets.length}`;
-    if (state.setIdx > 0) { startRestTimer(); } else { stopRestTimer(); state.seconds = 0; updateTimerDisplay(); }
+    if (state.setIdx > 0) startRestTimer();
     const wPick = document.getElementById('weight-picker'); wPick.innerHTML = "";
     if (state.currentEx.isBW) { wPick.add(new Option("BW", 0)); } 
     else {
@@ -220,24 +213,19 @@ function initPickers() {
         let o = new Option(v === 0 ? "0 (Fail)" : v, v); if(v === 2) o.selected = true; rirPick.add(o);
     });
 }
-
 function nextStep() {
     state.log.push({ exName: state.currentExName, w: document.getElementById('weight-picker').value, r: document.getElementById('reps-picker').value, rir: document.getElementById('rir-picker').value, isBW: state.currentEx.isBW });
     if (state.setIdx < state.currentEx.sets.length - 1) { state.setIdx++; initPickers(); } else { navigate('ui-extra'); }
 }
-
 function handleExtra(extra) {
     if(extra) { state.setIdx++; state.currentEx.sets.push({...state.currentEx.sets[state.setIdx-1]}); initPickers(); navigate('ui-main'); } 
     else { state.exIdx++; checkFlow(); }
 }
-
 function checkFlow() { if (state.exIdx < workouts[state.type].length) showConfirmScreen(); else finish(); }
-
 function finish() {
     navigate('ui-summary');
     let t = `סיכום אימון ${state.type} - שבוע ${state.week}\n---\n`;
     state.log.forEach(l => { if(l.skip) t += `${l.exName}: דלג\n`; else t += `${l.exName}: ${l.isBW ? 'BW' : l.w+'kg'} x ${l.r} (RIR ${l.rir})\n`; });
     document.getElementById('summary-area').innerText = t;
 }
-
 function copyResult() { navigator.clipboard.writeText(document.getElementById('summary-area').innerText).then(() => { alert("הועתק!"); location.reload(); }); }
