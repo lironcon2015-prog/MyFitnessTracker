@@ -90,11 +90,8 @@ function resetAndStartTimer() {
     state.seconds = 0;
     const target = (state.exIdx === 0 && !state.isArmPhase) ? 120 : 90;
     state.startTime = Date.now();
-    
-    // איפוס UI לפני התחלה
     document.getElementById('rest-timer').innerText = "00:00";
     if(document.getElementById('timer-bar')) document.getElementById('timer-bar').style.width = "0%";
-
     state.timerInterval = setInterval(() => {
         state.seconds = Math.floor((Date.now() - state.startTime) / 1000);
         const m = Math.floor(state.seconds / 60).toString().padStart(2, '0');
@@ -114,11 +111,7 @@ function stopRestTimer() {
 function navigate(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById(id).classList.add('active');
-    
-    // בכל מעבר מסך שאינו מסך התיעוד הראשי - עוצרים טיימר
     if (id !== 'ui-main') stopRestTimer();
-    
-    // מניעת כפילויות בסטאק
     if (state.historyStack[state.historyStack.length - 1] !== id) state.historyStack.push(id);
     document.getElementById('global-back').style.visibility = (id === 'ui-week') ? 'hidden' : 'visible';
 }
@@ -126,23 +119,17 @@ function navigate(id) {
 function handleBackClick() {
     if (state.historyStack.length <= 1) return;
     const currentScreen = state.historyStack.pop();
-    
     if (currentScreen === 'ui-main' && state.setIdx > 0) {
         state.log.pop();
         state.setIdx--;
         initPickers();
         state.historyStack.push('ui-main');
-        if(state.setIdx > 0) resetAndStartTimer(); // חזרה לסט קודם מפעילה טיימר אם זה לא הסט הראשון
+        if(state.setIdx > 0) resetAndStartTimer();
         return;
     }
-
     const prevScreen = state.historyStack.pop();
     navigate(prevScreen);
-    
-    // אם חזרנו למסך התיעוד ממסך הבונוס - הטיימר צריך להמשיך/להתחיל
-    if(prevScreen === 'ui-main' && state.setIdx > 0) {
-        resetAndStartTimer();
-    }
+    if(prevScreen === 'ui-main' && state.setIdx > 0) resetAndStartTimer();
 }
 
 function selectWeek(w) { state.week = w; navigate('ui-workout-type'); }
@@ -167,6 +154,7 @@ function showExerciseList(muscle) {
     options.innerHTML = "";
     document.getElementById('variation-title').innerText = `תרגילי ${muscle}`;
     
+    // סינון תרגילים שטרם בוצעו
     const filtered = exerciseDatabase.filter(ex => 
         ex.muscles.includes(muscle) && !state.completedExInSession.includes(ex.name)
     );
@@ -176,7 +164,9 @@ function showExerciseList(muscle) {
         btn.className = "menu-item";
         btn.innerHTML = `<span>${ex.name}</span><span>➔</span>`;
         btn.onclick = () => {
-            state.currentEx = JSON.parse(JSON.stringify(ex));
+            // יצירת עותק עמוק לפי שם כדי למנוע באגים של אינדקסים
+            const dbRef = exerciseDatabase.find(d => d.name === ex.name);
+            state.currentEx = JSON.parse(JSON.stringify(dbRef));
             state.currentExName = ex.name;
             startRecording();
         };
@@ -290,9 +280,11 @@ function handleExtra(isBonus) {
         state.currentEx.sets.push({...state.currentEx.sets[state.setIdx-1]}); 
         initPickers(); navigate('ui-main'); 
     } else {
+        // הוספה לרשימת התרגילים שבוצעו כדי למנוע כפילות בפריסטייל וידיים
         state.completedExInSession.push(state.currentExName);
+        
         if (state.isArmPhase) showArmSelection();
-        else if (state.isFreestyle) showExerciseList(state.currentMuscle); // חוזר לאותו פלג גוף
+        else if (state.isFreestyle) showExerciseList(state.currentMuscle);
         else { state.exIdx++; checkFlow(); }
     }
 }
@@ -306,7 +298,9 @@ function startArmWorkout() { state.isArmPhase = true; state.armGroup = 'biceps';
 
 function showArmSelection() {
     const list = armExercises[state.armGroup];
-    const remaining = list.filter(ex => !state.completedArmEx.includes(ex.name));
+    // סינון תרגילים שבוצעו כבר (כולל אם נבחרו בפריסטייל במקרה)
+    const remaining = list.filter(ex => !state.completedExInSession.includes(ex.name));
+    
     if (remaining.length === 0) {
         if (state.armGroup === 'biceps') { state.armGroup = 'triceps'; showArmSelection(); }
         else finish(); return;
