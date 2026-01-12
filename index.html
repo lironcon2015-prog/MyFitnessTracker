@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>GymPro 9.0</title>
+    <title>GymPro 9.1</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="stylesheet" href="style.css">
@@ -12,7 +12,7 @@
     <div class="app-container">
         <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
             <button id="global-back" style="background:none; border:none; color: var(--primary-blue); font-size: 1.1em; font-weight: 600; cursor: pointer;" onclick="handleBackClick()">↩ חזור</button>
-            <span style="color: var(--text-dim); font-size: 0.85em; font-weight: 800; background: rgba(255,255,255,0.1); padding: 4px 12px; border-radius: 8px;">V 9.0</span>
+            <span style="color: var(--text-dim); font-size: 0.85em; font-weight: 800; background: rgba(255,255,255,0.1); padding: 4px 12px; border-radius: 8px;">V 9.1</span>
         </header>
 
         <div id="ui-week" class="screen active">
@@ -41,6 +41,9 @@
                 <button class="menu-item" onclick="showExerciseList('רגליים')">רגליים</button>
                 <button class="menu-item" onclick="showExerciseList('חזה')">חזה</button>
                 <button class="menu-item" onclick="showExerciseList('גב')">גב</button>
+                <div style="margin-top: 20px;">
+                    <button class="btn-primary" onclick="navigate('ui-ask-arms')" style="background-color: var(--card-bg); border: 1px solid var(--primary-blue);">סיום חלק עיקרי ומעבר לידיים</button>
+                </div>
             </div>
         </div>
 
@@ -48,6 +51,7 @@
             <div class="centered-content">
                 <h2 id="variation-title" style="margin-bottom: 20px; font-weight: 800;">בחר תרגיל</h2>
                 <div id="variation-options"></div>
+                <button class="btn-secondary" onclick="navigate('ui-muscle-select')" style="margin-top:10px;">החלף פלג גוף</button>
             </div>
         </div>
 
@@ -96,7 +100,7 @@
             <div class="centered-content">
                 <div class="professional-title">התרגיל הושלם</div>
                 <button class="btn-primary" style="background-color: var(--success);" onclick="handleExtra(true)">+ סט בונוס</button>
-                <button id="btn-continue-flow" class="btn-primary" onclick="handleExtra(false)">המשך לתרגיל הבא</button>
+                <button id="btn-continue-flow" class="btn-primary" onclick="handleExtra(false)">המשך</button>
             </div>
         </div>
 
