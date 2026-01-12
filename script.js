@@ -4,7 +4,7 @@ let state = {
     historyStack: ['ui-week'],
     timerInterval: null, seconds: 0, startTime: null,
     isArmPhase: false, isFreestyle: false, currentMuscle: '',
-    completedArmEx: [], completedExInSession: [],
+    completedExInSession: [],
     workoutStartTime: null, workoutDurationMins: 0,
     lastLoggedSet: null 
 };
@@ -12,14 +12,13 @@ let state = {
 let audioContext;
 let wakeLock = null;
 
-const unilateralExercises = ["Dumbbell Peck Fly", "Lateral Raises", "Lateral Raises (DB)", "Single Leg Curl", "Dumbbell Bicep Curls", "Cable Fly"];
+const unilateralExercises = ["Dumbbell Peck Fly", "Lateral Raises", "Single Leg Curl", "Dumbbell Bicep Curls", "Cable Fly"];
 
+// Database מעודכן ללא כפילויות
 const exerciseDatabase = [
     { name: "Overhead Press (Main)", muscles: ["כתפיים"], isCalc: true, baseRM: 77.5, rmRange: [65, 90], manualRange: {base: 50, min: 40, max: 80, step: 2.5} },
     { name: "Lateral Raises", muscles: ["כתפיים"], sets: [{w: 12.5, r: 13}, {w: 12.5, r: 13}, {w: 12.5, r: 11}], step: 0.5 },
-    { name: "Lateral Raises (DB)", muscles: ["כתפיים"], sets: [{w: 12.5, r: 13}, {w: 12.5, r: 13}, {w: 12.5, r: 11}], step: 0.5 },
     { name: "Face Pulls", muscles: ["כתפיים"], sets: [{w: 40, r: 13}, {w: 40, r: 13}, {w: 40, r: 15}], step: 2.5 },
-    { name: "Face Pull (Cable)", muscles: ["כתפיים"], sets: [{w: 37.5, r: 12}, {w: 37.5, r: 12}, {w: 37.5, r: 13}], step: 2.5 },
     { name: "Barbell Shrugs", muscles: ["כתפיים"], sets: [{w: 140, r: 11}, {w: 140, r: 11}, {w: 140, r: 11}], step: 5 },
     { name: "Bench Press (Main)", muscles: ["חזה"], isCalc: true, baseRM: 122.5, rmRange: [110, 160], manualRange: {base: 85, min: 60, max: 140, step: 2.5} },
     { name: "Incline Bench Press", muscles: ["חזה"], sets: [{w: 65, r: 9}, {w: 65, r: 9}, {w: 65, r: 9}], step: 2.5 },
@@ -32,12 +31,11 @@ const exerciseDatabase = [
     { name: "Romanian Deadlift", muscles: ["רגליים"], sets: [{w: 100, r: 8}, {w: 100, r: 8}, {w: 100, r: 8}], step: 2.5, minW: 60, maxW: 180 },
     { name: "Single Leg Curl", muscles: ["רגליים"], sets: [{w: 25, r: 8}, {w: 30, r: 6}, {w: 25, r: 8}], step: 2.5 },
     { name: "Lying Leg Curl (Double)", muscles: ["רגליים"], sets: [{w: 50, r: 8}, {w: 60, r: 6}, {w: 50, r: 8}], step: 5 },
-    { name: "Seated Leg Curl (Double)", muscles: ["רגליים"], sets: [{w: 50, r: 8}, {w: 60, r: 6}, {w: 50, r: 8}], step: 5 },
     { name: "Seated Calf Raise", muscles: ["רגליים"], sets: [{w: 70, r: 10}, {w: 70, r: 10}, {w: 70, r: 12}], step: 5 },
     { name: "Standing Calf Raise", muscles: ["רגליים"], sets: [{w: 110, r: 10}, {w: 110, r: 10}, {w: 110, r: 12}], step: 10 },
     { name: "Lat Pulldown", muscles: ["גב"], sets: [{w: 75, r: 10}, {w: 75, r: 10}, {w: 75, r: 11}], step: 2.5 },
     { name: "Pull Ups", muscles: ["גב"], isBW: true, sets: [{w: 0, r: 8}, {w: 0, r: 8}, {w: 0, r: 8}] },
-    { name: "Cable Row", muscles: ["גב"], sets: [{w: 65, r: 10}, {w: 65, r: 10}, {w: 65, r: 12}], step: 2.5, askGrip: true },
+    { name: "Cable Row", muscles: ["גב"], sets: [{w: 65, r: 10}, {w: 65, r: 10}, {w: 65, r: 12}], step: 2.5 },
     { name: "Machine Row", muscles: ["גב"], sets: [{w: 50, r: 10}, {w: 50, r: 10}, {w: 50, r: 12}], step: 5 },
     { name: "Straight Arm Pulldown", muscles: ["גב"], sets: [{w: 30, r: 10}, {w: 30, r: 12}, {w: 30, r: 12}], step: 2.5 },
     { name: "Back Extension", muscles: ["גב"], sets: [{w: 0, r: 12}, {w: 0, r: 12}, {w: 0, r: 12}], step: 5, minW: 0, maxW: 50, isBW: true }
@@ -56,13 +54,14 @@ const armExercises = {
 };
 
 const workouts = {
-    'A': ["Overhead Press (Main)", "Barbell Shrugs", "Lateral Raises (DB)", "Face Pull (Cable)", "Incline Bench Press"],
+    'A': ["Overhead Press (Main)", "Barbell Shrugs", "Lateral Raises", "Face Pulls", "Incline Bench Press"],
     'B': ["Leg Press", "Single Leg Curl", "Lat Pulldown", "Cable Row", "Seated Calf Raise", "Straight Arm Pulldown"],
     'C': ["Bench Press (Main)", "Incline Bench Press", "Dumbbell Peck Fly", "Lateral Raises", "Face Pulls"]
 };
 
-const workoutDisplayNames = { 'A': 'כתפיים', 'B': 'רגליים וגב', 'C': 'חזה', 'Freestyle': 'אימון מותאם אישית' };
+const workoutDisplayNames = { 'A': 'כתפיים', 'B': 'רגליים וגב', 'C': 'חזה', 'Freestyle': 'פריסטייל' };
 
+// פונקציות עזר וטיימר (זהה ל-9.2)
 function playBeep(times = 1) {
     if (!audioContext) { const AudioCtx = window.AudioContext || window.webkitAudioContext; audioContext = new AudioCtx(); }
     if (audioContext.state === 'suspended') audioContext.resume();
@@ -88,7 +87,7 @@ async function initAudio() {
 function resetAndStartTimer() {
     stopRestTimer();
     state.seconds = 0;
-    const target = (state.exIdx === 0 && !state.isArmPhase) ? 120 : 90;
+    const target = (state.exIdx === 0 && !state.isArmPhase && !state.isFreestyle) ? 120 : 90;
     state.startTime = Date.now();
     document.getElementById('rest-timer').innerText = "00:00";
     if(document.getElementById('timer-bar')) document.getElementById('timer-bar').style.width = "0%";
@@ -135,14 +134,14 @@ function handleBackClick() {
 function selectWeek(w) { state.week = w; navigate('ui-workout-type'); }
 
 function selectWorkout(t) {
-    state.type = t; state.exIdx = 0; state.log = []; state.completedArmEx = []; 
+    state.type = t; state.exIdx = 0; state.log = []; 
     state.completedExInSession = []; state.isArmPhase = false; state.isFreestyle = false;
     state.workoutStartTime = Date.now();
     showConfirmScreen();
 }
 
 function startFreestyle() {
-    state.type = 'Freestyle'; state.log = []; state.completedArmEx = [];
+    state.type = 'Freestyle'; state.log = []; 
     state.completedExInSession = []; state.isArmPhase = false; state.isFreestyle = true;
     state.workoutStartTime = Date.now();
     navigate('ui-muscle-select');
@@ -154,7 +153,6 @@ function showExerciseList(muscle) {
     options.innerHTML = "";
     document.getElementById('variation-title').innerText = `תרגילי ${muscle}`;
     
-    // סינון תרגילים שטרם בוצעו
     const filtered = exerciseDatabase.filter(ex => 
         ex.muscles.includes(muscle) && !state.completedExInSession.includes(ex.name)
     );
@@ -164,11 +162,21 @@ function showExerciseList(muscle) {
         btn.className = "menu-item";
         btn.innerHTML = `<span>${ex.name}</span><span>➔</span>`;
         btn.onclick = () => {
-            // יצירת עותק עמוק לפי שם כדי למנוע באגים של אינדקסים
+            // בחירה בטוחה לפי שם
             const dbRef = exerciseDatabase.find(d => d.name === ex.name);
             state.currentEx = JSON.parse(JSON.stringify(dbRef));
             state.currentExName = ex.name;
-            startRecording();
+            
+            // הגנה: בפריסטייל לא הולכים למסך 1RM גם אם התרגיל מוגדר כ-Calc
+            if (state.currentEx.isCalc && state.isFreestyle) {
+                state.currentEx.sets = Array(3).fill({w: state.currentEx.manualRange.base, r: 8});
+                state.currentEx.step = state.currentEx.manualRange.step;
+                state.currentEx.minW = state.currentEx.manualRange.min;
+                state.currentEx.maxW = state.currentEx.manualRange.max;
+                startRecording();
+            } else {
+                startRecording();
+            }
         };
         options.appendChild(btn);
     });
@@ -190,15 +198,9 @@ function confirmExercise(doEx) {
     state.currentEx = JSON.parse(JSON.stringify(exData));
     state.currentExName = exData.name;
 
-    if (state.currentEx.isCalc && !state.isFreestyle) {
+    if (state.currentEx.isCalc) {
         setupCalculatedEx();
     } else {
-        if(state.currentEx.manualRange) {
-            state.currentEx.sets = Array(3).fill({w: state.currentEx.manualRange.base, r: 8});
-            state.currentEx.step = state.currentEx.manualRange.step;
-            state.currentEx.minW = state.currentEx.manualRange.min;
-            state.currentEx.maxW = state.currentEx.manualRange.max;
-        }
         startRecording();
     }
 }
@@ -280,9 +282,7 @@ function handleExtra(isBonus) {
         state.currentEx.sets.push({...state.currentEx.sets[state.setIdx-1]}); 
         initPickers(); navigate('ui-main'); 
     } else {
-        // הוספה לרשימת התרגילים שבוצעו כדי למנוע כפילות בפריסטייל וידיים
         state.completedExInSession.push(state.currentExName);
-        
         if (state.isArmPhase) showArmSelection();
         else if (state.isFreestyle) showExerciseList(state.currentMuscle);
         else { state.exIdx++; checkFlow(); }
@@ -298,7 +298,6 @@ function startArmWorkout() { state.isArmPhase = true; state.armGroup = 'biceps';
 
 function showArmSelection() {
     const list = armExercises[state.armGroup];
-    // סינון תרגילים שבוצעו כבר (כולל אם נבחרו בפריסטייל במקרה)
     const remaining = list.filter(ex => !state.completedExInSession.includes(ex.name));
     
     if (remaining.length === 0) {
