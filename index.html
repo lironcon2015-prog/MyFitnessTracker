@@ -3,131 +3,155 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>GymPro 9.0</title>
+    <title>GymPro 9.0 Official</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="app-container">
-        <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <button id="global-back" style="background:none; border:none; color: var(--primary-blue); font-size: 1.1em; font-weight: 600; cursor: pointer;" onclick="handleBackClick()">↩ חזור</button>
-            <span style="color: var(--text-dim); font-size: 0.85em; font-weight: 800; background: rgba(255,255,255,0.1); padding: 4px 12px; border-radius: 8px;">V 9.0</span>
+        <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+            <button id="global-back" style="background:none; border:none; color: var(--primary-blue); font-size: 1.2em; font-weight: 600; cursor: pointer; visibility: hidden;" onclick="handleBackClick()">↩ חזור</button>
+            <div style="text-align: left;">
+                <span style="color: var(--text-dim); font-size: 0.8em; font-weight: 900; background: rgba(255,255,255,0.1); padding: 6px 12px; border-radius: 8px;">VERSION 9.0</span>
+            </div>
         </header>
 
         <div id="ui-week" class="screen active">
-            <h1 style="font-size: 2.2em; font-weight: 800; margin: 20px 0;">GymPro</h1>
-            <button onclick="initAudio()" id="audio-init-btn" class="btn-primary" style="margin-bottom: 40px;">הפעל מצב אימון</button>
+            <h1 style="font-size: 3em; font-weight: 900; margin-bottom: 10px;">GymPro</h1>
+            <p style="color: var(--text-dim); margin-bottom: 30px;">ברוך הבא לאימון שלך.</p>
+            <button onclick="initAudio()" id="audio-init-btn" class="btn-primary" style="margin-bottom: 40px; background-color: var(--danger);">1. לחץ להפעלת סאונד</button>
             <div class="centered-content">
-                <button class="menu-item" onclick="selectWeek(1)"><span>שבוע 1</span><span>➔</span></button>
-                <button class="menu-item" onclick="selectWeek(2)"><span>שבוע 2</span><span>➔</span></button>
-                <button class="menu-item" onclick="selectWeek(3)"><span>שבוע 3</span><span>➔</span></button>
+                <button class="menu-item" onclick="selectWeek(1)"><span>שבוע 1 (קל)</span><span>➔</span></button>
+                <button class="menu-item" onclick="selectWeek(2)"><span>שבוע 2 (בינוני)</span><span>➔</span></button>
+                <button class="menu-item" onclick="selectWeek(3)"><span>שבוע 3 (שיא)</span><span>➔</span></button>
             </div>
         </div>
 
         <div id="ui-workout-type" class="screen">
+            <h2 style="margin-bottom: 30px;">מה עושים היום?</h2>
             <div class="centered-content">
-                <button class="menu-item" onclick="selectWorkout('A')">אימון A: כתפיים (משולב)</button>
-                <button class="menu-item" onclick="selectWorkout('B')">אימון B: רגליים (משולב)</button>
-                <button class="menu-item" onclick="selectWorkout('C')">אימון C: חזה (משולב)</button>
-                <div style="height: 1px; background: var(--border-color); margin: 10px 0;"></div>
-                <button class="btn-primary" style="background-color: #5856d6;" onclick="startFreestyle()">אימון חופשי (מותאם אישית)</button>
+                <button class="menu-item" onclick="selectWorkout('A')">אימון A: כתפיים וגב</button>
+                <button class="menu-item" onclick="selectWorkout('B')">אימון B: רגליים וגב</button>
+                <button class="menu-item" onclick="selectWorkout('C')">אימון C: חזה וכתפיים</button>
+                <hr style="width: 100%; border: 0; border-top: 1px solid var(--border-color); margin: 20px 0;">
+                <button class="btn-primary" style="background: linear-gradient(135deg, #5856d6, #af52de);" onclick="startFreestyle()">+ אימון חופשי חדש</button>
             </div>
         </div>
 
         <div id="ui-body-part" class="screen">
-            <h2 class="professional-title">בחר פלג גוף</h2>
-            <div class="centered-content">
-                <button class="menu-item" onclick="selectBodyPart('legs')">רגליים</button>
-                <button class="menu-item" onclick="selectBodyPart('chest')">חזה</button>
-                <button class="menu-item" onclick="selectBodyPart('back')">גב</button>
-                <button class="menu-item" onclick="selectBodyPart('shoulders')">כתפיים</button>
-            </div>
+            <h2 style="text-align:center;">בחר פלג גוף</h2>
+            <div id="body-parts-grid" class="centered-content"></div>
         </div>
 
         <div id="ui-freestyle-list" class="screen">
-            <h2 id="freestyle-list-title" class="professional-title">בחר תרגיל</h2>
+            <h2 id="freestyle-list-title" style="text-align:center;">בחירת תרגיל</h2>
             <div id="freestyle-options" class="centered-content"></div>
         </div>
 
         <div id="ui-freestyle-interim" class="screen">
-            <div class="centered-content">
-                <h2 style="text-align: center; margin-bottom: 30px;">מה הלאה?</h2>
+            <div class="centered-content" style="text-align:center;">
+                <h2 style="font-size: 2em; margin-bottom: 40px;">התרגיל הסתיים!</h2>
                 <button class="btn-primary" onclick="continueFreestyleSamePart()">תרגיל נוסף לאותו שריר</button>
-                <button class="btn-secondary" onclick="navigate('ui-body-part')">החלף פלג גוף</button>
-                <button class="btn-primary" style="background-color: var(--success); margin-top: 20px;" onclick="finishMainWorkout()">עבור לידיים</button>
+                <button class="btn-secondary" onclick="navigate('ui-body-part')">החלף קבוצת שרירים</button>
+                <button class="btn-primary" style="background-color: var(--success); margin-top: 40px;" onclick="finishMainWorkout()">סיום אימון (עבור לידיים)</button>
             </div>
         </div>
 
         <div id="ui-1rm" class="screen">
             <div class="centered-content">
-                <h2 id="rm-title" style="margin-bottom: 20px;">1RM</h2>
-                <div class="log-card"><div class="input-row"><span>משקל מקסימלי (ק"ג)</span><select id="rm-picker" class="modern-select"></select></div></div>
-                <button class="btn-primary" onclick="save1RM()">המשך</button>
+                <h2 id="rm-title" style="text-align:center; margin-bottom: 10px;"></h2>
+                <p style="text-align:center; color: var(--text-dim); margin-bottom: 30px;">הזן משקל מקסימלי נוכחי</p>
+                <div class="log-card">
+                    <div class="input-row">
+                        <span>1RM (ק"ג)</span>
+                        <select id="rm-picker" class="modern-select"></select>
+                    </div>
+                </div>
+                <button class="btn-primary" onclick="save1RM()">חשב סט ומשיך</button>
             </div>
         </div>
 
         <div id="ui-confirm" class="screen">
-            <div class="centered-content">
-                <h2 id="confirm-ex-name" style="color: var(--primary-blue); margin-bottom: 30px; text-align: center; font-size: 2em; font-weight: 800;"></h2>
-                <button class="btn-primary" onclick="confirmExercise(true)">כן, התחל</button>
-                <button class="btn-secondary" onclick="confirmExercise(false)">דלג</button>
+            <div class="centered-content" style="text-align:center;">
+                <h2 id="confirm-ex-name" style="font-size: 2.2em; color: var(--primary-blue); margin-bottom: 10px;"></h2>
+                <p style="margin-bottom: 40px; color: var(--text-dim);">האם אתה מוכן להתחיל?</p>
+                <button class="btn-primary" onclick="confirmExercise(true)">כן, בוא נתחיל</button>
+                <button class="btn-secondary" onclick="confirmExercise(false)">דלג על התרגיל</button>
             </div>
         </div>
 
         <div id="ui-main" class="screen">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                <h2 id="ex-display-name" style="margin:0; font-size: 1.3em; max-width: 70%; font-weight: 800;"></h2>
-                <span id="set-counter" class="set-badge">SET 1/3</span>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 id="ex-display-name" style="margin:0; font-size: 1.5em; flex: 1;"></h2>
+                <span id="set-counter" class="set-badge"></span>
             </div>
-            <div id="unilateral-note" style="display:none; color: #ff9f0a; background: rgba(255,159,10,0.15); padding: 10px; border-radius: 10px; text-align: center; margin-bottom: 15px; font-size: 0.85em; font-weight: bold;">משקל לצד אחד בלבד</div>
-            <div id="last-set-info" class="history-label" style="display:none;"></div>
+            
+            <div id="unilateral-note" style="display:none; color: #ff9f0a; background: rgba(255,159,10,0.1); padding: 12px; border-radius: 12px; text-align: center; margin-bottom: 20px; font-weight: bold; border: 1px solid #ff9f0a;">
+                ⚠️ שים לב: המשקל הוא לצד אחד
+            </div>
+
             <div class="log-card">
-                <div class="input-row"><span>משקל</span><select id="weight-picker" class="modern-select"></select></div>
-                <div class="input-row"><span>חזרות</span><select id="reps-picker" class="modern-select"></select></div>
-                <div class="input-row"><span>RIR</span><select id="rir-picker" class="modern-select"></select></div>
+                <div class="input-row">
+                    <span>משקל (ק"ג)</span>
+                    <select id="weight-picker" class="modern-select"></select>
+                </div>
+                <div class="input-row">
+                    <span>חזרות</span>
+                    <select id="reps-picker" class="modern-select"></select>
+                </div>
+                <div class="input-row">
+                    <span>RIR</span>
+                    <select id="rir-picker" class="modern-select"></select>
+                </div>
             </div>
-            <button class="btn-primary" onclick="nextStep()">סיום סט</button>
+
+            <button class="btn-primary" onclick="nextStep()" style="font-size: 1.3em; padding: 25px;">סיום סט</button>
+
             <div id="timer-area" style="visibility: hidden;" class="timer-container">
+                <div id="rest-timer" class="timer-display">01:30</div>
                 <div class="progress-track"><div id="timer-bar" class="progress-bar"></div></div>
-                <div id="rest-timer" class="timer-display">00:00</div>
-                <button class="btn-danger" onclick="handleExtra(false)">סיום תרגיל</button>
-            </div>
-        </div>
-
-        <div id="ui-ask-arms" class="screen">
-            <div class="centered-content">
-                <h2 style="text-align: center; margin-bottom: 30px;">אימון ידיים?</h2>
-                <button class="btn-primary" onclick="startArmWorkout()">כן</button>
-                <button class="btn-secondary" onclick="finish()">לא, סיים</button>
-            </div>
-        </div>
-
-        <div id="ui-arm-selection" class="screen">
-            <h2 id="arm-selection-title">בחר תרגיל</h2>
-            <div id="arm-options"></div>
-            <button class="btn-secondary" id="btn-skip-arm-group" style="margin-top:auto;"></button>
-        </div>
-
-        <div id="ui-variation" class="screen">
-            <div class="centered-content">
-                <h2 id="variation-title" style="margin-bottom: 20px;">בחר סוג</h2>
-                <div id="variation-options"></div>
+                <p style="color: var(--text-dim); margin-top: 15px;">זמן מנוחה מומלץ</p>
+                <button class="btn-danger" style="margin-top: 20px; background-color: rgba(255,69,58,0.1); color: var(--danger);" onclick="handleExtra(false)">סיים תרגיל מוקדם</button>
             </div>
         </div>
 
         <div id="ui-extra" class="screen">
+            <div class="centered-content" style="text-align:center;">
+                <h2 style="font-size: 2.2em; margin-bottom: 10px;">תרגיל הושלם!</h2>
+                <p style="color: var(--text-dim); margin-bottom: 40px;">איך אתה מרגיש?</p>
+                <button class="btn-primary" style="background-color: var(--success);" onclick="handleExtra(true)">🔥 סט בונוס (אופציונלי)</button>
+                <button class="btn-primary" onclick="handleExtra(false)">המשך לתרגיל הבא</button>
+            </div>
+        </div>
+
+        <div id="ui-ask-arms" class="screen">
+            <div class="centered-content" style="text-align:center;">
+                <h2 style="font-size: 2.2em; margin-bottom: 40px;">סיימנו את החלק העיקרי!<br>ממשיכים לידיים?</h2>
+                <button class="btn-primary" onclick="startArmWorkout()">כן, תן לי תרגילי ידיים</button>
+                <button class="btn-secondary" onclick="finish()">לא, אני גמור. סיים אימון</button>
+            </div>
+        </div>
+
+        <div id="ui-arm-selection" class="screen">
+            <h2 id="arm-selection-title" style="text-align:center;"></h2>
+            <div id="arm-options" class="centered-content"></div>
+            <button class="btn-secondary" id="btn-skip-arm-group" style="margin-top: auto;"></button>
+        </div>
+
+        <div id="ui-variation" class="screen">
             <div class="centered-content">
-                <div class="professional-title">התרגיל הושלם</div>
-                <button class="btn-primary" style="background-color: var(--success);" onclick="handleExtra(true)">+ סט בונוס</button>
-                <button class="btn-primary" onclick="handleExtra(false)">המשך</button>
+                <h2 id="variation-title" style="text-align:center; margin-bottom: 30px;">בחר סוג תרגיל</h2>
+                <div id="variation-options"></div>
             </div>
         </div>
 
         <div id="ui-summary" class="screen">
-            <h2 style="color: var(--success); margin-bottom: 10px;">האימון הושלם</h2>
+            <h2 style="font-size: 2.2em; text-align:center;">כל הכבוד, אלוף!</h2>
+            <p style="text-align:center; color: var(--text-dim); margin-bottom: 20px;">הנה מה שעשית היום:</p>
             <div id="summary-area" class="summary-box"></div>
-            <button class="btn-primary" onclick="copyResult()">העתק סיכום וסגור</button>
+            <button class="btn-primary" style="background-color: var(--primary-blue);" onclick="copyResult()">העתק סיכום וסגור</button>
         </div>
     </div>
+
     <script src="script.js"></script>
 </body>
 </html>
