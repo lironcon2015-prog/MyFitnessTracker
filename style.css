@@ -2,6 +2,7 @@
     --bg-color: #1c1c1e;
     --card-bg: #2c2c2e;
     --primary-blue: #0A84FF;
+    --primary-purple: #5E5CE6;
     --text-main: #FFFFFF;
     --text-dim: #d1d1d6;
     --danger: #ff453a;
@@ -32,17 +33,34 @@ body {
     to { opacity: 1; transform: translateY(0); } 
 }
 
-.btn-primary, .btn-secondary, .menu-item, .btn-danger {
+.btn-primary, .btn-secondary, .menu-item, .btn-danger, .btn-freestyle, .btn-finish-main {
     width: 100%; padding: 18px; border-radius: 14px; font-size: 1.05em; font-weight: 700;
-    border: none; cursor: pointer; margin-bottom: 12px; display: flex;
+    border: none; cursor: pointer; margin-bottom: 14px; display: flex;
     justify-content: center; align-items: center; transition: all 0.2s ease;
     box-sizing: border-box; text-align: center;
 }
 
 .btn-primary { background-color: var(--primary-blue); color: white; }
-.btn-primary:active { background-color: #0071e3; transform: scale(0.98); }
+.btn-primary:active { transform: scale(0.98); opacity: 0.9; }
+
 .btn-secondary { background-color: var(--card-bg); color: var(--text-main); border: 1px solid var(--border-color); }
+
 .btn-danger { background-color: rgba(255, 69, 58, 0.15); color: #ff6961; border: 1px solid rgba(255, 69, 58, 0.3); }
+
+/* עיצוב מובחן לפריסטייל */
+.btn-freestyle {
+    background-color: transparent;
+    color: var(--primary-blue);
+    border: 2px solid var(--primary-blue);
+    margin-top: 10px;
+}
+
+/* עיצוב כפתור סיום חלק עיקרי */
+.btn-finish-main {
+    background-color: var(--primary-purple);
+    color: white;
+    box-shadow: 0 4px 15px rgba(94, 92, 230, 0.3);
+}
 
 .menu-item { background-color: var(--card-bg); color: var(--text-main); border: 1px solid var(--border-color); justify-content: space-between; padding: 20px; }
 .menu-item span:last-child { color: var(--primary-blue); font-size: 0.9em; }
