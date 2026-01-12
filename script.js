@@ -14,24 +14,18 @@ let wakeLock = null;
 
 const unilateralExercises = ["Dumbbell Peck Fly", "Lateral Raises", "Lateral Raises (DB)", "Single Leg Curl", "Dumbbell Bicep Curls", "Cable Fly"];
 
-// מאגר תרגילים מרכזי
 const exerciseDatabase = [
-    // כתפיים
     { name: "Overhead Press (Main)", muscles: ["כתפיים"], isCalc: true, baseRM: 77.5, rmRange: [65, 90], manualRange: {base: 50, min: 40, max: 80, step: 2.5} },
     { name: "Lateral Raises", muscles: ["כתפיים"], sets: [{w: 12.5, r: 13}, {w: 12.5, r: 13}, {w: 12.5, r: 11}], step: 0.5 },
     { name: "Lateral Raises (DB)", muscles: ["כתפיים"], sets: [{w: 12.5, r: 13}, {w: 12.5, r: 13}, {w: 12.5, r: 11}], step: 0.5 },
     { name: "Face Pulls", muscles: ["כתפיים"], sets: [{w: 40, r: 13}, {w: 40, r: 13}, {w: 40, r: 15}], step: 2.5 },
     { name: "Face Pull (Cable)", muscles: ["כתפיים"], sets: [{w: 37.5, r: 12}, {w: 37.5, r: 12}, {w: 37.5, r: 13}], step: 2.5 },
     { name: "Barbell Shrugs", muscles: ["כתפיים"], sets: [{w: 140, r: 11}, {w: 140, r: 11}, {w: 140, r: 11}], step: 5 },
-    
-    // חזה
     { name: "Bench Press (Main)", muscles: ["חזה"], isCalc: true, baseRM: 122.5, rmRange: [110, 160], manualRange: {base: 85, min: 60, max: 140, step: 2.5} },
     { name: "Incline Bench Press", muscles: ["חזה"], sets: [{w: 65, r: 9}, {w: 65, r: 9}, {w: 65, r: 9}], step: 2.5 },
     { name: "Dumbbell Peck Fly", muscles: ["חזה"], sets: [{w: 14, r: 11}, {w: 14, r: 11}, {w: 14, r: 11}], step: 2 },
     { name: "Machine Peck Fly", muscles: ["חזה"], sets: [{w: 45, r: 11}, {w: 45, r: 11}, {w: 45, r: 11}], step: 1 },
     { name: "Cable Fly", muscles: ["חזה"], sets: [{w: 12.5, r: 11}, {w: 12.5, r: 11}, {w: 12.5, r: 11}], step: 2.5 },
-    
-    // רגליים
     { name: "Leg Press", muscles: ["רגליים"], sets: [{w: 280, r: 8}, {w: 300, r: 8}, {w: 300, r: 7}], step: 5 },
     { name: "Squat", muscles: ["רגליים"], sets: [{w: 100, r: 8}, {w: 100, r: 8}, {w: 100, r: 8}], step: 2.5, minW: 60, maxW: 180 },
     { name: "Deadlift", muscles: ["רגליים"], sets: [{w: 100, r: 5}, {w: 100, r: 5}, {w: 100, r: 5}], step: 2.5, minW: 60, maxW: 180 },
@@ -41,8 +35,6 @@ const exerciseDatabase = [
     { name: "Seated Leg Curl (Double)", muscles: ["רגליים"], sets: [{w: 50, r: 8}, {w: 60, r: 6}, {w: 50, r: 8}], step: 5 },
     { name: "Seated Calf Raise", muscles: ["רגליים"], sets: [{w: 70, r: 10}, {w: 70, r: 10}, {w: 70, r: 12}], step: 5 },
     { name: "Standing Calf Raise", muscles: ["רגליים"], sets: [{w: 110, r: 10}, {w: 110, r: 10}, {w: 110, r: 12}], step: 10 },
-    
-    // גב
     { name: "Lat Pulldown", muscles: ["גב"], sets: [{w: 75, r: 10}, {w: 75, r: 10}, {w: 75, r: 11}], step: 2.5 },
     { name: "Pull Ups", muscles: ["גב"], isBW: true, sets: [{w: 0, r: 8}, {w: 0, r: 8}, {w: 0, r: 8}] },
     { name: "Cable Row", muscles: ["גב"], sets: [{w: 65, r: 10}, {w: 65, r: 10}, {w: 65, r: 12}], step: 2.5, askGrip: true },
@@ -53,32 +45,24 @@ const exerciseDatabase = [
 
 const armExercises = {
     biceps: [
-        { name: "Dumbbell Bicep Curls", muscles: ["ידיים"], sets: [{w: 12, r: 8}], step: 0.5, minW: 8, maxW: 25, rir: 2 },
-        { name: "Barbell Bicep Curls", muscles: ["ידיים"], sets: [{w: 25, r: 8}], step: 1, minW: 15, maxW: 40, rir: 2 },
-        { name: "Reverse Bicep Curls", muscles: ["ידיים"], sets: [{w: 15, r: 8}], step: 1, minW: 10, maxW: 25, rir: 2 }
+        { name: "Dumbbell Bicep Curls", sets: [{w: 12, r: 8}], step: 0.5, minW: 8, maxW: 25 },
+        { name: "Barbell Bicep Curls", sets: [{w: 25, r: 8}], step: 1, minW: 15, maxW: 40 },
+        { name: "Reverse Bicep Curls", sets: [{w: 15, r: 8}], step: 1, minW: 10, maxW: 25 }
     ],
     triceps: [
-        { name: "Triceps Pushdown", muscles: ["ידיים"], sets: [{w: 35, r: 8}], step: 2.5, minW: 25, maxW: 50, rir: 2 },
-        { name: "Lying Triceps Extension (French Press)", muscles: ["ידיים"], sets: [{w: 35, r: 8}], step: 2.5, minW: 25, maxW: 50, rir: 2 }
+        { name: "Triceps Pushdown", sets: [{w: 35, r: 8}], step: 2.5, minW: 25, maxW: 50 },
+        { name: "Lying Triceps Extension (French Press)", sets: [{w: 35, r: 8}], step: 2.5, minW: 25, maxW: 50 }
     ]
 };
 
-// הגדרת אימונים מובנים (ממופים מחדש)
 const workouts = {
-    'A': [ // כתפיים (מבוסס על C הישן)
-        "Overhead Press (Main)", "Barbell Shrugs", "Lateral Raises (DB)", "Face Pull (Cable)", "Incline Bench Press"
-    ],
-    'B': [ // רגליים וגב (נשאר B)
-        "Leg Press", "Single Leg Curl", "Lat Pulldown", "Cable Row", "Seated Calf Raise", "Straight Arm Pulldown"
-    ],
-    'C': [ // חזה (מבוסס על A הישן)
-        "Bench Press (Main)", "Incline Bench Press", "Dumbbell Peck Fly", "Lateral Raises", "Face Pulls"
-    ]
+    'A': ["Overhead Press (Main)", "Barbell Shrugs", "Lateral Raises (DB)", "Face Pull (Cable)", "Incline Bench Press"],
+    'B': ["Leg Press", "Single Leg Curl", "Lat Pulldown", "Cable Row", "Seated Calf Raise", "Straight Arm Pulldown"],
+    'C': ["Bench Press (Main)", "Incline Bench Press", "Dumbbell Peck Fly", "Lateral Raises", "Face Pulls"]
 };
 
 const workoutDisplayNames = { 'A': 'כתפיים', 'B': 'רגליים וגב', 'C': 'חזה', 'Freestyle': 'אימון מותאם אישית' };
 
-// --- לוגיקת סאונד וטיימר (זהה ל-8.7) ---
 function playBeep(times = 1) {
     if (!audioContext) { const AudioCtx = window.AudioContext || window.webkitAudioContext; audioContext = new AudioCtx(); }
     if (audioContext.state === 'suspended') audioContext.resume();
@@ -101,11 +85,16 @@ async function initAudio() {
     try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
 }
 
-function startRestTimer() {
+function resetAndStartTimer() {
     stopRestTimer();
     state.seconds = 0;
     const target = (state.exIdx === 0 && !state.isArmPhase) ? 120 : 90;
     state.startTime = Date.now();
+    
+    // איפוס UI לפני התחלה
+    document.getElementById('rest-timer').innerText = "00:00";
+    if(document.getElementById('timer-bar')) document.getElementById('timer-bar').style.width = "0%";
+
     state.timerInterval = setInterval(() => {
         state.seconds = Math.floor((Date.now() - state.startTime) / 1000);
         const m = Math.floor(state.seconds / 60).toString().padStart(2, '0');
@@ -120,14 +109,16 @@ function startRestTimer() {
 function stopRestTimer() { 
     if (state.timerInterval) clearInterval(state.timerInterval); 
     state.timerInterval = null; 
-    if(document.getElementById('timer-bar')) document.getElementById('timer-bar').style.width = "0%";
 }
 
-// --- ניווט ---
 function navigate(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById(id).classList.add('active');
+    
+    // בכל מעבר מסך שאינו מסך התיעוד הראשי - עוצרים טיימר
     if (id !== 'ui-main') stopRestTimer();
+    
+    // מניעת כפילויות בסטאק
     if (state.historyStack[state.historyStack.length - 1] !== id) state.historyStack.push(id);
     document.getElementById('global-back').style.visibility = (id === 'ui-week') ? 'hidden' : 'visible';
 }
@@ -140,15 +131,20 @@ function handleBackClick() {
         state.log.pop();
         state.setIdx--;
         initPickers();
-        state.historyStack.push('ui-main'); // השארת המסך בסטאק
+        state.historyStack.push('ui-main');
+        if(state.setIdx > 0) resetAndStartTimer(); // חזרה לסט קודם מפעילה טיימר אם זה לא הסט הראשון
         return;
     }
-    
+
     const prevScreen = state.historyStack.pop();
     navigate(prevScreen);
+    
+    // אם חזרנו למסך התיעוד ממסך הבונוס - הטיימר צריך להמשיך/להתחיל
+    if(prevScreen === 'ui-main' && state.setIdx > 0) {
+        resetAndStartTimer();
+    }
 }
 
-// --- זרימת אימון ---
 function selectWeek(w) { state.week = w; navigate('ui-workout-type'); }
 
 function selectWorkout(t) {
@@ -182,7 +178,7 @@ function showExerciseList(muscle) {
         btn.onclick = () => {
             state.currentEx = JSON.parse(JSON.stringify(ex));
             state.currentExName = ex.name;
-            if (ex.askGrip) showGripSelection(); else startRecording();
+            startRecording();
         };
         options.appendChild(btn);
     });
@@ -199,13 +195,7 @@ function showConfirmScreen() {
 function confirmExercise(doEx) {
     const exName = workouts[state.type][state.exIdx];
     const exData = exerciseDatabase.find(e => e.name === exName);
-    
-    if (!doEx) { 
-        state.log.push({ skip: true, exName: exData.name }); 
-        state.exIdx++; 
-        checkFlow(); 
-        return; 
-    }
+    if (!doEx) { state.log.push({ skip: true, exName: exData.name }); state.exIdx++; checkFlow(); return; }
     
     state.currentEx = JSON.parse(JSON.stringify(exData));
     state.currentExName = exData.name;
@@ -213,7 +203,6 @@ function confirmExercise(doEx) {
     if (state.currentEx.isCalc && !state.isFreestyle) {
         setupCalculatedEx();
     } else {
-        // ב-Freestyle הופך לידני
         if(state.currentEx.manualRange) {
             state.currentEx.sets = Array(3).fill({w: state.currentEx.manualRange.base, r: 8});
             state.currentEx.step = state.currentEx.manualRange.step;
@@ -237,18 +226,13 @@ function save1RM() {
     state.rm = parseFloat(document.getElementById('rm-picker').value);
     const p = { 1: [0.65, 0.75, 0.85, 0.75, 0.65], 2: [0.70, 0.80, 0.90, 0.80, 0.70, 0.70], 3: [0.75, 0.85, 0.95, 0.85, 0.75, 0.75] };
     const reps = state.week === 1 ? [5, 5, 5, 8, 10] : (state.week === 2 ? [3, 3, 3, 8, 10, 10] : [5, 3, 1, 8, 10, 10]);
-    
-    state.currentEx.sets = p[state.week].map((pct, i) => ({ 
-        w: Math.round((state.rm * pct) / 2.5) * 2.5, r: reps[i] || 10 
-    }));
+    state.currentEx.sets = p[state.week].map((pct, i) => ({ w: Math.round((state.rm * pct) / 2.5) * 2.5, r: reps[i] || 10 }));
     startRecording();
 }
 
 function startRecording() { 
     state.setIdx = 0; state.lastLoggedSet = null; 
-    stopRestTimer(); 
-    navigate('ui-main'); 
-    initPickers(); 
+    stopRestTimer(); navigate('ui-main'); initPickers(); 
 }
 
 function initPickers() {
@@ -263,27 +247,23 @@ function initPickers() {
     } else { histDiv.style.display = 'none'; }
 
     const timerArea = document.getElementById('timer-area');
-    if (state.setIdx > 0) { timerArea.style.visibility = 'visible'; startRestTimer(); } 
+    if (state.setIdx > 0) { timerArea.style.visibility = 'visible'; resetAndStartTimer(); } 
     else { timerArea.style.visibility = 'hidden'; stopRestTimer(); }
 
     const isUni = unilateralExercises.some(u => state.currentExName.includes(u));
     document.getElementById('unilateral-note').style.display = isUni ? 'block' : 'none';
 
-    // משקל
     const wPick = document.getElementById('weight-picker'); wPick.innerHTML = "";
     const step = state.currentEx.step || 2.5;
     const currentW = target ? target.w : (state.lastLoggedSet ? state.lastLoggedSet.w : 0);
     const minW = state.currentEx.minW !== undefined ? state.currentEx.minW : Math.max(0, currentW - 40);
     const maxW = state.currentEx.maxW !== undefined ? state.currentEx.maxW : currentW + 40;
-    
     for(let i = minW; i <= maxW; i = parseFloat((i + step).toFixed(2))) {
         let o = new Option(i + " kg", i); if(i === currentW) o.selected = true; wPick.add(o);
     }
-    // חזרות
     const rPick = document.getElementById('reps-picker'); rPick.innerHTML = "";
     const currentR = target ? target.r : (state.lastLoggedSet ? state.lastLoggedSet.r : 8);
     for(let i = 1; i <= 25; i++) { let o = new Option(i, i); if(i === currentR) o.selected = true; rPick.add(o); }
-    // RIR
     const rirPick = document.getElementById('rir-picker'); rirPick.innerHTML = "";
     [0, 0.5, 1, 1.5, 2, 2.5, 3, 4, 5].forEach(v => {
         let o = new Option(v === 0 ? "0 (Fail)" : v, v); if(v === 2) o.selected = true; rirPick.add(o);
@@ -300,13 +280,8 @@ function nextStep() {
     };
     state.log.push(entry);
     state.lastLoggedSet = entry;
-    
-    if (state.setIdx < state.currentEx.sets.length - 1) { 
-        state.setIdx++; initPickers(); 
-    } else { 
-        document.getElementById('btn-continue-flow').innerText = state.isFreestyle ? "בחר תרגיל הבא" : "המשך לאימון הבא";
-        navigate('ui-extra'); 
-    }
+    if (state.setIdx < state.currentEx.sets.length - 1) { state.setIdx++; initPickers(); } 
+    else { navigate('ui-extra'); }
 }
 
 function handleExtra(isBonus) {
@@ -317,7 +292,7 @@ function handleExtra(isBonus) {
     } else {
         state.completedExInSession.push(state.currentExName);
         if (state.isArmPhase) showArmSelection();
-        else if (state.isFreestyle) navigate('ui-muscle-select');
+        else if (state.isFreestyle) showExerciseList(state.currentMuscle); // חוזר לאותו פלג גוף
         else { state.exIdx++; checkFlow(); }
     }
 }
@@ -327,13 +302,11 @@ function checkFlow() {
     else navigate('ui-ask-arms');
 }
 
-// --- אימון ידיים ---
 function startArmWorkout() { state.isArmPhase = true; state.armGroup = 'biceps'; showArmSelection(); }
 
 function showArmSelection() {
     const list = armExercises[state.armGroup];
     const remaining = list.filter(ex => !state.completedArmEx.includes(ex.name));
-    
     if (remaining.length === 0) {
         if (state.armGroup === 'biceps') { state.armGroup = 'triceps'; showArmSelection(); }
         else finish(); return;
@@ -354,7 +327,6 @@ function showArmSelection() {
     navigate('ui-arm-selection');
 }
 
-// --- סיכום ---
 function finish() {
     state.workoutDurationMins = Math.floor((Date.now() - state.workoutStartTime) / 60000);
     navigate('ui-summary');
