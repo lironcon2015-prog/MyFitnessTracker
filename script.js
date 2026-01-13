@@ -1,5 +1,6 @@
 /**
- * GYMPRO ELITE V10.2 - Official Codebase
+ * GYMPRO ELITE V10.3 - Fixes & Improvements
+ * Smooth Timer, Robust Back Logic, Haptics Check
  */
 
 // --- GLOBAL STATE ---
@@ -67,11 +68,18 @@ const workouts = {
 // --- CORE SYSTEMS ---
 
 function haptic(type = 'light') {
+    // Note: iOS Browsers (Safari/Chrome) do NOT support navigator.vibrate.
+    // This will only work on Android devices.
     if (!("vibrate" in navigator)) return;
-    if (type === 'light') navigator.vibrate(15);
-    else if (type === 'medium') navigator.vibrate([30, 50, 30]);
-    else if (type === 'success') navigator.vibrate([50, 100, 50, 100, 70]);
-    else if (type === 'warning') navigator.vibrate(100);
+    
+    try {
+        if (type === 'light') navigator.vibrate(20); 
+        else if (type === 'medium') navigator.vibrate(40);
+        else if (type === 'success') navigator.vibrate([50, 50, 50]);
+        else if (type === 'warning') navigator.vibrate([30, 30]);
+    } catch(e) {
+        console.log("Haptic failed");
+    }
 }
 
 function playBeep(times = 1) {
@@ -103,7 +111,11 @@ function navigate(id) {
     haptic('light');
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById(id).classList.add('active');
+    
+    // Stop timer ONLY if leaving main. 
+    // If entering main, initPickers/handleBack will manage timer.
     if (id !== 'ui-main') stopRestTimer();
+    
     if (state.historyStack[state.historyStack.length - 1] !== id) state.historyStack.push(id);
     document.getElementById('global-back').style.visibility = (id === 'ui-week') ? 'hidden' : 'visible';
 }
@@ -111,17 +123,39 @@ function navigate(id) {
 function handleBackClick() {
     haptic('warning');
     if (state.historyStack.length <= 1) return;
+
     const currentScreen = state.historyStack.pop();
+
+    // CASE 1: Returning from "Extra" (Bonus) screen to Main
+    // This acts as an "Undo" of the last set completion
+    if (currentScreen === 'ui-extra') {
+         state.log.pop(); // Remove the set we just finished
+         state.setIdx--;  // Go back one step
+         state.lastLoggedSet = state.log.length > 0 ? state.log[state.log.length - 1] : null;
+         
+         // Navigate manually without pushing to stack (since we are undoing)
+         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+         document.getElementById('ui-main').classList.add('active');
+         
+         initPickers();        // Refresh UI
+         resetAndStartTimer(); // Start timer (Resting before re-doing the set)
+         return;
+    }
+
+    // CASE 2: Undo a set within the Main screen (staying on ui-main)
     if (currentScreen === 'ui-main' && state.setIdx > 0) {
-        state.log.pop(); 
-        state.setIdx--; 
-        state.lastLoggedSet = state.log.length > 0 ? state.log[state.log.length-1] : null;
+        state.log.pop();
+        state.setIdx--;
+        state.lastLoggedSet = state.log.length > 0 ? state.log[state.log.length - 1] : null;
         initPickers();
-        state.historyStack.push('ui-main');
-        if(state.setIdx > 0) resetAndStartTimer();
+        state.historyStack.push('ui-main'); // Keep ui-main in stack
+        resetAndStartTimer(); // Restart timer for the previous rest period
         return;
     }
-    navigate(state.historyStack.pop());
+
+    // CASE 3: Standard Navigation Back
+    const prevScreen = state.historyStack.pop(); // Get previous
+    navigate(prevScreen); // Navigate to it
 }
 
 // --- WORKOUT FLOW ---
@@ -235,19 +269,40 @@ function initPickers() {
 }
 
 function resetAndStartTimer() {
-    stopRestTimer(); state.seconds = 0;
+    stopRestTimer();
+    state.seconds = 0;
     const target = (state.exIdx === 0 && !state.isArmPhase && !state.isFreestyle) ? 120 : 90;
     state.startTime = Date.now();
     const circle = document.getElementById('timer-progress');
+    const text = document.getElementById('rest-timer');
+
+    // Update immediately to remove 1s delay
+    text.innerText = "00:00";
+    circle.style.strokeDashoffset = 283;
+
     state.timerInterval = setInterval(() => {
-        state.seconds = Math.floor((Date.now() - state.startTime) / 1000);
-        document.getElementById('rest-timer').innerText = `${Math.floor(state.seconds/60).toString().padStart(2,'0')}:${(state.seconds%60).toString().padStart(2,'0')}`;
-        circle.style.strokeDashoffset = 283 - (Math.min(state.seconds / target, 1) * 283);
-        if (state.seconds === target) playBeep(2);
-    }, 1000);
+        // High frequency check (every 100ms) for smooth UI
+        const elapsed = Math.floor((Date.now() - state.startTime) / 1000);
+        state.seconds = elapsed;
+
+        const mins = Math.floor(state.seconds / 60).toString().padStart(2, '0');
+        const secs = (state.seconds % 60).toString().padStart(2, '0');
+        text.innerText = `${mins}:${secs}`;
+
+        const progress = Math.min(state.seconds / target, 1);
+        circle.style.strokeDashoffset = 283 - (progress * 283);
+
+        if (state.seconds === target) {
+            playBeep(2);
+            // Don't spam beep, maybe clear or flag
+        }
+    }, 100); 
 }
 
-function stopRestTimer() { clearInterval(state.timerInterval); }
+function stopRestTimer() { 
+    if (state.timerInterval) clearInterval(state.timerInterval); 
+    state.timerInterval = null;
+}
 
 function nextStep() {
     haptic('light');
