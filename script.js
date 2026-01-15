@@ -1,6 +1,6 @@
 /**
- * GYMPRO ELITE V10.7
- * Fixes: Back Button (Stack Duplication), RTL Alignment
+ * GYMPRO ELITE V10.8
+ * Fixes: Robust Back Button Logic (No Double Jump), CSS Text Alignment
  */
 
 // --- GLOBAL STATE ---
@@ -129,28 +129,34 @@ function handleBackClick() {
     haptic('warning');
     if (state.historyStack.length <= 1) return;
 
-    const currentScreen = state.historyStack.pop(); // Remove current from stack
+    // PEEK at the current screen (do not pop yet!)
+    const currentScreen = state.historyStack[state.historyStack.length - 1];
 
-    // LOGIC 1: Undo from Bonus Screen (Result)
+    // LOGIC 1: Undo from Bonus Screen (Back to Set Input)
     if (currentScreen === 'ui-extra') {
-        // We are currently in ui-extra. The top of stack (after pop) is now ui-main.
-        // We just need to remove the logic entry and update the view to ui-main.
-        // DO NOT use navigate() or push to stack, as ui-main is already at the top.
+        state.historyStack.pop(); // Remove ui-extra from stack
         
-        state.log.pop(); // Remove the "completed" set
-        state.setIdx--;  // Go back to the index of that set
+        // Remove the log entry and go back a set
+        state.log.pop();
+        state.setIdx--;
         state.lastLoggedSet = state.log.length > 0 ? state.log[state.log.length - 1] : null;
         
-        document.getElementById('ui-extra').classList.remove('active');
+        // Manually switch screens
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
         document.getElementById('ui-main').classList.add('active');
         
+        // Safety Check: Ensure ui-main is at the top of the stack now
+        if (state.historyStack[state.historyStack.length - 1] !== 'ui-main') {
+            state.historyStack.push('ui-main');
+        }
+        
         initPickers();
-        return;
+        return; // STOP here. Do not execute default back logic.
     }
 
     // LOGIC 2: Undo within Main Screen (Previous Set)
     if (currentScreen === 'ui-main' && state.setIdx > 0) {
-        state.historyStack.push('ui-main'); // Stay on main, so put it back
+        // We stay on ui-main, just revert data
         state.log.pop();
         state.setIdx--;
         state.lastLoggedSet = state.log.length > 0 ? state.log[state.log.length - 1] : null;
@@ -166,11 +172,14 @@ function handleBackClick() {
     }
 
     // Default Back Behavior
-    // Since we popped the current screen at the start, prevScreen is now the last item
-    const prevScreen = state.historyStack[state.historyStack.length - 1]; 
+    state.historyStack.pop(); // Remove current
+    const prevScreen = state.historyStack[state.historyStack.length - 1]; // Get previous
+    
+    // Switch visual
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById(prevScreen).classList.add('active');
     
+    // Handle back button visibility
     document.getElementById('global-back').style.visibility = (prevScreen === 'ui-week') ? 'hidden' : 'visible';
 }
 
