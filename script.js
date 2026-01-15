@@ -1,6 +1,6 @@
 /**
- * GYMPRO ELITE V10.4 - Timer Logic Overhaul
- * Fixes: Timer continuity bugs, Back button reset issues
+ * GYMPRO ELITE V10.6
+ * Fixes: Back Button Logic, Interruption Flow, Workout Names, UI Spacing
  */
 
 // --- GLOBAL STATE ---
@@ -9,7 +9,8 @@ let state = {
     log: [], currentEx: null, currentExName: '',
     historyStack: ['ui-week'],
     timerInterval: null, seconds: 0, startTime: null,
-    isArmPhase: false, isFreestyle: false, currentMuscle: '',
+    isArmPhase: false, isFreestyle: false, isExtraPhase: false, isInterruption: false,
+    currentMuscle: '',
     completedExInSession: [],
     workoutStartTime: null, workoutDurationMins: 0,
     lastLoggedSet: null 
@@ -24,6 +25,7 @@ const unilateralExercises = ["Dumbbell Peck Fly", "Lateral Raises", "Single Leg 
 const exerciseDatabase = [
     { name: "Overhead Press (Main)", muscles: ["כתפיים"], isCalc: true, baseRM: 77.5, rmRange: [65, 90], manualRange: {base: 50, min: 40, max: 80, step: 2.5} },
     { name: "Lateral Raises", muscles: ["כתפיים"], sets: [{w: 12.5, r: 13}, {w: 12.5, r: 13}, {w: 12.5, r: 11}], step: 0.5 },
+    { name: "Weighted Pull Ups", muscles: ["גב"], sets: [{w: 0, r: 8}, {w: 0, r: 8}, {w: 0, r: 8}], step: 5, minW: 0, maxW: 40, isBW: true },
     { name: "Face Pulls", muscles: ["כתפיים"], sets: [{w: 40, r: 13}, {w: 40, r: 13}, {w: 40, r: 15}], step: 2.5 },
     { name: "Barbell Shrugs", muscles: ["כתפיים"], sets: [{w: 140, r: 11}, {w: 140, r: 11}, {w: 140, r: 11}], step: 5 },
     { name: "Bench Press (Main)", muscles: ["חזה"], isCalc: true, baseRM: 122.5, rmRange: [110, 160], manualRange: {base: 85, min: 60, max: 140, step: 2.5} },
@@ -60,9 +62,16 @@ const armExercises = {
 };
 
 const workouts = {
-    'A': ["Overhead Press (Main)", "Barbell Shrugs", "Lateral Raises", "Face Pulls", "Incline Bench Press"],
+    'A': ["Overhead Press (Main)", "Barbell Shrugs", "Lateral Raises", "Weighted Pull Ups", "Face Pulls", "Incline Bench Press"],
     'B': ["Leg Press", "Single Leg Curl", "Lat Pulldown", "Cable Row", "Seated Calf Raise", "Straight Arm Pulldown"],
     'C': ["Bench Press (Main)", "Incline Bench Press", "Dumbbell Peck Fly", "Lateral Raises", "Face Pulls"]
+};
+
+const workoutNames = {
+    'A': "אימון A (כתפיים-חזה-גב)",
+    'B': "אימון B (רגליים-גב)",
+    'C': "אימון C (חזה-כתפיים)",
+    'Freestyle': "Freestyle"
 };
 
 // --- CORE SYSTEMS ---
@@ -107,10 +116,12 @@ function navigate(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById(id).classList.add('active');
     
-    // Safety stop when leaving main, but initPickers handles start
+    // Safety stop when leaving main
     if (id !== 'ui-main') stopRestTimer();
     
+    // Prevent duplicate history entries
     if (state.historyStack[state.historyStack.length - 1] !== id) state.historyStack.push(id);
+    
     document.getElementById('global-back').style.visibility = (id === 'ui-week') ? 'hidden' : 'visible';
 }
 
@@ -118,31 +129,49 @@ function handleBackClick() {
     haptic('warning');
     if (state.historyStack.length <= 1) return;
 
-    const currentScreen = state.historyStack.pop();
+    const currentScreen = state.historyStack.pop(); // Remove current
+    const prevScreen = state.historyStack[state.historyStack.length - 1]; // Peek previous
 
-    // CASE: Undo last set (from Extra or Main)
-    if (currentScreen === 'ui-extra' || (currentScreen === 'ui-main' && state.setIdx > 0)) {
-        if (currentScreen === 'ui-extra') {
-             // If we were on Extra, we need to manually show Main again
-             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-             document.getElementById('ui-main').classList.add('active');
-        } else {
-             state.historyStack.push('ui-main'); // Stay on main
-        }
+    // LOGIC 1: Undo from Bonus Screen (Result) - Fixed for single set undo
+    if (currentScreen === 'ui-extra') {
+        // We want to go back to ui-main to EDIT the last set, not skip it.
+        // We do NOT use navigate() here to avoid messing up the stack order.
         
-        // Remove last log entry
-        state.log.pop();
-        state.setIdx--; 
+        state.log.pop(); // Remove the "completed" set
+        state.setIdx--;  // Go back to the index of that set
         state.lastLoggedSet = state.log.length > 0 ? state.log[state.log.length - 1] : null;
         
-        // Re-initialize UI (This will auto-start timer if needed)
+        // Manually switch screens
+        document.getElementById('ui-extra').classList.remove('active');
+        document.getElementById('ui-main').classList.add('active');
+        
+        // Re-add ui-main to stack since we are now there
+        state.historyStack.push('ui-main'); 
+        
         initPickers();
         return;
     }
 
-    // CASE: Standard Back
-    const prevScreen = state.historyStack.pop(); 
+    // LOGIC 2: Undo within Main Screen (Previous Set)
+    if (currentScreen === 'ui-main' && state.setIdx > 0) {
+        state.historyStack.push('ui-main'); // Stay on main
+        state.log.pop();
+        state.setIdx--;
+        state.lastLoggedSet = state.log.length > 0 ? state.log[state.log.length - 1] : null;
+        initPickers();
+        return;
+    }
+
+    // LOGIC 3: Back from Main Screen (Set 1) to Previous Exercise
+    if (currentScreen === 'ui-confirm' && !state.isFreestyle && !state.isExtraPhase && !state.isInterruption) {
+        if (state.exIdx > 0) {
+            state.exIdx--; 
+        }
+    }
+
+    // Default Back Behavior
     navigate(prevScreen); 
+    state.historyStack.pop(); // Remove the duplicate push that navigate() does
 }
 
 // --- WORKOUT FLOW ---
@@ -151,15 +180,19 @@ function selectWeek(w) { state.week = w; navigate('ui-workout-type'); }
 
 function selectWorkout(t) {
     state.type = t; state.exIdx = 0; state.log = []; 
-    state.completedExInSession = []; state.isArmPhase = false; state.isFreestyle = false;
+    state.completedExInSession = []; state.isArmPhase = false; state.isFreestyle = false; state.isExtraPhase = false; state.isInterruption = false;
     state.workoutStartTime = Date.now();
     showConfirmScreen();
 }
 
 function startFreestyle() {
     state.type = 'Freestyle'; state.log = []; state.completedExInSession = [];
-    state.isArmPhase = false; state.isFreestyle = true;
+    state.isArmPhase = false; state.isFreestyle = true; state.isExtraPhase = false; state.isInterruption = false;
     state.workoutStartTime = Date.now();
+    
+    document.getElementById('btn-resume-flow').style.display = 'none';
+    document.getElementById('btn-finish-extra').style.display = 'none';
+    
     navigate('ui-muscle-select');
 }
 
@@ -168,7 +201,10 @@ function showExerciseList(muscle) {
     const options = document.getElementById('variation-options');
     options.innerHTML = "";
     document.getElementById('variation-title').innerText = `תרגילי ${muscle}`;
+    
+    // Filter logic
     const filtered = exerciseDatabase.filter(ex => ex.muscles.includes(muscle) && !state.completedExInSession.includes(ex.name));
+    
     filtered.forEach(ex => {
         const btn = document.createElement('button');
         btn.className = "menu-card";
@@ -198,7 +234,12 @@ function showConfirmScreen() {
 function confirmExercise(doEx) {
     const exName = workouts[state.type][state.exIdx];
     const exData = exerciseDatabase.find(e => e.name === exName);
-    if (!doEx) { state.log.push({ skip: true, exName: exData.name }); state.exIdx++; checkFlow(); return; }
+    if (!doEx) { 
+        state.log.push({ skip: true, exName: exData.name }); 
+        state.exIdx++; 
+        checkFlow(); 
+        return; 
+    }
     state.currentEx = JSON.parse(JSON.stringify(exData));
     state.currentExName = exData.name;
     if (state.currentEx.isCalc) setupCalculatedEx();
@@ -237,9 +278,7 @@ function initPickers() {
 
     document.getElementById('unilateral-note').style.display = unilateralExercises.some(u => state.currentExName.includes(u)) ? 'block' : 'none';
     
-    // TIMER LOGIC: 
-    // If setIdx > 0, we are resting from the previous set. Start timer.
-    // If setIdx == 0, we are starting a new exercise. No rest needed.
+    // Timer Handling
     const timerArea = document.getElementById('timer-area');
     if (state.setIdx > 0) { 
         timerArea.style.visibility = 'visible'; 
@@ -252,12 +291,17 @@ function initPickers() {
     const wPick = document.getElementById('weight-picker'); wPick.innerHTML = "";
     const step = state.currentEx.step || 2.5;
     const currentW = target ? target.w : (state.lastLoggedSet ? state.lastLoggedSet.w : 0);
-    for(let i = Math.max(0, currentW - 40); i <= currentW + 50; i = parseFloat((i + step).toFixed(2))) {
+    const minW = state.currentEx.minW !== undefined ? state.currentEx.minW : Math.max(0, currentW - 40);
+    const maxW = state.currentEx.maxW !== undefined ? state.currentEx.maxW : currentW + 50;
+    
+    for(let i = minW; i <= maxW; i = parseFloat((i + step).toFixed(2))) {
         let o = new Option(i + " kg", i); if(i === currentW) o.selected = true; wPick.add(o);
     }
+    
     const rPick = document.getElementById('reps-picker'); rPick.innerHTML = "";
     const currentR = target ? target.r : (state.lastLoggedSet ? state.lastLoggedSet.r : 8);
     for(let i = 1; i <= 30; i++) { let o = new Option(i, i); if(i === currentR) o.selected = true; rPick.add(o); }
+    
     const rirPick = document.getElementById('rir-picker'); rirPick.innerHTML = "";
     [0, 0.5, 1, 1.5, 2, 2.5, 3, 4, 5].forEach(v => {
         let o = new Option(v === 0 ? "Fail" : v, v); if(v === 2) o.selected = true; rirPick.add(o);
@@ -265,23 +309,17 @@ function initPickers() {
 }
 
 function resetAndStartTimer() {
-    // 1. Stop any existing timer first
     stopRestTimer();
-
-    // 2. Reset State
     state.seconds = 0;
     state.startTime = Date.now();
-    const target = (state.exIdx === 0 && !state.isArmPhase && !state.isFreestyle) ? 120 : 90;
+    const target = (state.exIdx === 0 && !state.isArmPhase && !state.isFreestyle && !state.isExtraPhase && !state.isInterruption) ? 120 : 90;
 
-    // 3. HARD RESET UI IMMEDIATELY (Do not wait for interval)
-    // This prevents the "ghost" numbers from previous screens
     const circle = document.getElementById('timer-progress');
     const text = document.getElementById('rest-timer');
     
     text.innerText = "00:00";
-    circle.style.strokeDashoffset = 283; // Full circle
+    circle.style.strokeDashoffset = 283;
 
-    // 4. Start Interval
     state.timerInterval = setInterval(() => {
         const elapsed = Math.floor((Date.now() - state.startTime) / 1000);
         state.seconds = elapsed;
@@ -315,19 +353,80 @@ function nextStep() {
 }
 
 function handleExtra(isBonus) {
-    if(isBonus) { state.setIdx++; state.currentEx.sets.push({...state.currentEx.sets[state.setIdx-1]}); initPickers(); navigate('ui-main'); } 
-    else {
+    if(isBonus) { 
+        state.setIdx++; 
+        state.currentEx.sets.push({...state.currentEx.sets[state.setIdx-1]}); 
+        initPickers(); 
+        navigate('ui-main'); 
+    } else {
         state.completedExInSession.push(state.currentExName);
-        if (state.isArmPhase) showArmSelection();
-        else if (state.isFreestyle) showExerciseList(state.currentMuscle);
-        else { state.exIdx++; checkFlow(); }
+        
+        // Flow Control
+        if (state.isInterruption) {
+            // If we are in interruption mode, ask if user wants to continue interrupting or go back
+            // Actually user asked to return to muscle select to allow adding more or resuming
+            document.getElementById('btn-resume-flow').style.display = 'flex';
+            document.getElementById('btn-finish-extra').style.display = 'none';
+            navigate('ui-muscle-select');
+        } else if (state.isExtraPhase) {
+            navigate('ui-ask-extra');
+        } else if (state.isArmPhase) {
+            showArmSelection();
+        } else if (state.isFreestyle) {
+            showExerciseList(state.currentMuscle);
+        } else { 
+            state.exIdx++; 
+            checkFlow(); 
+        }
     }
 }
 
 function checkFlow() {
-    if (state.exIdx < workouts[state.type].length) showConfirmScreen();
-    else navigate('ui-ask-arms');
+    if (state.exIdx < workouts[state.type].length) {
+        showConfirmScreen();
+    } else {
+        navigate('ui-ask-extra');
+    }
 }
+
+// --- INTERRUPTION LOGIC ---
+function interruptWorkout() {
+    state.isInterruption = true;
+    document.getElementById('btn-resume-flow').style.display = 'flex';
+    document.getElementById('btn-finish-extra').style.display = 'none';
+    navigate('ui-muscle-select');
+}
+
+function resumeWorkout() {
+    state.isInterruption = false;
+    // Determine where we should be.
+    // If we haven't finished the main workout, go to the next planned exercise.
+    if (!state.isArmPhase && !state.isExtraPhase && state.exIdx < workouts[state.type].length) {
+         // Instead of skipping, we just ensure we are at the right index
+         // Since we increment exIdx only when "Continue" is pressed on standard flow,
+         // we just need to re-show the confirm screen for current index.
+         showConfirmScreen();
+    } else {
+        // Fallback if interruption happened late
+        navigate('ui-ask-extra');
+    }
+}
+
+
+// --- EXTRA PHASE LOGIC (End of workout) ---
+
+function startExtraPhase() {
+    state.isExtraPhase = true;
+    document.getElementById('btn-resume-flow').style.display = 'none';
+    document.getElementById('btn-finish-extra').style.display = 'block';
+    navigate('ui-muscle-select');
+}
+
+function finishExtraPhase() {
+    navigate('ui-ask-arms');
+}
+
+// --- ARMS & FINISH ---
 
 function startArmWorkout() { state.isArmPhase = true; state.armGroup = 'biceps'; showArmSelection(); }
 
@@ -358,13 +457,22 @@ function finish() {
     haptic('success');
     state.workoutDurationMins = Math.floor((Date.now() - state.workoutStartTime) / 60000);
     navigate('ui-summary');
-    let summaryText = `GYMPRO ELITE SUMMARY\nWeek: ${state.week} | Duration: ${state.workoutDurationMins}m\n\n`;
+    
+    const workoutDisplayName = workoutNames[state.type] || state.type;
+    let summaryText = `GYMPRO ELITE SUMMARY\n${workoutDisplayName} | Week: ${state.week} | Duration: ${state.workoutDurationMins}m\n\n`;
+    
     let grouped = {};
     state.log.forEach(e => {
-        if(!grouped[e.exName]) grouped[e.exName] = { sets: [] };
-        if(!e.skip) grouped[e.exName].sets.push(`${e.w}kg x ${e.r} (RIR ${e.rir})`);
+        if(!grouped[e.exName]) grouped[e.exName] = { sets: [], vol: 0 };
+        if(!e.skip) {
+            grouped[e.exName].sets.push(`${e.w}kg x ${e.r} (RIR ${e.rir})`);
+            grouped[e.exName].vol += (e.w * e.r);
+        }
     });
-    for (let ex in grouped) { summaryText += `${ex}:\n${grouped[ex].sets.join('\n')}\n\n`; }
+    
+    for (let ex in grouped) { 
+        summaryText += `${ex} (Vol: ${grouped[ex].vol}kg):\n${grouped[ex].sets.join('\n')}\n\n`; 
+    }
     document.getElementById('summary-area').innerText = summaryText.trim();
 }
 
