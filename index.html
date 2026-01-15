@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>GymPro Elite 10.2</title>
+    <title>GymPro Elite 10.6</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="stylesheet" href="style.css">
@@ -17,7 +17,7 @@
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
             </button>
             <div class="brand-logo">GYMPRO <span>ELITE</span></div>
-            <div class="version-tag">V 10.2</div>
+            <div class="version-tag">V 10.6</div>
         </header>
 
         <main class="content-area">
@@ -41,28 +41,35 @@
             <div id="ui-workout-type" class="screen">
                 <div class="hero-section"><h2>בחר מסלול</h2></div>
                 <div class="vertical-stack">
-                    <button class="menu-card tall" onclick="selectWorkout('A')"><h3>אימון A</h3><p>Push / כתפיים</p></button>
-                    <button class="menu-card tall" onclick="selectWorkout('B')"><h3>אימון B</h3><p>Legs / גב</p></button>
-                    <button class="menu-card tall" onclick="selectWorkout('C')"><h3>אימון C</h3><p>Chest / עליון</p></button>
+                    <button class="menu-card tall" onclick="selectWorkout('A')"><h3>אימון A</h3><p>כתפיים - חזה - גב</p></button>
+                    <button class="menu-card tall" onclick="selectWorkout('B')"><h3>אימון B</h3><p>רגליים - גב</p></button>
+                    <button class="menu-card tall" onclick="selectWorkout('C')"><h3>אימון C</h3><p>חזה - כתפיים</p></button>
                     <button class="menu-card tall freestyle-card" onclick="startFreestyle()"><h3>Freestyle</h3><p>בחירה חופשית</p></button>
                 </div>
             </div>
 
             <div id="ui-muscle-select" class="screen">
                 <h2 class="section-title">בחר שריר</h2>
+                
+                <button id="btn-resume-flow" class="action-card success-gradient" style="display:none; margin-bottom: 20px;" onclick="resumeWorkout()">
+                    <div class="card-text">חזור למסלול המקורי</div>
+                    <div class="card-icon">↻</div>
+                </button>
+
                 <div class="grid-menu">
                     <button class="menu-card" onclick="showExerciseList('כתפיים')">כתפיים</button>
                     <button class="menu-card" onclick="showExerciseList('רגליים')">רגליים</button>
                     <button class="menu-card" onclick="showExerciseList('חזה')">חזה</button>
                     <button class="menu-card" onclick="showExerciseList('גב')">גב</button>
                 </div>
-                <button class="finish-main-btn" onclick="navigate('ui-ask-arms')">מעבר לידיים</button>
+                
+                <button id="btn-finish-extra" class="finish-main-btn" onclick="finishExtraPhase()">סיום הוספת תרגילים</button>
             </div>
 
             <div id="ui-variation" class="screen">
                 <h2 id="variation-title" class="section-title">בחר תרגיל</h2>
                 <div id="variation-options" class="vertical-stack"></div>
-                <button class="btn-text" onclick="navigate('ui-muscle-select')">חזור</button>
+                <button class="btn-text" onclick="navigate('ui-muscle-select')">חזור לבחירת שריר</button>
             </div>
 
             <div id="ui-1rm" class="screen">
@@ -116,8 +123,20 @@
             <div id="ui-extra" class="screen flex-center">
                 <div class="glass-card bonus-card">
                     <h3>התרגיל הושלם!</h3>
-                    <button class="btn-main success-gradient" onclick="handleExtra(true)">+ סט בונוס</button>
-                    <button class="btn-main secondary" onclick="handleExtra(false)">המשך</button>
+                    <div class="vertical-stack">
+                        <button class="btn-main success-gradient" onclick="handleExtra(true)">+ סט בונוס</button>
+                        <button class="btn-main secondary" onclick="interruptWorkout()">➕ הוסף תרגיל ביניים</button>
+                        <button class="btn-main primary-gradient" onclick="handleExtra(false)">המשך</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="ui-ask-extra" class="screen flex-center">
+                <div class="confirm-box">
+                    <h2>האם להוסיף תרגילים נוספים?</h2>
+                    <p class="sub-text">ניתן לבחור תרגילים מכל קבוצות השרירים</p>
+                    <button class="btn-main primary-gradient" onclick="startExtraPhase()">כן, הוסף תרגיל</button>
+                    <button class="btn-text" onclick="navigate('ui-ask-arms')">לא, המשך לידיים</button>
                 </div>
             </div>
 
