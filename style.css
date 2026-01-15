@@ -54,7 +54,8 @@ body {
 
 .action-card {
     background: var(--accent-gradient); border-radius: var(--ios-radius); padding: 20px;
-    border: none; color: white; display: flex; align-items: center; justify-content: space-between; gap: 15px; width: 100%;
+    border: none; color: white; display: flex; align-items: center; justify-content: flex-start; /* Changed for RTL alignment */
+    gap: 15px; width: 100%;
     margin-bottom: 25px; text-align: right; font-weight: 600; box-shadow: 0 4px 20px rgba(10, 132, 255, 0.3);
 }
 
@@ -115,7 +116,7 @@ body {
 .history-pill { 
     background: rgba(50, 215, 75, 0.1); color: #32D74B; 
     padding: 8px; border-radius: 8px; font-size: 0.8em; 
-    margin-top: 5px; margin-bottom: 20px; /* Increased margin here */
+    margin-top: 5px; margin-bottom: 20px; 
     display: none; text-align: center; 
 }
 .badge-row { display: flex; gap: 8px; margin-bottom: 5px; }
