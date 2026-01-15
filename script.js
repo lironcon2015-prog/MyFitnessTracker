@@ -1,6 +1,6 @@
 /**
- * GYMPRO ELITE V10.6
- * Fixes: Back Button Logic, Interruption Flow, Workout Names, UI Spacing
+ * GYMPRO ELITE V10.7
+ * Fixes: Back Button (Stack Duplication), RTL Alignment
  */
 
 // --- GLOBAL STATE ---
@@ -129,24 +129,20 @@ function handleBackClick() {
     haptic('warning');
     if (state.historyStack.length <= 1) return;
 
-    const currentScreen = state.historyStack.pop(); // Remove current
-    const prevScreen = state.historyStack[state.historyStack.length - 1]; // Peek previous
+    const currentScreen = state.historyStack.pop(); // Remove current from stack
 
-    // LOGIC 1: Undo from Bonus Screen (Result) - Fixed for single set undo
+    // LOGIC 1: Undo from Bonus Screen (Result)
     if (currentScreen === 'ui-extra') {
-        // We want to go back to ui-main to EDIT the last set, not skip it.
-        // We do NOT use navigate() here to avoid messing up the stack order.
+        // We are currently in ui-extra. The top of stack (after pop) is now ui-main.
+        // We just need to remove the logic entry and update the view to ui-main.
+        // DO NOT use navigate() or push to stack, as ui-main is already at the top.
         
         state.log.pop(); // Remove the "completed" set
         state.setIdx--;  // Go back to the index of that set
         state.lastLoggedSet = state.log.length > 0 ? state.log[state.log.length - 1] : null;
         
-        // Manually switch screens
         document.getElementById('ui-extra').classList.remove('active');
         document.getElementById('ui-main').classList.add('active');
-        
-        // Re-add ui-main to stack since we are now there
-        state.historyStack.push('ui-main'); 
         
         initPickers();
         return;
@@ -154,7 +150,7 @@ function handleBackClick() {
 
     // LOGIC 2: Undo within Main Screen (Previous Set)
     if (currentScreen === 'ui-main' && state.setIdx > 0) {
-        state.historyStack.push('ui-main'); // Stay on main
+        state.historyStack.push('ui-main'); // Stay on main, so put it back
         state.log.pop();
         state.setIdx--;
         state.lastLoggedSet = state.log.length > 0 ? state.log[state.log.length - 1] : null;
@@ -170,8 +166,12 @@ function handleBackClick() {
     }
 
     // Default Back Behavior
-    navigate(prevScreen); 
-    state.historyStack.pop(); // Remove the duplicate push that navigate() does
+    // Since we popped the current screen at the start, prevScreen is now the last item
+    const prevScreen = state.historyStack[state.historyStack.length - 1]; 
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(prevScreen).classList.add('active');
+    
+    document.getElementById('global-back').style.visibility = (prevScreen === 'ui-week') ? 'hidden' : 'visible';
 }
 
 // --- WORKOUT FLOW ---
@@ -363,8 +363,6 @@ function handleExtra(isBonus) {
         
         // Flow Control
         if (state.isInterruption) {
-            // If we are in interruption mode, ask if user wants to continue interrupting or go back
-            // Actually user asked to return to muscle select to allow adding more or resuming
             document.getElementById('btn-resume-flow').style.display = 'flex';
             document.getElementById('btn-finish-extra').style.display = 'none';
             navigate('ui-muscle-select');
@@ -399,21 +397,14 @@ function interruptWorkout() {
 
 function resumeWorkout() {
     state.isInterruption = false;
-    // Determine where we should be.
-    // If we haven't finished the main workout, go to the next planned exercise.
     if (!state.isArmPhase && !state.isExtraPhase && state.exIdx < workouts[state.type].length) {
-         // Instead of skipping, we just ensure we are at the right index
-         // Since we increment exIdx only when "Continue" is pressed on standard flow,
-         // we just need to re-show the confirm screen for current index.
          showConfirmScreen();
     } else {
-        // Fallback if interruption happened late
         navigate('ui-ask-extra');
     }
 }
 
-
-// --- EXTRA PHASE LOGIC (End of workout) ---
+// --- EXTRA PHASE LOGIC ---
 
 function startExtraPhase() {
     state.isExtraPhase = true;
