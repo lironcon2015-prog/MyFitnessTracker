@@ -55,13 +55,13 @@ body {
 .action-card {
     background: var(--accent-gradient); border-radius: var(--ios-radius); padding: 20px;
     border: none; color: white; display: flex; align-items: center; 
-    justify-content: flex-start; /* Aligns content to Right in RTL */
+    justify-content: flex-start;
     gap: 15px; width: 100%;
     margin-bottom: 25px; font-weight: 600; box-shadow: 0 4px 20px rgba(10, 132, 255, 0.3);
 }
 
 .card-text {
-    text-align: right; /* Explicitly force right alignment for text */
+    text-align: right;
     flex-grow: 1;
 }
 
@@ -90,6 +90,14 @@ body {
     background: none; border: none; color: white; font-size: 1.3em; font-weight: 700;
     width: 100%; outline: none; text-align: center; appearance: none;
 }
+
+/* New Note Style */
+.note-card { padding: 12px 16px; margin-top: 5px; }
+.note-card input {
+    background: none; border: none; color: white; width: 100%;
+    font-size: 0.95em; outline: none; font-family: inherit;
+}
+.note-card input::placeholder { color: #48484a; }
 
 .btn-main {
     padding: 18px; border-radius: var(--ios-radius); border: none;
