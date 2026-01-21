@@ -1,5 +1,5 @@
 /**
- * GYMPRO ELITE V11.0.0
+ * GYMPRO ELITE V11.0.1 - FIXED CALC LOGIC
  */
 
 // --- GLOBAL STATE ---
@@ -75,18 +75,18 @@ const StorageManager = {
     }
 };
 
-// --- DATABASE (Updated RM Ranges) ---
+// --- DATABASE ---
 const unilateralExercises = ["Dumbbell Peck Fly", "Lateral Raises", "Single Leg Curl", "Dumbbell Bicep Curls", "Cable Fly", "Concentration Curls"];
 
 const exerciseDatabase = [
-    // FIXED: Overhead Press RM Range 50-100
+    // Overhead Press RM Range 50-100
     { name: "Overhead Press (Main)", muscles: ["כתפיים"], isCalc: true, baseRM: 60, rmRange: [50, 100], manualRange: {base: 50, min: 40, max: 80, step: 2.5} },
     { name: "Lateral Raises", muscles: ["כתפיים"], sets: [{w: 12.5, r: 13}, {w: 12.5, r: 13}, {w: 12.5, r: 11}], step: 0.5 },
     { name: "Weighted Pull Ups", muscles: ["גב"], sets: [{w: 0, r: 8}, {w: 0, r: 8}, {w: 0, r: 8}], step: 5, minW: 0, maxW: 40, isBW: true },
     { name: "Face Pulls", muscles: ["כתפיים"], sets: [{w: 40, r: 13}, {w: 40, r: 13}, {w: 40, r: 15}], step: 2.5 },
     { name: "Barbell Shrugs", muscles: ["כתפיים"], sets: [{w: 140, r: 11}, {w: 140, r: 11}, {w: 140, r: 11}], step: 5 },
     
-    // FIXED: Bench Press RM Range 80-150
+    // Bench Press RM Range 80-150
     { name: "Bench Press (Main)", muscles: ["חזה"], isCalc: true, baseRM: 100, rmRange: [80, 150], manualRange: {base: 85, min: 60, max: 140, step: 2.5} },
     { name: "Incline Bench Press", muscles: ["חזה"], sets: [{w: 65, r: 9}, {w: 65, r: 9}, {w: 65, r: 9}], step: 2.5 },
     { name: "Dumbbell Peck Fly", muscles: ["חזה"], sets: [{w: 14, r: 11}, {w: 14, r: 11}, {w: 14, r: 11}], step: 2 },
@@ -360,7 +360,7 @@ function confirmExercise(doEx) {
     else startRecording();
 }
 
-// --- UPDATED: RM SELECTION LOGIC V11.0.0 ---
+// --- UPDATED: RM SELECTION LOGIC ---
 function setupCalculatedEx() {
     document.getElementById('rm-title').innerText = `${state.currentExName} 1RM`;
     
@@ -442,12 +442,21 @@ function initPickers() {
     const savedWeight = StorageManager.getLastWeight(state.currentExName);
     
     let defaultW;
-    if (state.setIdx === 0 && savedWeight) {
-        defaultW = savedWeight;
-    } else if (state.lastLoggedSet) {
-        defaultW = state.lastLoggedSet.w;
+    
+    // --- LOGIC FIX HERE ---
+    // If it's a calculated exercise, ALWAYS prioritize the calculated target weight for the current set.
+    // This overrides the "memory" of previous sets or previous sessions.
+    if (state.currentEx.isCalc && target) {
+        defaultW = target.w;
     } else {
-        defaultW = target ? target.w : 0;
+        // Standard logic for Accessory exercises
+        if (state.setIdx === 0 && savedWeight) {
+            defaultW = savedWeight;
+        } else if (state.lastLoggedSet) {
+            defaultW = state.lastLoggedSet.w;
+        } else {
+            defaultW = target ? target.w : 0;
+        }
     }
 
     const minW = Math.max(0, defaultW - 40);
@@ -691,7 +700,7 @@ function copyResult() {
     }
 }
 
-// --- ARCHIVE LOGIC V11.0.0 ---
+// --- ARCHIVE LOGIC ---
 
 function openArchive() {
     const list = document.getElementById('archive-list');
@@ -731,7 +740,7 @@ function showArchiveDetail(item) {
     delBtn.onclick = () => {
         if(confirm("למחוק אימון זה מהארכיון?")) {
             StorageManager.deleteFromArchive(item.timestamp);
-            openArchive(); // Refresh list and go back
+            openArchive(); 
         }
     };
 
