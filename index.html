@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>GymPro Elite 10.8</title>
+    <title>GymPro Elite 10.9.2</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="stylesheet" href="style.css">
@@ -17,7 +17,7 @@
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
             </button>
             <div class="brand-logo">GYMPRO <span>ELITE</span></div>
-            <div class="version-tag">V 10.8</div>
+            <div class="version-tag">V 10.9.2</div>
         </header>
 
         <main class="content-area">
@@ -43,7 +43,7 @@
                 <div class="vertical-stack">
                     <button class="menu-card tall" onclick="selectWorkout('A')"><h3>אימון A</h3><p>כתפיים - חזה - גב</p></button>
                     <button class="menu-card tall" onclick="selectWorkout('B')"><h3>אימון B</h3><p>רגליים - גב</p></button>
-                    <button class="menu-card tall" onclick="selectWorkout('C')"><h3>אימון C</h3><p>חזה - כתפיים</p></button>
+                    <button class="menu-card tall" onclick="selectWorkout('C')"><h3>חזה - כתפיים</h3><p>חזה - כתפיים</p></button>
                     <button class="menu-card tall freestyle-card" onclick="startFreestyle()"><h3>Freestyle</h3><p>בחירה חופשית</p></button>
                 </div>
             </div>
@@ -69,7 +69,7 @@
             <div id="ui-variation" class="screen">
                 <h2 id="variation-title" class="section-title">בחר תרגיל</h2>
                 <div id="variation-options" class="vertical-stack"></div>
-                <button class="btn-text" onclick="navigate('ui-muscle-select')">חזור לבחירת שריר</button>
+                <button class="btn-text" onclick="handleBackClick()">חזור</button>
             </div>
 
             <div id="ui-1rm" class="screen">
@@ -87,6 +87,8 @@
                     <h2 id="confirm-ex-name"></h2>
                     <button class="btn-main primary-gradient" onclick="confirmExercise(true)">התחל</button>
                     <button class="btn-text" onclick="confirmExercise(false)">דלג</button>
+                    
+                    <button id="btn-interruption" class="btn-text" style="color: var(--accent); margin-top: 20px;" onclick="interruptWorkout()">➕ הוסף תרגיל ביניים</button>
                 </div>
             </div>
 
@@ -104,6 +106,10 @@
                     <div class="glass-card compact"><label>Weight</label><select id="weight-picker" class="ios-picker"></select></div>
                     <div class="glass-card compact"><label>Reps</label><select id="reps-picker" class="ios-picker"></select></div>
                     <div class="glass-card compact"><label>RIR</label><select id="rir-picker" class="ios-picker"></select></div>
+                </div>
+
+                <div class="glass-card note-card">
+                    <input type="text" id="set-note" placeholder="הוסף הערה לסט (אופציונלי)..." autocomplete="off">
                 </div>
 
                 <button id="btn-submit-set" class="btn-main primary-gradient pulse" onclick="nextStep()">סיום סט</button>
@@ -125,7 +131,6 @@
                     <h3>התרגיל הושלם!</h3>
                     <div class="vertical-stack">
                         <button class="btn-main success-gradient" onclick="handleExtra(true)">+ סט בונוס</button>
-                        <button class="btn-main secondary" onclick="interruptWorkout()">➕ הוסף תרגיל ביניים</button>
                         <button class="btn-main primary-gradient" onclick="handleExtra(false)">המשך</button>
                     </div>
                 </div>
@@ -158,6 +163,16 @@
                 <div class="hero-section"><h2>סיכום אימון</h2></div>
                 <div id="summary-area" class="summary-card"></div>
                 <button class="btn-main primary-gradient" onclick="copyResult()">העתק וסגור</button>
+            </div>
+
+            <div id="ui-archive-detail" class="screen">
+                <div class="hero-section"><h2 id="archive-detail-title">פירוט אימון</h2></div>
+                <div id="archive-detail-content" class="summary-card"></div>
+                <div class="vertical-stack" style="margin-top:20px;">
+                    <button class="btn-main primary-gradient" onclick="copyArchiveDetail()">העתק סיכום</button>
+                    <button class="btn-main" style="background: #ff453a;" onclick="deleteCurrentArchiveItem()">מחק אימון</button>
+                    <button class="btn-text" onclick="handleBackClick()">חזור לארכיון</button>
+                </div>
             </div>
         </main>
     </div>
