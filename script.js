@@ -1,5 +1,5 @@
 /**
- * GYMPRO ELITE V11.0.1 - FIXED CALC LOGIC
+ * GYMPRO ELITE V11.0.2 - STRICT CALC LOGIC
  */
 
 // --- GLOBAL STATE ---
@@ -442,23 +442,34 @@ function initPickers() {
     const savedWeight = StorageManager.getLastWeight(state.currentExName);
     
     let defaultW;
+    let currentR;
+
+    // --- STRICT LOGIC SPLIT ---
     
-    // --- LOGIC FIX HERE ---
-    // If it's a calculated exercise, ALWAYS prioritize the calculated target weight for the current set.
-    // This overrides the "memory" of previous sets or previous sessions.
     if (state.currentEx.isCalc && target) {
+        // CASE 1: Calculated Exercise (Must follow the plan strictly)
         defaultW = target.w;
+        currentR = target.r;
     } else {
-        // Standard logic for Accessory exercises
-        if (state.setIdx === 0 && savedWeight) {
-            defaultW = savedWeight;
-        } else if (state.lastLoggedSet) {
+        // CASE 2: Standard/Accessory Exercise (Smart Memory)
+        // Weight Priority: Last Logged -> History -> Default Target -> 0
+        if (state.lastLoggedSet) {
             defaultW = state.lastLoggedSet.w;
+        } else if (state.setIdx === 0 && savedWeight) {
+            defaultW = savedWeight;
         } else {
             defaultW = target ? target.w : 0;
         }
+
+        // Reps Priority: Last Logged -> Default Target -> 8
+        if (state.lastLoggedSet) {
+            currentR = state.lastLoggedSet.r;
+        } else {
+            currentR = target ? target.r : 8;
+        }
     }
 
+    // Populate Weight Picker
     const minW = Math.max(0, defaultW - 40);
     const maxW = defaultW + 50;
     
@@ -466,9 +477,13 @@ function initPickers() {
         let o = new Option(i + " kg", i); if(i === defaultW) o.selected = true; wPick.add(o);
     }
     
+    // Populate Reps Picker
     const rPick = document.getElementById('reps-picker'); rPick.innerHTML = "";
-    const currentR = target ? target.r : (state.lastLoggedSet ? state.lastLoggedSet.r : 8);
-    for(let i = 1; i <= 30; i++) { let o = new Option(i, i); if(i === currentR) o.selected = true; rPick.add(o); }
+    for(let i = 1; i <= 30; i++) { 
+        let o = new Option(i, i); 
+        if(i === currentR) o.selected = true; 
+        rPick.add(o); 
+    }
     
     const rirPick = document.getElementById('rir-picker'); rirPick.innerHTML = "";
     [0, 0.5, 1, 1.5, 2, 2.5, 3, 4, 5].forEach(v => {
