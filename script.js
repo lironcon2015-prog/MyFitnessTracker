@@ -1,5 +1,5 @@
 /**
- * GYMPRO ELITE V11.0.3 - FIXES & FREESTYLE IMPROVEMENTS
+ * GYMPRO ELITE V11.0.4 - FIXED NAVIGATION LOGIC
  */
 
 // --- GLOBAL STATE ---
@@ -278,7 +278,7 @@ function showExerciseList(muscle) {
     options.innerHTML = "";
     document.getElementById('variation-title').innerText = `תרגילי ${muscle}`;
     
-    // FIX: Add back button for freestyle mode
+    // FIX: Add back button for freestyle mode using navigation logic
     if (state.isFreestyle) {
         const backBtn = document.createElement('button');
         backBtn.className = "btn-text";
@@ -287,7 +287,8 @@ function showExerciseList(muscle) {
         backBtn.style.marginBottom = "10px";
         backBtn.style.padding = "5px";
         backBtn.innerHTML = "🡠 חזור לבחירת קבוצת שריר";
-        backBtn.onclick = () => handleBackClick();
+        // UPDATED: Use navigate() to jump directly to muscle select instead of popping history
+        backBtn.onclick = () => navigate('ui-muscle-select');
         options.appendChild(backBtn);
     }
 
