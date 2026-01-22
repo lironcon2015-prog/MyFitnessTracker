@@ -1,5 +1,5 @@
 /**
- * GYMPRO ELITE V11.0.2 - STRICT CALC LOGIC & FIXES
+ * GYMPRO ELITE V11.0.3 - FIXES & FREESTYLE IMPROVEMENTS
  */
 
 // --- GLOBAL STATE ---
@@ -202,8 +202,7 @@ function handleBackClick() {
     if (currentScreen === 'ui-extra') {
         state.historyStack.pop(); 
         state.log.pop();
-        // BUG FIX: Removed state.setIdx-- to prevent jumping back two sets.
-        // We want to remain on the same index (the last set completed) to edit it.
+        // FIX: Removed state.setIdx-- to prevent jumping back two sets.
         state.lastLoggedSet = state.log.length > 0 ? state.log[state.log.length - 1] : null;
         
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -279,7 +278,7 @@ function showExerciseList(muscle) {
     options.innerHTML = "";
     document.getElementById('variation-title').innerText = `תרגילי ${muscle}`;
     
-    // FEATURE: Add a back button at the top of the list for Freestyle mode
+    // FIX: Add back button for freestyle mode
     if (state.isFreestyle) {
         const backBtn = document.createElement('button');
         backBtn.className = "btn-text";
