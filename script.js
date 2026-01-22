@@ -1,5 +1,5 @@
 /**
- * GYMPRO ELITE V11.0.2 - STRICT CALC LOGIC
+ * GYMPRO ELITE V11.0.2 - STRICT CALC LOGIC & FIXES
  */
 
 // --- GLOBAL STATE ---
@@ -202,7 +202,8 @@ function handleBackClick() {
     if (currentScreen === 'ui-extra') {
         state.historyStack.pop(); 
         state.log.pop();
-        state.setIdx--;
+        // BUG FIX: Removed state.setIdx-- to prevent jumping back two sets.
+        // We want to remain on the same index (the last set completed) to edit it.
         state.lastLoggedSet = state.log.length > 0 ? state.log[state.log.length - 1] : null;
         
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -278,6 +279,19 @@ function showExerciseList(muscle) {
     options.innerHTML = "";
     document.getElementById('variation-title').innerText = `תרגילי ${muscle}`;
     
+    // FEATURE: Add a back button at the top of the list for Freestyle mode
+    if (state.isFreestyle) {
+        const backBtn = document.createElement('button');
+        backBtn.className = "btn-text";
+        backBtn.style.color = "var(--accent)";
+        backBtn.style.textAlign = "right";
+        backBtn.style.marginBottom = "10px";
+        backBtn.style.padding = "5px";
+        backBtn.innerHTML = "🡠 חזור לבחירת קבוצת שריר";
+        backBtn.onclick = () => handleBackClick();
+        options.appendChild(backBtn);
+    }
+
     const filtered = exerciseDatabase.filter(ex => ex.muscles.includes(muscle) && !state.completedExInSession.includes(ex.name));
     
     filtered.forEach(ex => {
