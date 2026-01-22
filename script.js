@@ -1,15 +1,28 @@
-/** GYMPRO ELITE V11.3.0 - Calendar View + Drawer Implementation */
+/** 
+ * GYMPRO ELITE V11.3.0 
+ * - FULL DATABASE RESTORED
+ * - CALENDAR VIEW & DRAWER IMPLEMENTED
+ * - STACK PRUNING FOR FREESTYLE FIX
+ */
+
+// --- GLOBAL STATE ---
 let state = {
-    week: 1, type: '', rm: 100, exIdx: 0, setIdx: 0, log: [], currentEx: null, currentExName: '',
-    historyStack: ['ui-week'], timerInterval: null, seconds: 0, startTime: null,
+    week: 1, type: '', rm: 100, exIdx: 0, setIdx: 0, 
+    log: [], currentEx: null, currentExName: '',
+    historyStack: ['ui-week'],
+    timerInterval: null, seconds: 0, startTime: null,
     isArmPhase: false, isFreestyle: false, isExtraPhase: false, isInterruption: false,
-    currentMuscle: '', completedExInSession: [], workoutStartTime: null, workoutDurationMins: 0,
-    lastLoggedSet: null, firstArmGroup: null, secondArmGroup: null,
+    currentMuscle: '',
+    completedExInSession: [],
+    workoutStartTime: null, workoutDurationMins: 0,
+    lastLoggedSet: null,
+    firstArmGroup: null, secondArmGroup: null,
     archiveView: 'list', calendarDate: new Date()
 };
 
 let audioContext, wakeLock = null, selectedArchiveIds = new Set();
 
+// --- STORAGE ---
 const StorageManager = {
     KEY_WEIGHTS: 'gympro_weights', KEY_RM: 'gympro_rm', KEY_ARCHIVE: 'gympro_archive',
     getData(k) { try { return JSON.parse(localStorage.getItem(k)) || {}; } catch { return {}; } },
@@ -19,38 +32,70 @@ const StorageManager = {
     getLastRM(ex) { return this.getData(this.KEY_RM)[ex] || null; },
     saveRM(ex, r) { let d = this.getData(this.KEY_RM); d[ex] = r; this.saveData(this.KEY_RM, d); },
     saveToArchive(o) { let h = this.getArchive(); h.unshift(o); this.saveData(this.KEY_ARCHIVE, h); },
-    getArchive() { let h = localStorage.getItem(this.KEY_ARCHIVE); try { return JSON.parse(h) || []; } catch { return []; } },
+    getArchive() { try { return JSON.parse(localStorage.getItem(this.KEY_ARCHIVE)) || []; } catch { return []; } },
     deleteFromArchive(t) { let h = this.getArchive().filter(i => i.timestamp !== t); this.saveData(this.KEY_ARCHIVE, h); },
     getAllData() { return { weights: this.getData(this.KEY_WEIGHTS), rms: this.getData(this.KEY_RM), archive: this.getArchive() }; },
     restoreData(d) { if(d.weights) this.saveData(this.KEY_WEIGHTS, d.weights); if(d.rms) this.saveData(this.KEY_RM, d.rms); if(d.archive) this.saveData(this.KEY_ARCHIVE, d.archive); }
 };
 
+// --- DATABASE (100% RESTORED) ---
+const unilateralExercises = ["Dumbbell Peck Fly", "Lateral Raises", "Single Leg Curl", "Dumbbell Bicep Curls", "Cable Fly", "Concentration Curls"];
+const heavyCompounds = ["Overhead Press (Main)", "Bench Press (Main)", "Squat", "Deadlift"];
+
 const exerciseDatabase = [
     { name: "Overhead Press (Main)", muscles: ["כתפיים"], isCalc: true, baseRM: 60, rmRange: [50, 100], manualRange: {base: 50, min: 40, max: 80, step: 2.5} },
-    { name: "Lateral Raises", muscles: ["כתפיים"], sets: [{w: 12.5, r: 13}, {w: 12.5, r: 13}], step: 0.5 },
-    { name: "Weighted Pull Ups", muscles: ["גב"], sets: [{w: 0, r: 8}], step: 5, isBW: true },
-    { name: "Face Pulls", muscles: ["כתפיים"], sets: [{w: 40, r: 13}], step: 2.5 },
-    { name: "Barbell Shrugs", muscles: ["כתפיים"], sets: [{w: 140, r: 11}], step: 5 },
+    { name: "Lateral Raises", muscles: ["כתפיים"], sets: [{w: 12.5, r: 13}, {w: 12.5, r: 13}, {w: 12.5, r: 11}], step: 0.5 },
+    { name: "Weighted Pull Ups", muscles: ["גב"], sets: [{w: 0, r: 8}, {w: 0, r: 8}, {w: 0, r: 8}], step: 5, minW: 0, maxW: 40, isBW: true },
+    { name: "Face Pulls", muscles: ["כתפיים"], sets: [{w: 40, r: 13}, {w: 40, r: 13}, {w: 40, r: 15}], step: 2.5 },
+    { name: "Barbell Shrugs", muscles: ["כתפיים"], sets: [{w: 140, r: 11}, {w: 140, r: 11}, {w: 140, r: 11}], step: 5 },
     { name: "Bench Press (Main)", muscles: ["חזה"], isCalc: true, baseRM: 100, rmRange: [80, 150], manualRange: {base: 85, min: 60, max: 140, step: 2.5} },
-    { name: "Incline Bench Press", muscles: ["חזה"], sets: [{w: 65, r: 9}], step: 2.5 },
-    { name: "Dumbbell Peck Fly", muscles: ["חזה"], sets: [{w: 14, r: 11}], step: 2 },
-    { name: "Leg Press", muscles: ["רגליים"], sets: [{w: 280, r: 8}], step: 5 },
-    { name: "Squat", muscles: ["רגליים"], sets: [{w: 100, r: 8}], step: 2.5 },
-    { name: "Lat Pulldown", muscles: ["גב"], sets: [{w: 75, r: 10}], step: 2.5 },
-    { name: "Cable Row", muscles: ["גב"], sets: [{w: 65, r: 10}], step: 2.5 },
-    { name: "Straight Arm Pulldown", muscles: ["גב"], sets: [{w: 30, r: 10}], step: 2.5 }
+    { name: "Incline Bench Press", muscles: ["חזה"], sets: [{w: 65, r: 9}, {w: 65, r: 9}, {w: 65, r: 9}], step: 2.5 },
+    { name: "Dumbbell Peck Fly", muscles: ["חזה"], sets: [{w: 14, r: 11}, {w: 14, r: 11}, {w: 14, r: 11}], step: 2 },
+    { name: "Machine Peck Fly", muscles: ["חזה"], sets: [{w: 45, r: 11}, {w: 45, r: 11}, {w: 45, r: 11}], step: 1 },
+    { name: "Cable Fly", muscles: ["חזה"], sets: [{w: 12.5, r: 11}, {w: 12.5, r: 11}, {w: 12.5, r: 11}], step: 2.5 },
+    { name: "Leg Press", muscles: ["רגליים"], sets: [{w: 280, r: 8}, {w: 300, r: 8}, {w: 300, r: 7}], step: 5 },
+    { name: "Squat", muscles: ["רגליים"], sets: [{w: 100, r: 8}, {w: 100, r: 8}, {w: 100, r: 8}], step: 2.5, minW: 60, maxW: 180 },
+    { name: "Deadlift", muscles: ["רגליים"], sets: [{w: 100, r: 5}, {w: 100, r: 5}, {w: 100, r: 5}], step: 2.5, minW: 60, maxW: 180 },
+    { name: "Romanian Deadlift", muscles: ["רגליים"], sets: [{w: 100, r: 8}, {w: 100, r: 8}, {w: 100, r: 8}], step: 2.5, minW: 60, maxW: 180 },
+    { name: "Single Leg Curl", muscles: ["רגליים"], sets: [{w: 25, r: 8}, {w: 30, r: 6}, {w: 25, r: 8}], step: 2.5 },
+    { name: "Lying Leg Curl (Double)", muscles: ["רגליים"], sets: [{w: 50, r: 8}, {w: 60, r: 6}, {w: 50, r: 8}], step: 5 },
+    { name: "Seated Leg Curl", muscles: ["רגליים"], sets: [{w: 50, r: 10}, {w: 50, r: 10}, {w: 50, r: 10}], step: 5 }, 
+    { name: "Seated Calf Raise", muscles: ["רגליים"], sets: [{w: 70, r: 10}, {w: 70, r: 10}, {w: 70, r: 12}], step: 5 },
+    { name: "Standing Calf Raise", muscles: ["רגליים"], sets: [{w: 110, r: 10}, {w: 110, r: 10}, {w: 110, r: 12}], step: 10 },
+    { name: "Lat Pulldown", muscles: ["גב"], sets: [{w: 75, r: 10}, {w: 75, r: 10}, {w: 75, r: 11}], step: 2.5 },
+    { name: "Pull Ups", muscles: ["גב"], isBW: true, sets: [{w: 0, r: 8}, {w: 0, r: 8}, {w: 0, r: 8}] },
+    { name: "Cable Row", muscles: ["גב"], sets: [{w: 65, r: 10}, {w: 65, r: 10}, {w: 65, r: 12}], step: 2.5 },
+    { name: "Machine Row", muscles: ["גב"], sets: [{w: 50, r: 10}, {w: 50, r: 10}, {w: 50, r: 12}], step: 5 },
+    { name: "Straight Arm Pulldown", muscles: ["גב"], sets: [{w: 30, r: 10}, {w: 30, r: 12}, {w: 30, r: 12}], step: 2.5 },
+    { name: "Back Extension", muscles: ["גב"], sets: [{w: 0, r: 12}, {w: 0, r: 12}, {w: 0, r: 12}], step: 5, minW: 0, maxW: 50, isBW: true }
 ];
 
 const armExercises = {
-    biceps: [{ name: "Dumbbell Bicep Curls", sets: [{w: 12, r: 8}], step: 0.5 }],
-    triceps: [{ name: "Triceps Pushdown", sets: [{w: 35, r: 8}], step: 2.5 }]
+    biceps: [
+        { name: "Dumbbell Bicep Curls", sets: [{w: 12, r: 8}], step: 0.5 },
+        { name: "Barbell Bicep Curls", sets: [{w: 25, r: 8}], step: 1 },
+        { name: "Concentration Curls", sets: [{w: 10, r: 10}], step: 0.5 }
+    ],
+    triceps: [
+        { name: "Triceps Pushdown", sets: [{w: 35, r: 8}], step: 2.5 },
+        { name: "Lying Triceps Extension", sets: [{w: 25, r: 8}], step: 2.5 }
+    ]
 };
 
-const workouts = { 'A': ["Overhead Press (Main)", "Barbell Shrugs", "Lateral Raises", "Weighted Pull Ups", "Face Pulls", "Incline Bench Press"], 'B': ["Leg Press", "Lat Pulldown", "Cable Row", "Straight Arm Pulldown"], 'C': ["Bench Press (Main)", "Incline Bench Press", "Dumbbell Peck Fly", "Lateral Raises", "Face Pulls"] };
-const variationMap = { 'C': { 2: ["Dumbbell Peck Fly", "Machine Peck Fly", "Cable Fly"] } };
+const workouts = {
+    'A': ["Overhead Press (Main)", "Barbell Shrugs", "Lateral Raises", "Weighted Pull Ups", "Face Pulls", "Incline Bench Press"],
+    'B': ["Leg Press", "Single Leg Curl", "Lat Pulldown", "Cable Row", "Seated Calf Raise", "Straight Arm Pulldown"],
+    'C': ["Bench Press (Main)", "Incline Bench Press", "Dumbbell Peck Fly", "Lateral Raises", "Face Pulls"]
+};
+
+const variationMap = {
+    'B': { 1: ["Single Leg Curl", "Lying Leg Curl (Double)", "Seated Leg Curl"], 3: ["Cable Row", "Machine Row"], 4: ["Seated Calf Raise", "Standing Calf Raise"] },
+    'C': { 2: ["Dumbbell Peck Fly", "Machine Peck Fly", "Cable Fly"] }
+};
+
 const workoutNames = { 'A': "אימון A", 'B': "אימון B", 'C': "אימון C", 'Freestyle': "Freestyle" };
 
-// --- NAVIGATION & UI ---
+// --- CORE SYSTEMS ---
 
 function haptic(t='light') { if(navigator.vibrate) navigator.vibrate(t==='success'?[50,50,50]:(t==='medium'?40:20)); }
 function playBeep(n=1) {
@@ -76,13 +121,14 @@ function handleBackClick() {
     if(state.historyStack.length<=1) return; haptic('warning');
     let curr = state.historyStack.pop();
     if(curr==='ui-archive-detail') { navigate('ui-archive'); return; }
+    if(curr==='ui-main' && state.setIdx > 0) { state.log.pop(); state.setIdx--; initPickers(); return; }
     let prev = state.historyStack[state.historyStack.length-1];
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById(prev).classList.add('active');
     document.getElementById('global-back').style.visibility = (prev==='ui-week')?'hidden':'visible';
 }
 
-// --- WORKOUT LOGIC ---
+// --- WORKOUT ENGINE ---
 
 function selectWeek(w) { state.week=w; navigate('ui-workout-type'); }
 function selectWorkout(t) { state.type=t; state.exIdx=0; state.log=[]; state.completedExInSession=[]; state.workoutStartTime=Date.now(); showConfirmScreen(); }
@@ -91,6 +137,10 @@ function startFreestyle() { state.type='Freestyle'; state.log=[]; state.isFreest
 function showExerciseList(m) {
     state.currentMuscle=m; let opts=document.getElementById('variation-options'); opts.innerHTML="";
     document.getElementById('variation-title').innerText=`תרגילי ${m}`;
+    if(state.isFreestyle) {
+        let b=document.createElement('button'); b.className="btn-text"; b.style.color="var(--accent)"; b.innerText="🡠 חזור לבחירת שריר";
+        b.onclick=()=>navigate('ui-muscle-select'); opts.appendChild(b);
+    }
     exerciseDatabase.filter(ex=>ex.muscles.includes(m) && !state.completedExInSession.includes(ex.name)).forEach(ex=>{
         let btn=document.createElement('button'); btn.className="menu-card"; btn.innerHTML=`<span>${ex.name}</span>➔`;
         btn.onclick=()=>{ state.currentEx=JSON.parse(JSON.stringify(ex)); state.currentExName=ex.name; if(ex.isCalc) state.currentEx.sets=Array(3).fill({w:ex.manualRange.base, r:8}); startRecording(); };
@@ -114,7 +164,7 @@ function showConfirmScreen(forceName=null) {
 
 function showVariationSelect() {
     let opts=document.getElementById('variation-options'); opts.innerHTML="";
-    variationMap[state.type][state.exIdx].forEach(n=>{
+    variationMap[state.type][state.exIdx].filter(n=>!state.completedExInSession.includes(n)).forEach(n=>{
         let b=document.createElement('button'); b.className="menu-card"; b.innerHTML=`<span>${n}</span>➔`; b.onclick=()=>showConfirmScreen(n); opts.appendChild(b);
     });
     navigate('ui-variation');
@@ -131,7 +181,8 @@ function setupCalculatedEx() {
 function save1RM() {
     state.rm=parseFloat(document.getElementById('rm-picker').value); StorageManager.saveRM(state.currentExName, state.rm);
     let p=[0.65,0.75,0.85,0.75,0.65], r=[5,5,5,8,10];
-    if(state.week===2){ p=[0.7,0.8,0.9,0.8,0.7]; r=[3,3,3,8,10]; } else if(state.week===3){ p=[0.75,0.85,0.95,0.85,0.75]; r=[5,3,1,8,10]; }
+    if(state.week===2){ p=[0.7,0.8,0.9,0.8,0.7,0.7]; r=[3,3,3,8,10,10]; } 
+    else if(state.week===3){ p=[0.75,0.85,0.95,0.85,0.75,0.75]; r=[5,3,1,8,10,10]; }
     state.currentEx.sets = p.map((pct,i)=>({w:Math.round((state.rm*pct)/2.5)*2.5, r:r[i]})); startRecording();
 }
 
@@ -141,7 +192,7 @@ function initPickers() {
     let target=state.currentEx.sets[state.setIdx]; document.getElementById('ex-display-name').innerText=state.currentExName;
     document.getElementById('set-counter').innerText=`SET ${state.setIdx+1}/${state.currentEx.sets.length}`;
     let hist=document.getElementById('last-set-info'); if(state.lastLoggedSet){ hist.innerText=`סט אחרון: ${state.lastLoggedSet.w}kg x ${state.lastLoggedSet.r}`; hist.style.display='block'; } else hist.style.display='none';
-    document.getElementById('btn-warmup').style.display=(state.setIdx===0 && ["Squat","Bench Press (Main)"].includes(state.currentExName))?'block':'none';
+    document.getElementById('btn-warmup').style.display=(state.setIdx===0 && heavyCompounds.includes(state.currentExName))?'block':'none';
     let ta=document.getElementById('timer-area'); if(state.setIdx>0){ ta.style.visibility='visible'; resetAndStartTimer(); } else { ta.style.visibility='hidden'; stopRestTimer(); }
     let wp=document.getElementById('weight-picker'); wp.innerHTML=""; let step=state.currentEx.step||2.5;
     let defW = state.currentEx.isCalc && target ? target.w : (state.lastLoggedSet?state.lastLoggedSet.w : (StorageManager.getLastWeight(state.currentExName)||0));
@@ -185,12 +236,12 @@ function checkFlow() {
 }
 
 function resetAndStartTimer() {
-    stopRestTimer(); state.seconds=0; state.startTime=Date.now(); let target=90;
+    stopRestTimer(); state.seconds=0; state.startTime=Date.now();
     let c=document.getElementById('timer-progress'), t=document.getElementById('rest-timer');
     state.timerInterval=setInterval(()=>{
         state.seconds=Math.floor((Date.now()-state.startTime)/1000);
         t.innerText=`${Math.floor(state.seconds/60).toString().padStart(2,'0')}:${(state.seconds%60).toString().padStart(2,'0')}`;
-        c.style.strokeDashoffset=283-(Math.min(state.seconds/target,1)*283); if(state.seconds===target) playBeep(2);
+        c.style.strokeDashoffset=283-(Math.min(state.seconds/90,1)*283); if(state.seconds===90) playBeep(2);
     },100);
 }
 function stopRestTimer(){ if(state.timerInterval){ clearInterval(state.timerInterval); state.timerInterval=null; } }
@@ -206,13 +257,9 @@ function finish() {
 
 function copyResult() { let t=document.getElementById('summary-area').innerText; navigator.clipboard.writeText(t).then(()=>{ alert("הסיכום הועתק!"); location.reload(); }); }
 
-// --- ARCHIVE & CALENDAR ENGINE ---
+// --- ARCHIVE & CALENDAR ---
 
-function openArchive() {
-    selectedArchiveIds.clear();
-    switchArchiveView(state.archiveView);
-    navigate('ui-archive');
-}
+function openArchive() { selectedArchiveIds.clear(); switchArchiveView(state.archiveView); navigate('ui-archive'); }
 
 function switchArchiveView(v) {
     state.archiveView = v;
@@ -236,53 +283,40 @@ function renderCalendar() {
     let d = state.calendarDate;
     document.getElementById('cal-month-year').innerText = d.toLocaleString('he-IL', { month: 'long', year: 'numeric' });
     let grid = document.getElementById('calendar-grid'); grid.innerHTML = "";
-    
     let first = new Date(d.getFullYear(), d.getMonth(), 1).getDay();
     let daysInMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
     let archive = StorageManager.getArchive();
-
-    // Fill empty slots
     for(let i=0; i<first; i++) grid.appendChild(Object.assign(document.createElement('div'), {className: 'calendar-day other-month'}));
-
     for(let day=1; day<=daysInMonth; day++) {
         let dateStr = new Date(d.getFullYear(), d.getMonth(), day).toLocaleDateString('he-IL');
         let workoutsOnDay = archive.filter(i => i.date === dateStr);
-        
-        let dayEl = document.createElement('div');
-        dayEl.className = 'calendar-day' + (workoutsOnDay.length ? ' has-workout' : '');
+        let dayEl = document.createElement('div'); dayEl.className = 'calendar-day' + (workoutsOnDay.length ? ' has-workout' : '');
         if(dateStr === new Date().toLocaleDateString('he-IL')) dayEl.classList.add('today');
         dayEl.innerText = day;
-
         if(workoutsOnDay.length) {
             let markers = document.createElement('div'); markers.className = 'day-markers';
             workoutsOnDay.forEach(w => {
-                let m = document.createElement('div');
-                m.className = `marker type-${(w.type || 'freestyle').toLowerCase()}`;
+                let m = document.createElement('div'); m.className = `marker type-${(w.type || 'freestyle').toLowerCase()}`;
                 markers.appendChild(m);
             });
-            dayEl.appendChild(markers);
-            dayEl.onclick = () => openDrawer(dateStr, workoutsOnDay);
+            dayEl.appendChild(markers); dayEl.onclick = () => openDrawer(dateStr, workoutsOnDay);
         }
         grid.appendChild(dayEl);
     }
 }
 
 function changeMonth(n) { state.calendarDate.setMonth(state.calendarDate.getMonth() + n); renderCalendar(); }
-
 function openDrawer(date, workouts) {
     document.getElementById('drawer-date').innerText = date;
     let list = document.getElementById('drawer-workouts'); list.innerHTML = "";
     workouts.forEach(w => {
         let b = document.createElement('button'); b.className = "menu-card";
         b.innerHTML = `<div><strong>${w.typeName || w.type}</strong><br><small>${w.duration} דק'</small></div>➔`;
-        b.onclick = () => { closeDrawer(); showArchiveDetail(w); };
-        list.appendChild(b);
+        b.onclick = () => { closeDrawer(); showArchiveDetail(w); }; list.appendChild(b);
     });
     document.getElementById('calendar-drawer').classList.add('active');
 }
-
 function closeDrawer() { document.getElementById('calendar-drawer').classList.remove('active'); }
-
 function updateCopySelectedBtn(){ let b=document.getElementById('btn-copy-selected'); b.disabled=selectedArchiveIds.size===0; b.style.opacity=b.disabled?0.5:1; }
 function copyBulkLog(m) {
     let h=StorageManager.getArchive(), items=m==='all'?h:h.filter(i=>selectedArchiveIds.has(i.timestamp));
@@ -295,7 +329,7 @@ function exportData() { let d=StorageManager.getAllData(), b=new Blob([JSON.stri
 function triggerImport(){ document.getElementById('import-file').click(); }
 function importData(i){ let r=new FileReader(); r.onload=(e)=>{ StorageManager.restoreData(JSON.parse(e.target.result)); location.reload(); }; r.readAsText(i.files[0]); }
 
-// Placeholders for flow
+// Placeholders for flow logic
 function interruptWorkout() { state.isInterruption=true; navigate('ui-muscle-select'); }
 function resumeWorkout() { state.isInterruption=false; navigate('ui-confirm'); }
 function openSwapMenu() {
