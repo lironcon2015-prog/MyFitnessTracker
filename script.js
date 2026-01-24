@@ -1,8 +1,7 @@
 /**
- * GYMPRO ELITE V11.4.0
- * - NEW: Inline Finish Flow (No extra screen)
- * - NEW: Pre-workout History Card
- * - NEW: Unilateral notation in summary
+ * GYMPRO ELITE V11.5.0
+ * - NEW: Freestyle Arms (Merged Biceps/Triceps)
+ * - FIX: History Card UI (Pill design, LTR fix)
  */
 
 // --- GLOBAL STATE ---
@@ -272,6 +271,26 @@ function showExerciseList(muscle) {
         options.appendChild(backBtn);
     }
 
+    // HANDLER FOR ARMS IN FREESTYLE
+    if (muscle === 'ידיים') {
+        const allArms = [...armExercises.biceps, ...armExercises.triceps];
+        allArms.forEach(ex => {
+            const btn = document.createElement('button');
+            btn.className = "menu-card";
+            btn.innerHTML = `<span>${ex.name}</span><div class="arrow">➔</div>`;
+            btn.onclick = () => {
+                state.currentEx = JSON.parse(JSON.stringify(ex));
+                state.currentExName = ex.name;
+                // Standardize to 3 sets for Freestyle
+                state.currentEx.sets = [ex.sets[0], ex.sets[0], ex.sets[0]];
+                startRecording();
+            };
+            options.appendChild(btn);
+        });
+        navigate('ui-variation');
+        return;
+    }
+
     const filtered = exerciseDatabase.filter(ex => ex.muscles.includes(muscle) && !state.completedExInSession.includes(ex.name));
     
     filtered.forEach(ex => {
@@ -339,12 +358,12 @@ function showConfirmScreen(forceExName = null) {
     const history = getLastPerformance(exName);
     if (history) {
         const historyHtml = `
-            <div class="glass-card compact" style="width:100%; border:1px solid rgba(255,255,255,0.08);">
+            <div class="glass-card compact" style="width:100%; box-sizing:border-box;">
                 <div style="font-size:0.85em; color:var(--text-dim); margin-bottom:10px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:8px;">
                     ביצוע אחרון: ${history.date}
                 </div>
                 <div class="history-list">
-                    ${history.sets.map(s => `<div>• ${s}</div>`).join('')}
+                    ${history.sets.map(s => `<div class="history-item">${s}</div>`).join('')}
                 </div>
             </div>
         `;
