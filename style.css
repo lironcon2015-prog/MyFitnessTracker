@@ -208,7 +208,7 @@ body {
     stroke-dasharray: 283; stroke-dashoffset: 283; transition: 1s linear;
 }
 .timer-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 2.2em; font-weight: 300; font-variant-numeric: tabular-nums; }
-.btn-finish-ex { background: none; border: 1px solid var(--border); color: var(--text-dim); padding: 8px 16px; border-radius: 20px; font-size: 0.8em; }
+/* .btn-finish-ex removed from CSS */
 
 /* Badges & Summary */
 .history-pill { 
@@ -253,3 +253,31 @@ body {
     font-size: 0.95em;
 }
 .warmup-row:last-child { border-bottom: none; }
+
+/* Inline Action Panel */
+.action-panel {
+    animation: fadeIn 0.3s ease;
+}
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+.passive-preview {
+    color: var(--text-dim);
+    font-size: 0.8em;
+    text-align: center;
+    margin-bottom: 15px;
+}
+.secondary-action {
+    border: 1px solid var(--border);
+    border-radius: var(--ios-radius);
+    color: var(--text);
+    padding: 15px;
+}
+
+/* History Card */
+.history-list {
+    text-align: left;
+    margin-top: 10px;
+    font-size: 0.9em;
+    color: #d1d1d6;
+    line-height: 1.6;
+}
