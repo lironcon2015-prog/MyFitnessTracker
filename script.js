@@ -1,8 +1,8 @@
 /**
- * GYMPRO ELITE V11.2.4
- * - FIX: Freestyle navigation bug (Stack pruning in handleExtra)
- * - FIX: Explicit navigation in muscle group selection
- * - NEW: Calendar View with Heatmap & Bottom Sheet Drawer
+ * GYMPRO ELITE V11.4.0
+ * - NEW: Inline Finish Flow (No extra screen)
+ * - NEW: Pre-workout History Card
+ * - NEW: Unilateral notation in summary
  */
 
 // --- GLOBAL STATE ---
@@ -18,9 +18,12 @@ let state = {
     lastLoggedSet: null,
     firstArmGroup: null, 
     secondArmGroup: null,
+    lastWorkoutDetails: {}, // To store grouped details for archive
     // Archive State
     archiveView: 'list', // 'list' or 'calendar'
-    calendarOffset: 0 // Months from current
+    calendarOffset: 0, // Months from current
+    // Edit State
+    editingIndex: -1
 };
 
 let audioContext;
@@ -207,21 +210,15 @@ function handleBackClick() {
 
     const currentScreen = state.historyStack[state.historyStack.length - 1];
 
-    if (currentScreen === 'ui-extra') {
-        state.historyStack.pop(); 
-        state.log.pop();
-        state.lastLoggedSet = state.log.length > 0 ? state.log[state.log.length - 1] : null;
-        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-        document.getElementById('ui-main').classList.add('active');
-        if (state.historyStack[state.historyStack.length - 1] !== 'ui-main') state.historyStack.push('ui-main');
-        initPickers();
-        return;
-    }
-
     if (currentScreen === 'ui-main' && state.setIdx > 0) {
         state.log.pop();
         state.setIdx--;
         state.lastLoggedSet = state.log.length > 0 ? state.log[state.log.length - 1] : null;
+        
+        // Restore UI if we were in "Done" state
+        document.getElementById('action-panel').style.display = 'none';
+        document.getElementById('btn-submit-set').style.display = 'block';
+        
         initPickers();
         return;
     }
@@ -296,37 +293,65 @@ function showExerciseList(muscle) {
     navigate('ui-variation');
 }
 
+function getLastPerformance(exName) {
+    const archive = StorageManager.getArchive();
+    // Search backwards
+    for (const item of archive) {
+        if (item.details && item.details[exName]) {
+            return {
+                date: item.date,
+                sets: item.details[exName].sets
+            };
+        }
+    }
+    return null;
+}
+
 function showConfirmScreen(forceExName = null) {
-    if (forceExName) {
-        const exData = exerciseDatabase.find(e => e.name === forceExName);
-        state.currentEx = JSON.parse(JSON.stringify(exData));
-        state.currentExName = exData.name;
-        document.getElementById('confirm-ex-name').innerText = exData.name;
-        const intBtn = document.getElementById('btn-interruption');
-        if (intBtn) intBtn.style.display = (state.exIdx > 0) ? 'block' : 'none';
-        document.getElementById('btn-swap-confirm').style.display = 'none';
-        navigate('ui-confirm');
-        return;
+    let exName = forceExName;
+    if (!exName) {
+        if (variationMap[state.type] && variationMap[state.type][state.exIdx]) {
+            showVariationSelect();
+            return;
+        }
+        exName = workouts[state.type][state.exIdx];
+    }
+    
+    const exData = exerciseDatabase.find(e => e.name === exName);
+    state.currentEx = JSON.parse(JSON.stringify(exData));
+    state.currentExName = exData.name;
+    document.getElementById('confirm-ex-name').innerText = exData.name;
+    
+    // Buttons visibility
+    const intBtn = document.getElementById('btn-interruption');
+    if (intBtn) intBtn.style.display = (state.exIdx > 0) ? 'block' : 'none';
+    const swapBtn = document.getElementById('btn-swap-confirm');
+    if (!state.isFreestyle && !state.isExtraPhase && !state.isInterruption && !state.isArmPhase) {
+        swapBtn.style.display = 'flex';
+    } else {
+        swapBtn.style.display = 'none';
     }
 
-    if (variationMap[state.type] && variationMap[state.type][state.exIdx]) {
-        showVariationSelect();
-    } else {
-        const exName = workouts[state.type][state.exIdx];
-        const exData = exerciseDatabase.find(e => e.name === exName);
-        state.currentEx = JSON.parse(JSON.stringify(exData));
-        state.currentExName = exData.name;
-        document.getElementById('confirm-ex-name').innerText = exData.name;
-        const intBtn = document.getElementById('btn-interruption');
-        if (intBtn) intBtn.style.display = (state.exIdx > 0) ? 'block' : 'none';
-        const swapBtn = document.getElementById('btn-swap-confirm');
-        if (!state.isFreestyle && !state.isExtraPhase && !state.isInterruption && !state.isArmPhase) {
-            swapBtn.style.display = 'flex';
-        } else {
-            swapBtn.style.display = 'none';
-        }
-        navigate('ui-confirm');
+    // Render History Card
+    const historyContainer = document.getElementById('history-container');
+    historyContainer.innerHTML = "";
+    
+    const history = getLastPerformance(exName);
+    if (history) {
+        const historyHtml = `
+            <div class="glass-card compact" style="width:100%; border:1px solid rgba(255,255,255,0.08);">
+                <div style="font-size:0.85em; color:var(--text-dim); margin-bottom:10px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:8px;">
+                    ביצוע אחרון: ${history.date}
+                </div>
+                <div class="history-list">
+                    ${history.sets.map(s => `<div>• ${s}</div>`).join('')}
+                </div>
+            </div>
+        `;
+        historyContainer.innerHTML = historyHtml;
     }
+
+    navigate('ui-confirm');
 }
 
 function showVariationSelect() {
@@ -374,7 +399,17 @@ function save1RM() {
     startRecording();
 }
 
-function startRecording() { state.setIdx = 0; state.lastLoggedSet = null; navigate('ui-main'); initPickers(); }
+function startRecording() { 
+    state.setIdx = 0; 
+    state.lastLoggedSet = null; 
+    
+    // Reset Inline UI
+    document.getElementById('action-panel').style.display = 'none';
+    document.getElementById('btn-submit-set').style.display = 'block';
+    
+    navigate('ui-main'); 
+    initPickers(); 
+}
 
 function initPickers() {
     const target = state.currentEx.sets[state.setIdx];
@@ -389,9 +424,18 @@ function initPickers() {
     document.getElementById('unilateral-note').style.display = unilateralExercises.some(u => state.currentExName.includes(u)) ? 'block' : 'none';
     const btnWarmup = document.getElementById('btn-warmup');
     btnWarmup.style.display = (state.setIdx === 0 && heavyCompounds.includes(state.currentExName)) ? 'block' : 'none';
+    
+    // Timer Logic: Only show/start if not the first set. 
+    // The "Extra Set" logic handles timer separately.
     const timerArea = document.getElementById('timer-area');
-    if (state.setIdx > 0) { timerArea.style.visibility = 'visible'; resetAndStartTimer(); } 
-    else { timerArea.style.visibility = 'hidden'; stopRestTimer(); }
+    if (state.setIdx > 0 && document.getElementById('action-panel').style.display === 'none') { 
+        timerArea.style.visibility = 'visible'; 
+        resetAndStartTimer(); 
+    } else { 
+        timerArea.style.visibility = 'hidden'; 
+        stopRestTimer(); 
+    }
+
     const wPick = document.getElementById('weight-picker'); wPick.innerHTML = "";
     const step = state.currentEx.step || 2.5;
     const savedWeight = StorageManager.getLastWeight(state.currentExName);
@@ -468,6 +512,42 @@ function resetAndStartTimer() {
 
 function stopRestTimer() { if (state.timerInterval) { clearInterval(state.timerInterval); state.timerInterval = null; } }
 
+function getNextExerciseName() {
+    // Logic to peek at the next exercise name for the passive preview
+    if (state.isInterruption) return "חזרה למסלול המקורי";
+    if (state.isExtraPhase) return "בחירת תרגיל נוסף";
+    if (state.isArmPhase) return "תרגיל ידיים הבא / סיום";
+
+    const workoutList = workouts[state.type];
+    if (!workoutList) return "סיום אימון";
+
+    // Try to find the next available slot
+    for (let i = 0; i < workoutList.length; i++) {
+        const defaultName = workoutList[i];
+        let isDone = state.completedExInSession.includes(defaultName);
+        
+        if (!isDone && variationMap[state.type] && variationMap[state.type][i]) {
+            const variations = variationMap[state.type][i];
+            if (variations.some(v => state.completedExInSession.includes(v))) {
+                isDone = true;
+            }
+        }
+
+        // If we found a slot that is NOT done, and it's not the current one we are doing
+        if (!isDone && defaultName !== state.currentExName && !state.completedExInSession.includes(state.currentExName)) {
+             // Basic check: if we are at index X, next is usually X+1
+             if (i > state.exIdx) return defaultName; 
+        }
+    }
+    
+    // Fallback logic for simplicity
+    if (state.exIdx < workoutList.length - 1) {
+         return workoutList[state.exIdx + 1];
+    }
+
+    return "סיום אימון / תוספות";
+}
+
 function nextStep() {
     haptic('light');
     const wVal = parseFloat(document.getElementById('weight-picker').value);
@@ -475,31 +555,82 @@ function nextStep() {
     const entry = { exName: state.currentExName, w: wVal, r: parseInt(document.getElementById('reps-picker').value), rir: document.getElementById('rir-picker').value, note: noteVal };
     StorageManager.saveWeight(state.currentExName, wVal);
     state.log.push(entry); state.lastLoggedSet = entry;
-    if (state.setIdx < state.currentEx.sets.length - 1) { state.setIdx++; initPickers(); } 
-    else { haptic('medium'); navigate('ui-extra'); }
+
+    // Check if this was the last set
+    if (state.setIdx < state.currentEx.sets.length - 1) { 
+        state.setIdx++; 
+        initPickers(); 
+    } else { 
+        haptic('medium'); 
+        // Inline Finish Flow
+        document.getElementById('btn-submit-set').style.display = 'none';
+        document.getElementById('action-panel').style.display = 'block';
+        
+        // Passive Preview
+        const nextName = getNextExerciseName();
+        document.getElementById('next-ex-preview').innerText = `הבא בתור: ${nextName}`;
+
+        // Stop timer (it will restart only if extra set is chosen)
+        stopRestTimer();
+        document.getElementById('timer-area').style.visibility = 'hidden';
+    }
 }
 
-function handleExtra(isBonus) {
-    if(isBonus) { state.setIdx++; state.currentEx.sets.push({...state.currentEx.sets[state.setIdx-1]}); initPickers(); navigate('ui-main'); } 
-    else {
-        // commit exercise: prune stack to keep history clean
-        state.historyStack = state.historyStack.filter(s => s !== 'ui-main' && s !== 'ui-extra');
-        
-        if (!state.completedExInSession.includes(state.currentExName)) state.completedExInSession.push(state.currentExName);
-        
-        if (state.isInterruption) { state.isInterruption = false; navigate('ui-confirm'); } 
-        else if (state.isExtraPhase) { navigate('ui-ask-extra'); } 
-        else if (state.isArmPhase) { showArmSelection(); } 
-        else if (state.isFreestyle) { showExerciseList(state.currentMuscle); } 
-        else { checkFlow(); }
-    }
+function addExtraSet() {
+    state.setIdx++;
+    // Add a copy of the last set configuration to the array
+    state.currentEx.sets.push({...state.currentEx.sets[state.setIdx-1]});
+    
+    // UI Reset
+    document.getElementById('action-panel').style.display = 'none';
+    document.getElementById('btn-submit-set').style.display = 'block';
+    
+    initPickers();
+    // Force start timer for the extra set rest
+    document.getElementById('timer-area').style.visibility = 'visible'; 
+    resetAndStartTimer();
+}
+
+function finishCurrentExercise() {
+    // Commit exercise: prune stack to keep history clean
+    state.historyStack = state.historyStack.filter(s => s !== 'ui-main');
+    
+    if (!state.completedExInSession.includes(state.currentExName)) state.completedExInSession.push(state.currentExName);
+    
+    if (state.isInterruption) { state.isInterruption = false; navigate('ui-confirm'); } 
+    else if (state.isExtraPhase) { navigate('ui-ask-extra'); } 
+    else if (state.isArmPhase) { showArmSelection(); } 
+    else if (state.isFreestyle) { showExerciseList(state.currentMuscle); } 
+    else { checkFlow(); }
 }
 
 function checkFlow() {
     const workoutList = workouts[state.type];
-    const nextIdx = workoutList.findIndex(ex => !state.completedExInSession.includes(ex));
-    if (nextIdx !== -1) { state.exIdx = nextIdx; showConfirmScreen(); } 
-    else { navigate('ui-ask-extra'); }
+    let foundNext = false;
+
+    for (let i = 0; i < workoutList.length; i++) {
+        const defaultName = workoutList[i];
+        let isDone = state.completedExInSession.includes(defaultName);
+
+        // If default isn't done, check if any variation of this slot is done
+        if (!isDone && variationMap[state.type] && variationMap[state.type][i]) {
+            const variations = variationMap[state.type][i];
+            if (variations.some(v => state.completedExInSession.includes(v))) {
+                isDone = true;
+            }
+        }
+
+        if (!isDone) {
+            state.exIdx = i;
+            showConfirmScreen();
+            foundNext = true;
+            break;
+        }
+    }
+
+    if (!foundNext) {
+        navigate('ui-ask-extra');
+    }
 }
 
 function interruptWorkout() {
@@ -556,32 +687,87 @@ function finish() {
     haptic('success');
     state.workoutDurationMins = Math.floor((Date.now() - state.workoutStartTime) / 60000);
     navigate('ui-summary');
+    
+    // Clear note input for fresh entry
+    document.getElementById('summary-note').value = "";
+    
     const workoutDisplayName = workoutNames[state.type] || state.type;
     const dateStr = new Date().toLocaleDateString('he-IL');
     let summaryText = `GYMPRO ELITE SUMMARY\n${workoutDisplayName} | ${dateStr} | ${state.workoutDurationMins}m\n\n`;
     let grouped = {};
+    
     state.log.forEach(e => {
         if (!grouped[e.exName]) grouped[e.exName] = { sets: [], vol: 0, hasWarmup: false };
         if (e.isWarmup) grouped[e.exName].hasWarmup = true;
         else if (!e.skip) {
-            let setStr = `${e.w}kg x ${e.r} (RIR ${e.rir})`;
+            let weightStr = `${e.w}kg`;
+            if (unilateralExercises.some(u => e.exName.includes(u))) {
+                weightStr += ` (יד אחת)`;
+            }
+
+            let setStr = `${weightStr} x ${e.r} (RIR ${e.rir})`;
             if (e.note) setStr += ` | Note: ${e.note}`;
             grouped[e.exName].sets.push(setStr); grouped[e.exName].vol += (e.w * e.r);
         }
     });
+
     for (let ex in grouped) { 
         summaryText += `${ex} (Vol: ${grouped[ex].vol}kg):\n`;
         if (grouped[ex].hasWarmup) summaryText += `🔥 Warmup Completed\n`;
         summaryText += `${grouped[ex].sets.join('\n')}\n\n`; 
     }
+    
     document.getElementById('summary-area').innerText = summaryText.trim();
-    StorageManager.saveToArchive({ id: Date.now(), date: dateStr, timestamp: Date.now(), type: workoutDisplayName, duration: state.workoutDurationMins, summary: summaryText.trim(), details: grouped });
+    
+    // Store details for save later
+    state.lastWorkoutDetails = grouped;
 }
 
 function copyResult() {
-    const text = document.getElementById('summary-area').innerText;
-    if (navigator.clipboard) { navigator.clipboard.writeText(text).then(() => { haptic('light'); alert("הסיכום הועתק ונשמר בארכיון!"); location.reload(); }); } 
-    else { const el = document.createElement("textarea"); el.value = text; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el); alert("הסיכום הועתק ונשמר בארכיון!"); location.reload(); }
+    // 1. Get base text
+    let text = document.getElementById('summary-area').innerText;
+    
+    // 2. Get optional note
+    const userNote = document.getElementById('summary-note').value.trim();
+    if (userNote) {
+        text += `\n\n📝 הערות כלליות: ${userNote}`;
+    }
+
+    // 3. Prepare Archive Object
+    const workoutDisplayName = workoutNames[state.type] || state.type;
+    const dateStr = new Date().toLocaleDateString('he-IL');
+    
+    const archiveObj = { 
+        id: Date.now(), 
+        date: dateStr, 
+        timestamp: Date.now(), 
+        type: workoutDisplayName, 
+        duration: state.workoutDurationMins, 
+        summary: text, 
+        details: state.lastWorkoutDetails,
+        generalNote: userNote // Save note specifically as well
+    };
+
+    // 4. Save to Archive
+    StorageManager.saveToArchive(archiveObj);
+
+    // 5. Copy & Close
+    if (navigator.clipboard) { 
+        navigator.clipboard.writeText(text).then(() => { 
+            haptic('light'); 
+            alert("הסיכום (כולל הערות) הועתק ונשמר בארכיון!"); 
+            location.reload(); 
+        }); 
+    } else { 
+        const el = document.createElement("textarea"); 
+        el.value = text; 
+        document.body.appendChild(el); 
+        el.select(); 
+        document.execCommand('copy'); 
+        document.body.removeChild(el); 
+        alert("הסיכום (כולל הערות) הועתק ונשמר בארכיון!"); 
+        location.reload(); 
+    }
 }
 
 // --- ARCHIVE LOGIC & CALENDAR ---
@@ -758,11 +944,7 @@ function closeDayDrawer() {
 
 function openArchiveFromDrawer(itemData) {
     closeDayDrawer();
-    // We need to parse correctly if stringified, but here we passed object.
-    // However, onclick in HTML stringifies it.
-    // Since we pass object directly in template literal, it might be [object Object].
-    // Fixed logic: passing index or finding by timestamp is safer.
-    // Re-finding item by timestamp:
+    // Re-finding item by timestamp is safer.
     const realItem = StorageManager.getArchive().find(i => i.timestamp === itemData.timestamp);
     if(realItem) showArchiveDetail(realItem);
 }
@@ -790,4 +972,136 @@ function importData(input) {
         } catch(err) { alert("שגיאה בטעינת הקובץ. וודא שזהו קובץ גיבוי תקין."); }
     };
     reader.readAsText(file);
+}
+
+// --- NEW SESSION DRAWER LOGIC ---
+
+function openSessionLog() {
+    const drawer = document.getElementById('sheet-modal');
+    const overlay = document.getElementById('sheet-overlay');
+    const content = document.getElementById('sheet-content');
+
+    let html = `<h3>יומן אימון נוכחי</h3>`;
+    
+    if (state.log.length === 0) {
+        html += `<p style="text-align:center; margin-top:20px;">טרם בוצעו סטים באימון זה</p>`;
+    } else {
+        html += `<div class="vertical-stack">`;
+        state.log.forEach((entry, index) => {
+            const isSkip = entry.skip;
+            const isWarmup = entry.isWarmup;
+            let displayTitle = entry.exName;
+            let details = "";
+            let dotColor = "var(--text-dim)";
+
+            if (isSkip) {
+                details = "דילוג על תרגיל";
+            } else if (isWarmup) {
+                details = "סט חימום";
+                dotColor = "#ff3b30";
+            } else {
+                details = `${entry.w}kg x ${entry.r} (RIR ${entry.rir})`;
+                if (entry.note) details += ` | 📝`;
+                dotColor = "var(--accent)";
+            }
+
+            html += `
+            <div class="mini-workout-item" onclick="openEditSet(${index})">
+                <div class="mini-dot" style="background:${dotColor}"></div>
+                <div style="flex-grow:1;">
+                    <div style="font-weight:600; font-size:0.9em;">${index + 1}. ${displayTitle}</div>
+                    <div style="font-size:0.85em; color:#8E8E93;">${details}</div>
+                </div>
+                <div class="arrow">✎</div>
+            </div>`;
+        });
+        html += `</div>`;
+    }
+
+    content.innerHTML = html;
+    overlay.style.display = 'block';
+    drawer.classList.add('open');
+    haptic('light');
+}
+
+function openEditSet(index) {
+    const entry = state.log[index];
+    if (entry.skip || entry.isWarmup) {
+        alert("לא ניתן לערוך דילוגים או סטים של חימום כרגע.");
+        return;
+    }
+
+    state.editingIndex = index;
+    document.getElementById('edit-weight').value = entry.w;
+    document.getElementById('edit-reps').value = entry.r;
+    document.getElementById('edit-rir').value = entry.rir;
+    document.getElementById('edit-note').value = entry.note || "";
+
+    // Show delete only if it's the very last set
+    const btnDelete = document.getElementById('btn-delete-last-set');
+    if (index === state.log.length - 1) {
+        btnDelete.style.display = 'block';
+    } else {
+        btnDelete.style.display = 'none';
+    }
+
+    // Hide drawer, show modal
+    closeDayDrawer(); // repurposing the close function for the sheet
+    document.getElementById('edit-set-modal').style.display = 'flex';
+}
+
+function closeEditModal() {
+    document.getElementById('edit-set-modal').style.display = 'none';
+    state.editingIndex = -1;
+}
+
+function saveSetEdit() {
+    if (state.editingIndex === -1) return;
+    
+    const w = parseFloat(document.getElementById('edit-weight').value);
+    const r = parseInt(document.getElementById('edit-reps').value);
+    const rir = document.getElementById('edit-rir').value;
+    const note = document.getElementById('edit-note').value;
+
+    if (isNaN(w) || isNaN(r)) {
+        alert("נא להזין ערכים תקינים");
+        return;
+    }
+
+    // Update Log
+    state.log[state.editingIndex].w = w;
+    state.log[state.editingIndex].r = r;
+    state.log[state.editingIndex].rir = rir;
+    state.log[state.editingIndex].note = note;
+
+    // Update Last Logged Set if we edited the last one
+    if (state.editingIndex === state.log.length - 1) {
+        state.lastLoggedSet = state.log[state.editingIndex];
+        // Refresh UI info pill
+        const hist = document.getElementById('last-set-info');
+        hist.innerText = `סט אחרון: ${state.lastLoggedSet.w}kg x ${state.lastLoggedSet.r} (RIR ${state.lastLoggedSet.rir})`;
+    }
+
+    closeEditModal();
+    haptic('success');
+    openSessionLog(); // Re-open the drawer to show changes
+}
+
+function deleteLastSet() {
+    if (confirm("האם למחוק את הסט האחרון? פעולה זו תחזיר אותך צעד אחד אחורה.")) {
+        state.log.pop();
+        state.lastLoggedSet = state.log.length > 0 ? state.log[state.log.length - 1] : null;
+        
+        // Restore UI if we were in "Done" state
+        if (document.getElementById('action-panel').style.display === 'block') {
+             document.getElementById('action-panel').style.display = 'none';
+             document.getElementById('btn-submit-set').style.display = 'block';
+        } else if (state.setIdx > 0) {
+            state.setIdx--;
+        }
+        
+        closeEditModal();
+        haptic('warning');
+        initPickers(); // Refresh the main screen UI
+    }
 }
