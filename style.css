@@ -38,7 +38,15 @@ body {
 .back-btn { background: none; border: none; color: var(--accent); padding: 8px; visibility: hidden; cursor: pointer; }
 .brand-logo { font-weight: 800; font-size: 1.2em; letter-spacing: -0.5px; }
 .brand-logo span { color: var(--accent); }
-.version-tag { font-size: 0.7em; color: var(--text-dim); background: rgba(255,255,255,0.1); padding: 4px 8px; border-radius: 6px; }
+.settings-btn { background: none; border: none; font-size: 1.2em; cursor: pointer; padding: 8px; }
+
+.version-footer { 
+    font-size: 0.75em; 
+    color: var(--text-dim); 
+    text-align: center; 
+    margin-top: 30px; 
+    opacity: 0.6; 
+}
 
 /* Screens & Animation */
 .screen { display: none; flex-direction: column; height: 100%; overflow-y: auto; padding-bottom: 40px; scrollbar-width: none; }
@@ -208,7 +216,6 @@ body {
     stroke-dasharray: 283; stroke-dashoffset: 283; transition: 1s linear;
 }
 .timer-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 2.2em; font-weight: 300; font-variant-numeric: tabular-nums; }
-/* .btn-finish-ex removed from CSS */
 
 /* Badges & Summary */
 .history-pill { 
@@ -233,7 +240,6 @@ body {
     border: 1px solid var(--border); color: #d1d1d6; line-height: 1.5;
 }
 .finish-main-btn { background: #3a3a3c; color: white; padding: 15px; border-radius: var(--ios-radius); border: none; width: 100%; margin-top: 20px; font-weight: 600; }
-.bonus-card { width: 100%; text-align: center; }
 
 /* Modal Styles */
 .modal-overlay {
@@ -273,27 +279,144 @@ body {
     padding: 15px;
 }
 
-/* History Card */
+/* History - Clean UI */
 .history-list {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    margin-top: 10px;
     width: 100%;
-    max-width: 100%;
-    overflow: hidden;
-    box-sizing: border-box;
+    margin-top: 10px;
 }
 
 .history-item {
-    background: rgba(255,255,255,0.05);
-    padding: 10px 12px;
-    border-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
     font-size: 0.9em;
-    color: #d1d1d6;
-    direction: ltr; /* Force Numbers to be LTR */
-    text-align: left;
-    white-space: normal;
-    word-break: break-word;
-    border-right: 3px solid var(--accent); /* Visual indicator */
+    direction: ltr; /* Keeps formatting consistent */
 }
+.history-item:last-child { border-bottom: none; }
+
+/* Skip Button - Passive & Framed */
+.passive-skip {
+    margin: 25px auto 0;
+    font-size: 0.85em;
+    color: var(--text-dim);
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 10px 20px;
+    width: auto;
+    display: block; /* Toggled via JS */
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.passive-skip:hover {
+    background: rgba(255,255,255,0.1);
+    color: var(--text);
+}
+
+/* --- WORKOUT MANAGER STYLES --- */
+
+/* Manager List Item */
+.manager-item {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--ios-radius);
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.manager-info h3 { margin: 0; font-size: 1.1em; color: white; }
+.manager-info p { margin: 5px 0 0; font-size: 0.8em; color: var(--text-dim); }
+.manager-actions { display: flex; gap: 10px; }
+.icon-btn {
+    background: rgba(255,255,255,0.1); border: none; color: white;
+    width: 36px; height: 36px; border-radius: 50%; display: flex;
+    align-items: center; justify-content: center; cursor: pointer;
+    font-size: 1em;
+}
+.icon-btn.delete { background: rgba(255, 69, 58, 0.2); color: #ff453a; }
+
+/* Editor Row (Updated for Main/Sets controls) */
+.editor-row {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 10px 10px 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+.row-info {
+    font-weight: 500;
+    font-size: 0.9em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 45%;
+}
+.editor-controls { display: flex; gap: 8px; align-items: center; }
+
+/* New Editor Controls */
+.crown-btn {
+    background: none; border: 1px solid var(--border);
+    color: var(--text-dim);
+    width: 32px; height: 32px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all 0.2s;
+}
+.crown-btn.active {
+    background: rgba(255, 215, 0, 0.15);
+    border-color: #FFD700;
+    color: #FFD700;
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.3);
+}
+
+.set-selector {
+    display: flex;
+    align-items: center;
+    background: rgba(255,255,255,0.05);
+    border-radius: 8px;
+    padding: 2px;
+}
+.set-btn {
+    background: none; border: none; color: white;
+    width: 28px; height: 28px; cursor: pointer;
+    font-weight: bold; font-size: 1.1em;
+}
+.set-val {
+    font-size: 0.9em; font-weight: 600; width: 20px; text-align: center;
+}
+
+.control-icon-btn {
+    background: none; border: 1px solid var(--border); color: var(--text-dim);
+    width: 32px; height: 32px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+}
+
+/* Exercise Selector - Search & Chips */
+.search-input {
+    background: #1c1c1e; border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px; color: white; width: 100%;
+    font-family: inherit; font-size: 1em; box-sizing: border-box;
+    margin-bottom: 10px;
+}
+.search-input:focus { outline: none; border-color: var(--accent); }
+
+.chip-container {
+    display: flex; gap: 8px; overflow-x: auto; 
+    padding-bottom: 5px; scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+}
+.chip-container::-webkit-scrollbar { display: none; }
+.chip {
+    background: rgba(255,255,255,0.1); border: none; color: white;
+    padding: 8px 16px; border-radius: 20px; font-size: 0.9em;
+    white-space: nowrap; cursor: pointer; transition: 0.2s;
+}
+.chip.active { background: var(--accent); color: white; font-weight: 600; }
