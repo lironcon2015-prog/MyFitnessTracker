@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>GymPro Elite 11.2.4</title>
+    <title>GymPro Elite 11.4.0</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="stylesheet" href="style.css">
@@ -22,6 +22,23 @@
         </div>
     </div>
 
+    <!-- Edit Set Modal -->
+    <div id="edit-set-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>עריכת סט</h3>
+            <div class="input-grid" style="margin-bottom: 15px;">
+                <div class="glass-card compact"><label>Weight</label><input type="number" id="edit-weight" class="minimal-input" style="margin:0;"></div>
+                <div class="glass-card compact"><label>Reps</label><input type="number" id="edit-reps" class="minimal-input" style="margin:0;"></div>
+                <div class="glass-card compact"><label>RIR</label><input type="number" id="edit-rir" class="minimal-input" style="margin:0;"></div>
+            </div>
+            <input type="text" id="edit-note" class="minimal-input" placeholder="הערה...">
+            
+            <button class="btn-main primary-gradient" onclick="saveSetEdit()">שמור שינויים</button>
+            <button id="btn-delete-last-set" class="btn-text" style="color: #ff453a; display: none;" onclick="deleteLastSet()">מחק סט אחרון (Undo)</button>
+            <button class="btn-text" onclick="closeEditModal()">ביטול</button>
+        </div>
+    </div>
+
     <!-- Bottom Sheet (Drawer) -->
     <div id="sheet-overlay" class="bottom-sheet-overlay" onclick="closeDayDrawer()"></div>
     <div id="sheet-modal" class="bottom-sheet">
@@ -35,7 +52,7 @@
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
             </button>
             <div class="brand-logo">GYMPRO <span>ELITE</span></div>
-            <div class="version-tag">V 11.2.4</div>
+            <div class="version-tag">V 11.4.0</div>
         </header>
 
         <main class="content-area">
@@ -138,17 +155,23 @@
                         </button>
                     </div>
 
+                    <!-- History Card (New) -->
+                    <div id="history-container" style="width: 100%; margin-top: 30px;"></div>
+
                 </div>
             </div>
 
             <div id="ui-main" class="screen">
                 <div class="exercise-header">
-                    <div class="badge-row">
+                    <!-- Session Log Button -->
+                    <button onclick="openSessionLog()" style="position: absolute; left: 0; background: none; border: 1px solid var(--border); border-radius: 8px; color: var(--text-dim); padding: 5px 10px; font-size: 1.2em; cursor: pointer;">📋</button>
+                    
+                    <div class="badge-row" style="margin-top: 5px;">
                         <span id="set-counter" class="ios-badge">SET 1/3</span>
                         <button id="btn-warmup" class="warmup-badge" onclick="calcWarmup()">🔥 חימום</button>
                         <div id="unilateral-note" class="uni-badge">UNILATERAL</div>
                     </div>
-                    <h2 id="ex-display-name"></h2>
+                    <h2 id="ex-display-name" style="margin-top: 15px;"></h2>
                     <div id="last-set-info" class="history-pill"></div>
                 </div>
 
@@ -162,6 +185,15 @@
 
                 <button id="btn-submit-set" class="btn-main primary-gradient pulse" onclick="nextStep()">סיום סט</button>
 
+                <!-- New Action Panel (Inline Extra/Finish) -->
+                <div id="action-panel" class="action-panel" style="display: none;">
+                    <p id="next-ex-preview" class="passive-preview"></p>
+                    <div class="vertical-stack">
+                        <button class="btn-main primary-gradient" onclick="finishCurrentExercise()">המשך לתרגיל הבא</button>
+                        <button class="btn-text secondary-action" onclick="addExtraSet()">+ סט נוסף</button>
+                    </div>
+                </div>
+
                 <div id="timer-area" class="timer-section">
                     <div class="timer-wrap">
                         <svg class="timer-svg" viewBox="0 0 100 100">
@@ -170,19 +202,11 @@
                         </svg>
                         <div id="rest-timer" class="timer-text">00:00</div>
                     </div>
-                    <button class="btn-finish-ex" onclick="handleExtra(false)">דלג לתרגיל הבא</button>
+                    <!-- Skip button removed from timer, moved to action panel -->
                 </div>
             </div>
 
-            <div id="ui-extra" class="screen flex-center">
-                <div class="glass-card bonus-card">
-                    <h3>התרגיל הושלם!</h3>
-                    <div class="vertical-stack">
-                        <button class="btn-main success-gradient" onclick="handleExtra(true)">+ סט בונוס</button>
-                        <button class="btn-main primary-gradient" onclick="handleExtra(false)">המשך</button>
-                    </div>
-                </div>
-            </div>
+            <!-- UI Extra REMOVED -->
 
             <div id="ui-ask-extra" class="screen flex-center">
                 <div class="confirm-box">
@@ -209,6 +233,10 @@
 
             <div id="ui-summary" class="screen">
                 <div class="hero-section"><h2>סיכום אימון</h2></div>
+                
+                <!-- New Note Input -->
+                <input type="text" id="summary-note" class="minimal-input" placeholder="הערות כלליות לאימון (אופציונלי)" style="margin-bottom: 20px;">
+                
                 <div id="summary-area" class="summary-card"></div>
                 <button class="btn-main primary-gradient" onclick="copyResult()">העתק וסגור</button>
             </div>
@@ -279,3 +307,291 @@
     <script src="script.js"></script>
 </body>
 </html>
+
+### 2. קובץ CSS (style.css)
+נוספו מחלקות עבור ה-`passive-preview`, `secondary-action` ועיצוב כרטיס ההיסטוריה.
+
+```css
+:root {
+    --bg: #000000;
+    --card-bg: #1c1c1e;
+    --accent: #0A84FF;
+    --accent-gradient: linear-gradient(135deg, #0A84FF, #0056b3);
+    --success-gradient: linear-gradient(135deg, #32D74B, #248A3D);
+    --text: #ffffff;
+    --text-dim: #8E8E93;
+    --border: rgba(255, 255, 255, 0.12);
+    --ios-radius: 16px;
+    --type-a: #0A84FF;
+    --type-b: #32D74B;
+    --type-c: #FF9F0A;
+    --type-free: #BF5AF2;
+}
+
+body {
+    margin: 0; font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg); color: var(--text);
+    direction: rtl; overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.glass-overlay {
+    position: fixed; inset: 0;
+    background: radial-gradient(circle at 50% 30%, #2c2c2e 0%, #000 70%);
+    z-index: -1; opacity: 0.6;
+}
+
+.app-container {
+    height: 100vh; display: flex; flex-direction: column;
+    padding: calc(env(safe-area-inset-top) + 10px) 20px env(safe-area-inset-bottom);
+    box-sizing: border-box;
+}
+
+/* Header */
+.app-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+.back-btn { background: none; border: none; color: var(--accent); padding: 8px; visibility: hidden; cursor: pointer; }
+.brand-logo { font-weight: 800; font-size: 1.2em; letter-spacing: -0.5px; }
+.brand-logo span { color: var(--accent); }
+.version-tag { font-size: 0.7em; color: var(--text-dim); background: rgba(255,255,255,0.1); padding: 4px 8px; border-radius: 6px; }
+
+/* Screens & Animation */
+.screen { display: none; flex-direction: column; height: 100%; overflow-y: auto; padding-bottom: 40px; scrollbar-width: none; }
+.screen::-webkit-scrollbar { display: none; }
+.screen.active { display: flex; animation: slideIn 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); }
+@keyframes slideIn { from { transform: translateX(-20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+/* Cards & Buttons */
+.hero-section { margin-bottom: 25px; } 
+.hero-section h1 { font-size: 2em; line-height: 1.1; margin: 0; }
+.hero-section span { display: block; color: var(--text-dim); font-size: 0.6em; font-weight: 400; margin-top: 5px; }
+
+.section-label {
+    font-size: 0.9em; color: var(--text-dim); margin-bottom: 15px; margin-top: 10px; 
+}
+.section-title { font-size: 1.4em; margin-bottom: 20px; }
+
+.action-card {
+    background: var(--accent-gradient); border-radius: var(--ios-radius); padding: 20px;
+    border: none; color: white; display: flex; align-items: center; 
+    justify-content: flex-start;
+    gap: 15px; width: 100%;
+    margin-bottom: 25px; font-weight: 600; box-shadow: 0 4px 20px rgba(10, 132, 255, 0.3);
+}
+
+.card-text { text-align: right; flex-grow: 1; }
+
+.menu-card {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: var(--ios-radius); padding: 18px; color: white; margin-bottom: 12px;
+    display: flex; justify-content: space-between; align-items: center; cursor: pointer;
+    transition: transform 0.1s;
+}
+.menu-card:active { transform: scale(0.98); background: #2c2c2e; }
+.menu-card.tall { flex-direction: column; align-items: flex-start; gap: 5px; }
+.menu-card h3 { margin: 0; font-size: 1.1em; }
+.menu-card p { margin: 0; color: var(--text-dim); font-size: 0.85em; }
+.freestyle-card { border-color: var(--accent); }
+
+/* Archive Specifics */
+.archive-card-row { display: flex; flex-direction: row; align-items: center; width: 100%; gap: 15px; }
+.archive-checkbox { width: 24px; height: 24px; accent-color: var(--accent); cursor: pointer; margin: 0; }
+.archive-info { flex-grow: 1; display: flex; flex-direction: column; gap: 4px; }
+
+/* Segmented Control */
+.segmented-control {
+    display: flex; background: rgba(118, 118, 128, 0.24); padding: 2px;
+    border-radius: 9px; margin-bottom: 20px;
+}
+.segment-btn {
+    flex: 1; background: none; border: none; color: white; padding: 6px;
+    font-size: 0.9em; font-weight: 500; border-radius: 7px; cursor: pointer;
+}
+.segment-btn.active { background: #636366; box-shadow: 0 3px 8px rgba(0,0,0,0.12); }
+
+/* Calendar Styles */
+.calendar-wrapper { margin-top: 10px; }
+.calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 0 10px; }
+.month-nav-btn { background: none; border: none; color: var(--accent); font-size: 1.2em; padding: 5px 15px; cursor: pointer; }
+.current-month-display { font-weight: 700; font-size: 1.1em; }
+
+.calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; text-align: center; }
+.day-name { font-size: 0.75em; color: var(--text-dim); padding-bottom: 10px; font-weight: 600; }
+.calendar-cell {
+    background: var(--card-bg); aspect-ratio: 1/1; border-radius: 10px;
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+    padding-top: 6px; font-size: 0.9em; position: relative; border: 1px solid transparent;
+    cursor: pointer;
+}
+.calendar-cell.today { border-color: var(--accent); background: rgba(10, 132, 255, 0.1); font-weight: 700; }
+.calendar-cell.empty { background: transparent; cursor: default; }
+
+.dots-container { display: flex; gap: 3px; margin-top: 4px; flex-wrap: wrap; justify-content: center; width: 80%; }
+.dot { width: 6px; height: 6px; border-radius: 50%; }
+.dot.type-a { background-color: var(--type-a); }
+.dot.type-b { background-color: var(--type-b); }
+.dot.type-c { background-color: var(--type-c); }
+.dot.type-free { background-color: var(--type-free); }
+
+/* Bottom Sheet (Drawer) */
+.bottom-sheet-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    z-index: 1000; display: none; backdrop-filter: blur(3px);
+}
+.bottom-sheet {
+    position: fixed; bottom: 0; left: 0; width: 100%;
+    background: rgba(28, 28, 30, 0.95);
+    border-top-left-radius: 20px; border-top-right-radius: 20px;
+    padding: 20px; box-sizing: border-box;
+    transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+    z-index: 1001; border-top: 1px solid var(--border);
+    max-height: 60vh; overflow-y: auto;
+}
+.bottom-sheet.open { transform: translateY(0); }
+.sheet-handle { width: 40px; height: 5px; background: #48484a; border-radius: 3px; margin: 0 auto 20px; }
+.sheet-content h3 { margin-top: 0; margin-bottom: 5px; }
+.sheet-content p { color: var(--text-dim); font-size: 0.9em; margin-bottom: 15px; }
+.mini-workout-item { 
+    background: rgba(255,255,255,0.05); padding: 12px; border-radius: 12px; 
+    margin-bottom: 8px; display: flex; align-items: center; gap: 10px;
+}
+.mini-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+.grid-menu { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.vertical-stack { display: flex; flex-direction: column; gap: 10px; }
+
+/* Inputs & UI Elements */
+.glass-card { background: var(--card-bg); border-radius: var(--ios-radius); padding: 16px; border: 1px solid var(--border); margin-bottom: 15px; }
+.input-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+.compact { text-align: center; padding: 12px 5px; }
+.compact label { font-size: 0.7em; color: var(--text-dim); display: block; margin-bottom: 5px; text-transform: uppercase; }
+
+.ios-picker {
+    background: none; border: none; color: white; font-size: 1.3em; font-weight: 700;
+    width: 100%; outline: none; text-align: center; appearance: none;
+}
+
+.minimal-input {
+    background: transparent; border: none; border-bottom: 1px solid var(--border);
+    color: var(--text); font-size: 0.95em; width: 100%; padding: 12px 5px;
+    margin-bottom: 20px; text-align: center; font-family: inherit;
+    transition: border-color 0.3s;
+}
+.minimal-input:focus { outline: none; border-bottom-color: var(--accent); }
+.minimal-input::placeholder { color: var(--text-dim); }
+
+.btn-main {
+    padding: 18px; border-radius: var(--ios-radius); border: none;
+    font-weight: 700; color: white; width: 100%; font-size: 1.1em;
+    margin-top: 15px; cursor: pointer;
+}
+.btn-text { background: none; border: none; color: var(--text-dim); padding: 15px; width: 100%; margin-top: 5px; font-size: 0.9em; }
+
+/* Control Grid System */
+.action-grid {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;
+    margin-top: 25px; width: 100%;
+}
+.control-btn {
+    background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px 5px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 6px; color: var(--text-dim); cursor: pointer;
+    transition: all 0.2s;
+}
+.control-btn:active { transform: scale(0.95); background: rgba(255,255,255,0.1); }
+.control-btn .icon { font-size: 1.4em; }
+.control-btn span { font-size: 0.75em; font-weight: 600; }
+.control-btn.accent-border { border-color: rgba(10, 132, 255, 0.4); color: var(--text); background: rgba(10, 132, 255, 0.1); }
+
+.primary-gradient { background: var(--accent-gradient); }
+.success-gradient { background: var(--success-gradient); }
+.secondary { background: #3a3a3c; }
+
+.flex-center { justify-content: center; align-items: center; }
+.confirm-box { text-align: center; width: 100%; }
+.confirm-box h2 { font-size: 1.8em; margin: 10px 0 10px; }
+.sub-text { color: var(--text-dim); font-size: 0.9em; margin-bottom: 30px; }
+
+/* Timer */
+.timer-section { display: flex; flex-direction: column; align-items: center; margin-top: 25px; visibility: hidden; }
+.timer-wrap { position: relative; width: 140px; height: 140px; margin-bottom: 15px; }
+.timer-svg { transform: rotate(-90deg); width: 100%; height: 100%; }
+.timer-bg { fill: none; stroke: var(--border); stroke-width: 6; }
+.timer-bar {
+    fill: none; stroke: var(--accent); stroke-width: 6; stroke-linecap: round;
+    stroke-dasharray: 283; stroke-dashoffset: 283; transition: 1s linear;
+}
+.timer-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 2.2em; font-weight: 300; font-variant-numeric: tabular-nums; }
+/* .btn-finish-ex removed from CSS */
+
+/* Badges & Summary */
+.history-pill { 
+    background: rgba(50, 215, 75, 0.1); color: #32D74B; 
+    padding: 8px; border-radius: 8px; font-size: 0.8em; 
+    margin-top: 5px; margin-bottom: 20px; 
+    display: none; text-align: center; 
+}
+.badge-row { display: flex; gap: 8px; margin-bottom: 5px; align-items: center; }
+.ios-badge { background: var(--accent); padding: 4px 8px; border-radius: 6px; font-size: 0.7em; font-weight: 800; }
+.uni-badge { background: #ff9f0a; color: black; padding: 4px 8px; border-radius: 6px; font-size: 0.7em; font-weight: 800; display: none; }
+.warmup-badge { 
+    background: #ff3b30; color: white; padding: 4px 10px; border: none;
+    border-radius: 6px; font-size: 0.7em; font-weight: 800; 
+    display: none; cursor: pointer; animation: pulseRed 2s infinite;
+}
+@keyframes pulseRed { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
+
+.summary-card {
+    background: #111; padding: 20px; border-radius: var(--ios-radius);
+    font-family: 'Menlo', monospace; white-space: pre-wrap; font-size: 0.85em;
+    border: 1px solid var(--border); color: #d1d1d6; line-height: 1.5;
+}
+.finish-main-btn { background: #3a3a3c; color: white; padding: 15px; border-radius: var(--ios-radius); border: none; width: 100%; margin-top: 20px; font-weight: 600; }
+.bonus-card { width: 100%; text-align: center; }
+
+/* Modal Styles */
+.modal-overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.85); z-index: 1000;
+    display: none; justify-content: center; align-items: center;
+    backdrop-filter: blur(5px);
+}
+.modal-content {
+    background: var(--card-bg); border: 1px solid var(--border);
+    padding: 25px; border-radius: var(--ios-radius); width: 85%; max-width: 320px;
+    text-align: center;
+}
+.warmup-row {
+    display: flex; justify-content: space-between; padding: 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    font-size: 0.95em;
+}
+.warmup-row:last-child { border-bottom: none; }
+
+/* Inline Action Panel */
+.action-panel {
+    animation: fadeIn 0.3s ease;
+}
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+.passive-preview {
+    color: var(--text-dim);
+    font-size: 0.8em;
+    text-align: center;
+    margin-bottom: 15px;
+}
+.secondary-action {
+    border: 1px solid var(--border);
+    border-radius: var(--ios-radius);
+    color: var(--text);
+    padding: 15px;
+}
+
+/* History Card */
+.history-list {
+    text-align: left;
+    margin-top: 10px;
+    font-size: 0.9em;
+    color: #d1d1d6;
+    line-height: 1.6;
+}
