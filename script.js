@@ -1,10 +1,6 @@
 /**
- * GYMPRO ELITE V12.2.0
- * - New Data Structure: Workouts as Arrays of Objects {name, isMain, sets}
- * - Workout Manager Upgrade: Toggle Main (Crown) and Set Count
- * - Runtime Logic: Main exercises use 1RM logic, Regular use defined sets
- * - Migration: Auto-convert old string arrays to objects
- * - Fix: "Quads" label
+ * GYMPRO ELITE V12.2.1
+ * - Fix: Crash when converting regular exercises to Main (Missing RM ranges)
  */
 
 // --- DEFAULT DATA (Factory Settings) ---
@@ -921,9 +917,15 @@ function resizeSets(count) {
 function setupCalculatedEx() {
     document.getElementById('rm-title').innerText = `${state.currentExName} 1RM`;
     const lastRM = StorageManager.getLastRM(state.currentExName);
-    const defaultRM = lastRM ? lastRM : state.currentEx.baseRM;
-    const minRM = state.currentEx.rmRange[0];
-    const maxRM = state.currentEx.rmRange[1];
+    
+    // Fallbacks for converted exercises (FIX FOR CRASH)
+    const baseRM = state.currentEx.baseRM || 50; 
+    const rmRange = state.currentEx.rmRange || [20, 150]; // Reasonable default range
+    
+    const defaultRM = lastRM ? lastRM : baseRM;
+    const minRM = rmRange[0];
+    const maxRM = rmRange[1];
+    
     const p = document.getElementById('rm-picker'); p.innerHTML = "";
     for(let i = minRM; i <= maxRM; i += 2.5) {
         let o = new Option(i + " kg", i); if(i === defaultRM) o.selected = true; p.add(o);
