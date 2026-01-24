@@ -275,9 +275,25 @@ body {
 
 /* History Card */
 .history-list {
-    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
     margin-top: 10px;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+.history-item {
+    background: rgba(255,255,255,0.05);
+    padding: 10px 12px;
+    border-radius: 8px;
     font-size: 0.9em;
     color: #d1d1d6;
-    line-height: 1.6;
+    direction: ltr; /* Force Numbers to be LTR */
+    text-align: left;
+    white-space: normal;
+    word-break: break-word;
+    border-right: 3px solid var(--accent); /* Visual indicator */
 }
