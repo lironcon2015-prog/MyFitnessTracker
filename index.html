@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>GymPro Elite 11.5.0</title>
+    <title>GymPro Elite 12.2.0</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="stylesheet" href="style.css">
@@ -52,13 +52,16 @@
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
             </button>
             <div class="brand-logo">GYMPRO <span>ELITE</span></div>
-            <div class="version-tag">V 11.5.0</div>
+            <!-- Settings Button -->
+            <button class="settings-btn" onclick="openSettings()">
+                ⚙️
+            </button>
         </header>
 
         <main class="content-area">
             
             <div id="ui-week" class="screen active">
-                <div class="hero-section"><h1>ברוך הבא,<span>מוכן לשבור שיא?</span></h1></div>
+                <div class="hero-section"><h1>ברוך הבא,<span>לוח בקרה אישי</span></h1></div>
                 
                 <button onclick="initAudio()" id="audio-init-btn" class="action-card primary-gradient">
                     <div class="card-icon">⚡</div>
@@ -76,16 +79,88 @@
                     <div class="card-icon">📜</div>
                     <div class="card-text">ארכיון וגיבוי</div>
                 </button>
+
+                <div class="version-footer">GymPro Elite v12.2.0</div>
+            </div>
+
+            <!-- SETTINGS SCREEN -->
+            <div id="ui-settings" class="screen">
+                <h2 class="section-title">הגדרות וניהול</h2>
+                
+                <button class="menu-card tall" style="width:100%; margin-bottom: 20px; border-color: var(--accent);" onclick="openWorkoutManager()">
+                    <h3 style="color:var(--accent);">ניהול תוכניות אימון</h3>
+                    <p>ערוך, צור או מחק תוכניות</p>
+                </button>
+
+                <div class="glass-card">
+                    <h3 style="margin-top:0">ניהול נתונים</h3>
+                    <p style="color:var(--text-dim); font-size:0.9em;">גרסה V12.2.0</p>
+                    <button class="btn-text" style="color: #ff453a; border: 1px solid #ff453a; border-radius: 12px;" onclick="resetToFactorySettings()">⚠️ איפוס להגדרות יצרן</button>
+                </div>
+            </div>
+
+            <!-- WORKOUT MANAGER (LIST) -->
+            <div id="ui-workout-manager" class="screen">
+                <div class="hero-section"><h2>ניהול תוכניות</h2></div>
+                <div id="manager-list" class="vertical-stack"></div>
+                <button class="btn-main primary-gradient" onclick="createNewWorkout()">+ צור תוכנית חדשה</button>
+            </div>
+
+            <!-- WORKOUT EDITOR -->
+            <div id="ui-workout-editor" class="screen">
+                <div class="hero-section"><h2>עריכת תוכנית</h2></div>
+                
+                <div class="glass-card">
+                    <label style="font-size:0.8em; color:var(--text-dim);">שם התוכנית</label>
+                    <input type="text" id="editor-workout-name" class="minimal-input" style="text-align:right; font-size:1.2em; font-weight:bold; margin-bottom:0;">
+                </div>
+
+                <div class="section-label">רשימת תרגילים</div>
+                <div id="editor-list" class="vertical-stack"></div>
+
+                <button class="btn-text" style="border: 1px dashed var(--accent); color: var(--accent); margin-top: 10px;" onclick="openExerciseSelector()">+ הוסף תרגיל</button>
+                
+                <div style="margin-top: 30px;">
+                    <button class="btn-main primary-gradient" onclick="saveWorkoutChanges()">שמור שינויים</button>
+                    <button class="btn-text" onclick="handleBackClick()">ביטול</button>
+                </div>
+            </div>
+
+            <!-- EXERCISE SELECTOR (SMART PICKER) -->
+            <div id="ui-exercise-selector" class="screen">
+                <div style="position: sticky; top: 0; background: var(--bg); z-index: 10; padding-bottom: 10px;">
+                    <h2 class="section-title" style="margin-bottom: 10px;">בחר תרגיל</h2>
+                    
+                    <!-- Search -->
+                    <input type="text" id="selector-search" class="search-input" placeholder="חפש תרגיל..." oninput="filterSelector()">
+                    
+                    <!-- Filter Chips -->
+                    <div class="chip-container">
+                        <button class="chip active" onclick="setSelectorFilter('all', this)">הכל</button>
+                        <button class="chip" onclick="setSelectorFilter('חזה', this)">חזה</button>
+                        <button class="chip" onclick="setSelectorFilter('גב', this)">גב</button>
+                        <button class="chip" onclick="setSelectorFilter('רגליים', this)">רגליים</button>
+                        <button class="chip" onclick="setSelectorFilter('quads', this)">Quads</button>
+                        <button class="chip" onclick="setSelectorFilter('hamstrings', this)">Hams</button>
+                        <button class="chip" onclick="setSelectorFilter('calves', this)">Calves</button>
+                        <button class="chip" onclick="setSelectorFilter('כתפיים', this)">כתפיים</button>
+                        <button class="chip" onclick="setSelectorFilter('ידיים', this)">ידיים</button>
+                        <button class="chip" onclick="setSelectorFilter('biceps', this)">Biceps</button>
+                        <button class="chip" onclick="setSelectorFilter('triceps', this)">Triceps</button>
+                        <button class="chip" onclick="setSelectorFilter('קליסטניקס', this)">קליסטניקס</button>
+                    </div>
+                </div>
+
+                <div id="selector-list" class="vertical-stack" style="padding-top: 10px;"></div>
+                <button class="btn-text" onclick="handleBackClick()">ביטול</button>
             </div>
 
             <div id="ui-workout-type" class="screen">
                 <div class="hero-section"><h2>בחר מסלול</h2></div>
-                <div class="vertical-stack">
-                    <button class="menu-card tall" onclick="selectWorkout('A')"><h3>אימון A</h3><p>כתפיים - חזה - גב</p></button>
-                    <button class="menu-card tall" onclick="selectWorkout('B')"><h3>אימון B</h3><p>רגליים - גב</p></button>
-                    <button class="menu-card tall" onclick="selectWorkout('C')"><h3>אימון C</h3><p>חזה - כתפיים</p></button>
-                    <button class="menu-card tall freestyle-card" onclick="startFreestyle()"><h3>Freestyle</h3><p>בחירה חופשית</p></button>
+                <div id="workout-menu-container" class="vertical-stack">
+                    <!-- Dynamic Content -->
                 </div>
+                <button class="menu-card tall freestyle-card" style="margin-top: 15px;" onclick="startFreestyle()"><h3>Freestyle</h3><p>בחירה חופשית</p></button>
             </div>
 
             <div id="ui-muscle-select" class="screen">
@@ -102,6 +177,7 @@
                     <button class="menu-card" onclick="showExerciseList('חזה')">חזה</button>
                     <button class="menu-card" onclick="showExerciseList('גב')">גב</button>
                     <button class="menu-card" onclick="showExerciseList('ידיים')">ידיים</button>
+                    <button class="menu-card" style="border-color: var(--type-c);" onclick="showExerciseList('קליסטניקס')">קליסטניקס</button>
                 </div>
                 
                 <button id="btn-finish-extra" class="finish-main-btn" onclick="finishExtraPhase()">סיום הוספת תרגילים</button>
@@ -109,6 +185,10 @@
 
             <div id="ui-variation" class="screen">
                 <h2 id="variation-title" class="section-title">בחר תרגיל</h2>
+                
+                <!-- Dynamic Chips for Freestyle -->
+                <div id="variation-chips" class="chip-container" style="display: none; margin-bottom: 15px;"></div>
+                
                 <div id="variation-options" class="vertical-stack"></div>
                 <button class="btn-text" onclick="handleBackClick()">חזור</button>
             </div>
@@ -135,6 +215,7 @@
                 <div class="confirm-box">
                     <p>התרגיל הבא:</p>
                     <h2 id="confirm-ex-name"></h2>
+                    <div id="confirm-ex-config" class="sub-text" style="margin-top: -10px; margin-bottom: 20px; font-size: 0.8em; color: var(--accent);"></div>
                     
                     <button class="btn-main primary-gradient" onclick="confirmExercise(true)">התחל אימון</button>
                     
@@ -204,6 +285,10 @@
                         <div id="rest-timer" class="timer-text">00:00</div>
                     </div>
                 </div>
+                
+                <!-- NEW SKIP BUTTON (Hidden on Set 1) -->
+                <button id="btn-skip-exercise" class="btn-text passive-skip" onclick="skipCurrentExercise()">דלג על התרגיל</button>
+
             </div>
 
             <div id="ui-ask-extra" class="screen flex-center">
