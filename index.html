@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>GymPro Elite 12.2.2</title>
+    <title>GymPro Elite 12.3.0</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="stylesheet" href="style.css">
@@ -15,9 +15,9 @@
     <!-- Warmup Modal -->
     <div id="warmup-modal" class="modal-overlay">
         <div class="modal-content">
-            <h3>🔥 חימום מומלץ</h3>
+            <h3>חימום מומלץ</h3>
             <div id="warmup-list" class="vertical-stack" style="margin: 20px 0;"></div>
-            <button class="btn-main primary-gradient" onclick="markWarmupDone()">סיימתי חימום, סגור</button>
+            <button class="btn-main primary-gradient" onclick="markWarmupDone()">סיימתי חימום</button>
             <button class="btn-text" onclick="closeWarmup()">סגור ללא רישום</button>
         </div>
     </div>
@@ -49,10 +49,11 @@
     <div class="app-container">
         <header class="app-header">
             <button id="global-back" class="back-btn" onclick="handleBackClick()">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                <!-- CSS Chevron Back -->
+                <div class="chevron-back"></div>
             </button>
             <div class="brand-logo">GYMPRO <span>ELITE</span></div>
-            <!-- Settings Button -->
+            <!-- Settings Button (Kept as requested) -->
             <button class="settings-btn" onclick="openSettings()">
                 ⚙️
             </button>
@@ -61,27 +62,24 @@
         <main class="content-area">
             
             <div id="ui-week" class="screen active">
-                <!-- Fixed title: removed comma -->
                 <div class="hero-section"><h1>ברוך הבא <span>לוח בקרה אישי</span></h1></div>
                 
                 <button onclick="initAudio()" id="audio-init-btn" class="action-card primary-gradient">
-                    <div class="card-icon">⚡</div>
-                    <div class="card-text">לחץ להפעלת מנוע סאונד</div>
+                    <div class="card-text center-text">לחץ להפעלת סאונד</div>
                 </button>
 
                 <div class="section-label">בחר תוכנית שבועית</div>
                 <div class="grid-menu">
-                    <button class="menu-card" onclick="selectWeek(1)"><span>שבוע 1</span><div class="arrow">➔</div></button>
-                    <button class="menu-card" onclick="selectWeek(2)"><span>שבוע 2</span><div class="arrow">➔</div></button>
-                    <button class="menu-card" onclick="selectWeek(3)"><span>שבוע 3</span><div class="arrow">➔</div></button>
+                    <button class="menu-card" onclick="selectWeek(1)"><span>שבוע 1</span><div class="chevron"></div></button>
+                    <button class="menu-card" onclick="selectWeek(2)"><span>שבוע 2</span><div class="chevron"></div></button>
+                    <button class="menu-card" onclick="selectWeek(3)"><span>שבוע 3</span><div class="chevron"></div></button>
                 </div>
 
                 <button class="action-card secondary" style="margin-top: 20px;" onclick="openArchive()">
-                    <div class="card-icon">📜</div>
-                    <div class="card-text">ארכיון וגיבוי</div>
+                    <div class="card-text center-text">ארכיון וגיבוי</div>
                 </button>
 
-                <div class="version-footer">GymPro Elite v12.2.2</div>
+                <div class="version-footer">GymPro Elite v12.3.0</div>
             </div>
 
             <!-- SETTINGS SCREEN -->
@@ -95,8 +93,8 @@
 
                 <div class="glass-card">
                     <h3 style="margin-top:0">ניהול נתונים</h3>
-                    <p style="color:var(--text-dim); font-size:0.9em;">גרסה V12.2.2</p>
-                    <button class="btn-text" style="color: #ff453a; border: 1px solid #ff453a; border-radius: 12px;" onclick="resetToFactorySettings()">⚠️ איפוס להגדרות יצרן</button>
+                    <p style="color:var(--text-dim); font-size:0.9em;">גרסה V12.3.0</p>
+                    <button class="btn-text" style="color: #ff453a; border: 1px solid #ff453a; border-radius: 12px;" onclick="resetToFactorySettings()">איפוס להגדרות יצרן</button>
                 </div>
             </div>
 
@@ -168,8 +166,7 @@
                 <h2 class="section-title">בחר שריר</h2>
                 
                 <button id="btn-resume-flow" class="action-card success-gradient" style="display:none; margin-bottom: 20px;" onclick="resumeWorkout()">
-                    <div class="card-text">חזור למסלול המקורי</div>
-                    <div class="card-icon">↻</div>
+                    <div class="card-text center-text">חזור למסלול המקורי</div>
                 </button>
 
                 <div class="grid-menu">
@@ -194,7 +191,7 @@
                 <button class="btn-text" onclick="handleBackClick()">חזור</button>
             </div>
             
-            <!-- SWAP SCREEN (Updated for Split View) -->
+            <!-- SWAP SCREEN (Split View) -->
             <div id="ui-swap-list" class="screen">
                 <h2 class="section-title">אפשרויות החלפה</h2>
                 
@@ -222,20 +219,19 @@
                     
                     <button class="btn-main primary-gradient" onclick="confirmExercise(true)">התחל אימון</button>
                     
-                    <!-- CONTROL GRID -->
+                    <!-- CONTROL GRID (Clean Text) -->
                     <div class="action-grid">
                         <button class="control-btn" onclick="confirmExercise(false)">
-                            <div class="icon">⏭️</div>
                             <span>דלג</span>
                         </button>
                         
+                        <!-- Swap kept as icon per request -->
                         <button id="btn-swap-confirm" class="control-btn accent-border" onclick="openSwapMenu()">
                             <div class="icon">⇄</div>
                             <span>החלף</span>
                         </button>
                         
                         <button id="btn-interruption" class="control-btn" onclick="interruptWorkout()">
-                            <div class="icon">➕</div>
                             <span>הוסף</span>
                         </button>
                     </div>
@@ -248,12 +244,13 @@
 
             <div id="ui-main" class="screen">
                 <div class="exercise-header">
-                    <!-- Session Log Button -->
-                    <button onclick="openSessionLog()" style="position: absolute; left: 0; background: none; border: 1px solid var(--border); border-radius: 8px; color: var(--text-dim); padding: 5px 10px; font-size: 1.2em; cursor: pointer;">📋</button>
+                    <!-- Session Log Button (Clean) -->
+                    <button onclick="openSessionLog()" class="clean-log-btn">יומן</button>
                     
                     <div class="badge-row" style="margin-top: 5px;">
                         <span id="set-counter" class="ios-badge">SET 1/3</span>
-                        <button id="btn-warmup" class="warmup-badge" onclick="calcWarmup()">🔥 חימום</button>
+                        <!-- Warmup Button (Clean Text) -->
+                        <button id="btn-warmup" class="warmup-badge" onclick="calcWarmup()">חימום</button>
                         <div id="unilateral-note" class="uni-badge">UNILATERAL</div>
                     </div>
                     <h2 id="ex-display-name" style="margin-top: 15px;"></h2>
@@ -270,7 +267,7 @@
 
                 <button id="btn-submit-set" class="btn-main primary-gradient pulse" onclick="nextStep()">סיום סט</button>
 
-                <!-- New Action Panel (Inline Extra/Finish) -->
+                <!-- Action Panel -->
                 <div id="action-panel" class="action-panel" style="display: none;">
                     <p id="next-ex-preview" class="passive-preview"></p>
                     <div class="vertical-stack">
@@ -289,7 +286,6 @@
                     </div>
                 </div>
                 
-                <!-- NEW SKIP BUTTON (Hidden on Set 1) -->
                 <button id="btn-skip-exercise" class="btn-text passive-skip" onclick="skipCurrentExercise()">דלג על התרגיל</button>
 
             </div>
@@ -320,7 +316,6 @@
             <div id="ui-summary" class="screen">
                 <div class="hero-section"><h2>סיכום אימון</h2></div>
                 
-                <!-- New Note Input -->
                 <input type="text" id="summary-note" class="minimal-input" placeholder="הערות כלליות לאימון (אופציונלי)" style="margin-bottom: 20px;">
                 
                 <div id="summary-area" class="summary-card"></div>
@@ -332,12 +327,10 @@
                 
                 <div class="input-grid" style="margin-bottom: 20px;">
                     <button class="glass-card compact" onclick="exportData()" style="width:100%; border:1px solid var(--accent); color:var(--accent);">
-                        <label style="color:white; font-size:1.5em; margin-bottom:5px;">📤</label>
-                        ייצוא נתונים
+                        <label style="color:var(--text); font-size:0.9em; margin-bottom:5px; font-weight:600;">ייצוא</label>
                     </button>
                     <button class="glass-card compact" onclick="triggerImport()" style="width:100%; border:1px solid #32D74B; color:#32D74B;">
-                        <label style="color:white; font-size:1.5em; margin-bottom:5px;">📥</label>
-                        ייבוא נתונים
+                        <label style="color:var(--text); font-size:0.9em; margin-bottom:5px; font-weight:600;">ייבוא</label>
                     </button>
                 </div>
 
@@ -366,10 +359,10 @@
                 <!-- List View Container -->
                 <div id="list-view-container">
                     <div class="archive-actions" style="display: flex; gap: 10px; margin-bottom: 15px;">
-                        <button class="glass-card compact" style="width: 100%; color: var(--accent); border-color: var(--accent); font-weight:600;" onclick="copyBulkLog('all')">
+                        <button class="glass-card compact" style="width: 100%; color: var(--accent); border-color: var(--accent); font-weight:600; font-size: 0.9em;" onclick="copyBulkLog('all')">
                             העתק הכל
                         </button>
-                        <button id="btn-copy-selected" class="glass-card compact" style="width: 100%; color: var(--text-dim); border-color: var(--border); font-weight:600; opacity: 0.5;" onclick="copyBulkLog('selected')" disabled>
+                        <button id="btn-copy-selected" class="glass-card compact" style="width: 100%; color: var(--text-dim); border-color: var(--border); font-weight:600; opacity: 0.5; font-size: 0.9em;" onclick="copyBulkLog('selected')" disabled>
                             העתק מסומנים
                         </button>
                     </div>
