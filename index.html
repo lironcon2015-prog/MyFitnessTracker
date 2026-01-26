@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>GymPro Elite 12.2.0</title>
+    <title>GymPro Elite 12.2.2</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="stylesheet" href="style.css">
@@ -61,7 +61,8 @@
         <main class="content-area">
             
             <div id="ui-week" class="screen active">
-                <div class="hero-section"><h1>ברוך הבא,<span>לוח בקרה אישי</span></h1></div>
+                <!-- Fixed title: removed comma -->
+                <div class="hero-section"><h1>ברוך הבא <span>לוח בקרה אישי</span></h1></div>
                 
                 <button onclick="initAudio()" id="audio-init-btn" class="action-card primary-gradient">
                     <div class="card-icon">⚡</div>
@@ -80,7 +81,7 @@
                     <div class="card-text">ארכיון וגיבוי</div>
                 </button>
 
-                <div class="version-footer">GymPro Elite v12.2.0</div>
+                <div class="version-footer">GymPro Elite v12.2.2</div>
             </div>
 
             <!-- SETTINGS SCREEN -->
@@ -94,7 +95,7 @@
 
                 <div class="glass-card">
                     <h3 style="margin-top:0">ניהול נתונים</h3>
-                    <p style="color:var(--text-dim); font-size:0.9em;">גרסה V12.2.0</p>
+                    <p style="color:var(--text-dim); font-size:0.9em;">גרסה V12.2.2</p>
                     <button class="btn-text" style="color: #ff453a; border: 1px solid #ff453a; border-radius: 12px;" onclick="resetToFactorySettings()">⚠️ איפוס להגדרות יצרן</button>
                 </div>
             </div>
@@ -193,11 +194,13 @@
                 <button class="btn-text" onclick="handleBackClick()">חזור</button>
             </div>
             
-            <!-- SWAP SCREEN -->
+            <!-- SWAP SCREEN (Updated for Split View) -->
             <div id="ui-swap-list" class="screen">
-                <h2 class="section-title">שנה סדר תרגילים</h2>
-                <p class="sub-text">בחר תרגיל מהרשימה כדי לקפוץ אליו כעת:</p>
-                <div id="swap-options" class="vertical-stack"></div>
+                <h2 class="section-title">אפשרויות החלפה</h2>
+                
+                <!-- Dynamic Content Here -->
+                <div id="swap-container" class="vertical-stack"></div>
+
                 <button class="btn-text" onclick="handleBackClick()">ביטול</button>
             </div>
 
