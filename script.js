@@ -1,6 +1,8 @@
 /**
- * GYMPRO ELITE V12.2.1
- * - Fix: Crash when converting regular exercises to Main (Missing RM ranges)
+ * GYMPRO ELITE V12.2.2
+ * - New Feature: Exercise Variations Swap (Split Menu)
+ * - Database: Updated Pullups Group (Added Wide Grip, Weight Ranges)
+ * - Logic: Robust substitution system independent of workout names
  */
 
 // --- DEFAULT DATA (Factory Settings) ---
@@ -9,6 +11,7 @@ const defaultExercises = [
     { name: "Overhead Press (Main)", muscles: ["כתפיים"], isCalc: true, baseRM: 60, rmRange: [50, 100], manualRange: {base: 50, min: 40, max: 80, step: 2.5} },
     { name: "Arnold Press", muscles: ["כתפיים"], sets: [{w: 15, r: 10}, {w: 15, r: 10}, {w: 15, r: 10}], step: 2.5 },
     { name: "Dumbbell Shoulder Press", muscles: ["כתפיים"], sets: [{w: 20, r: 10}, {w: 20, r: 10}, {w: 20, r: 10}], step: 2.5 },
+    { name: "Machine Press", muscles: ["כתפיים"], sets: [{w: 40, r: 10}, {w: 40, r: 10}, {w: 40, r: 10}], step: 5 },
     { name: "Lateral Raises", muscles: ["כתפיים"], sets: [{w: 12.5, r: 13}, {w: 12.5, r: 13}, {w: 12.5, r: 11}], step: 0.5 },
     { name: "Cable Lateral Raises", muscles: ["כתפיים"], sets: [{w: 5, r: 15}, {w: 5, r: 15}, {w: 5, r: 15}], step: 1.25 },
     { name: "Face Pulls", muscles: ["כתפיים"], sets: [{w: 40, r: 13}, {w: 40, r: 13}, {w: 40, r: 15}], step: 2.5 },
@@ -16,11 +19,13 @@ const defaultExercises = [
     { name: "Barbell Shrugs", muscles: ["כתפיים"], sets: [{w: 140, r: 11}, {w: 140, r: 11}, {w: 140, r: 11}], step: 5 },
     { name: "Front Raises", muscles: ["כתפיים"], sets: [{w: 10, r: 12}, {w: 10, r: 12}, {w: 10, r: 12}], step: 1 },
 
-    // BACK (גב) + Calisthenics Overlap
-    { name: "Weighted Pull Ups", muscles: ["גב", "קליסטניקס"], sets: [{w: 0, r: 8}, {w: 0, r: 8}, {w: 0, r: 8}], step: 5, minW: 0, maxW: 40, isBW: true },
-    { name: "Pull Ups", muscles: ["גב", "קליסטניקס"], isBW: true, sets: [{w: 0, r: 8}, {w: 0, r: 8}, {w: 0, r: 8}] },
-    { name: "Chin Ups", muscles: ["גב", "קליסטניקס"], isBW: true, sets: [{w: 0, r: 8}, {w: 0, r: 8}, {w: 0, r: 8}] },
-    { name: "Lat Pulldown", muscles: ["גב"], sets: [{w: 75, r: 10}, {w: 75, r: 10}, {w: 75, r: 11}], step: 2.5 },
+    // BACK (גב) - Updated with Pullup Group Specs
+    { name: "Weighted Pull Ups", muscles: ["גב", "קליסטניקס"], sets: [{w: 0, r: 8}, {w: 0, r: 8}, {w: 0, r: 8}], step: 5, minW: 0, maxW: 60, isBW: true },
+    { name: "Pull Ups", muscles: ["גב", "קליסטניקס"], isBW: true, sets: [{w: 0, r: 8}, {w: 0, r: 8}, {w: 0, r: 8}], step: 5, minW: 0, maxW: 60 },
+    { name: "Chin Ups", muscles: ["גב", "קליסטניקס"], isBW: true, sets: [{w: 0, r: 8}, {w: 0, r: 8}, {w: 0, r: 8}], step: 5, minW: 0, maxW: 60 },
+    { name: "Wide Grip Pull Ups", muscles: ["גב", "קליסטניקס"], isBW: true, sets: [{w: 0, r: 8}, {w: 0, r: 8}, {w: 0, r: 8}], step: 5, minW: 0, maxW: 60 },
+    
+    { name: "Lat Pulldown", muscles: ["גב"], sets: [{w: 75, r: 10}, {w: 75, r: 10}, {w: 75, r: 11}], step: 2.5 }, // Kept as original
     { name: "Cable Row", muscles: ["גב"], sets: [{w: 65, r: 10}, {w: 65, r: 10}, {w: 65, r: 12}], step: 2.5 },
     { name: "Machine Row", muscles: ["גב"], sets: [{w: 50, r: 10}, {w: 50, r: 10}, {w: 50, r: 12}], step: 5 },
     { name: "Straight Arm Pulldown", muscles: ["גב"], sets: [{w: 30, r: 10}, {w: 30, r: 12}, {w: 30, r: 12}], step: 2.5 },
@@ -31,7 +36,7 @@ const defaultExercises = [
     { name: "Reverse Fly (Machine)", muscles: ["גב", "כתפיים"], sets: [{w: 30, r: 12}, {w: 30, r: 12}, {w: 30, r: 12}], step: 2.5 },
     { name: "Bodyweight Rows", muscles: ["גב", "קליסטניקס"], isBW: true, sets: [{w: 0, r: 10}, {w: 0, r: 10}, {w: 0, r: 10}] },
 
-    // CHEST (חזה) + Calisthenics Overlap
+    // CHEST (חזה)
     { name: "Bench Press (Main)", muscles: ["חזה"], isCalc: true, baseRM: 100, rmRange: [80, 150], manualRange: {base: 85, min: 60, max: 140, step: 2.5} },
     { name: "Incline Bench Press", muscles: ["חזה"], sets: [{w: 65, r: 9}, {w: 65, r: 9}, {w: 65, r: 9}], step: 2.5 },
     { name: "Dumbbell Peck Fly", muscles: ["חזה"], sets: [{w: 14, r: 11}, {w: 14, r: 11}, {w: 14, r: 11}], step: 2 },
@@ -42,7 +47,7 @@ const defaultExercises = [
     { name: "Dumbbell Bench Press", muscles: ["חזה"], sets: [{w: 30, r: 8}, {w: 30, r: 8}, {w: 30, r: 8}], step: 2.5 },
     { name: "Incline Dumbbell Bench Press", muscles: ["חזה"], sets: [{w: 25, r: 8}, {w: 25, r: 8}, {w: 25, r: 8}], step: 2.5 },
 
-    // LEGS (רגליים) - Updated with Sub-groups
+    // LEGS (רגליים)
     { name: "Leg Press", muscles: ["רגליים", "quads"], sets: [{w: 280, r: 8}, {w: 300, r: 8}, {w: 300, r: 7}], step: 5 },
     { name: "Squat", muscles: ["רגליים", "quads", "glutes"], sets: [{w: 100, r: 8}, {w: 100, r: 8}, {w: 100, r: 8}], step: 2.5, minW: 60, maxW: 180 },
     { name: "Deadlift", muscles: ["רגליים", "hamstrings"], sets: [{w: 100, r: 5}, {w: 100, r: 5}, {w: 100, r: 5}], step: 2.5, minW: 60, maxW: 180 },
@@ -79,7 +84,7 @@ const defaultExercises = [
     { name: "L-Sit", muscles: ["קליסטניקס", "בטן"], isBW: true, sets: [{w: 0, r: 10}, {w: 0, r: 10}, {w: 0, r: 10}] }
 ];
 
-// UPDATED DEFAULT WORKOUTS SCHEMA (Objects)
+// UPDATED DEFAULT WORKOUTS SCHEMA
 const defaultWorkouts = {
     'A': [
         { name: "Overhead Press (Main)", isMain: true, sets: 0 },
@@ -105,6 +110,41 @@ const defaultWorkouts = {
         { name: "Face Pulls", isMain: false, sets: 3 }
     ]
 };
+
+// --- NEW SUBSTITUTION LOGIC (V12.2.2) ---
+// Groups of exercises that can be swapped for one another
+const substituteGroups = [
+    // Chest
+    ["Incline Bench Press", "Incline Dumbbell Bench Press"],
+    ["Dumbbell Bench Press", "Machine Press"], // Fallback if regular Bench Press is not main
+    ["Dumbbell Peck Fly", "Machine Peck Fly", "Cable Fly"],
+    
+    // Back (Pullups Group) - Lat Pulldown stays included
+    ["Weighted Pull Ups", "Pull Ups", "Chin Ups", "Wide Grip Pull Ups", "Lat Pulldown"],
+    // Back (Rows Group)
+    ["Cable Row", "Machine Row", "T-Bar Row", "Single Arm Dumbbell Row", "Bodyweight Rows"],
+    // Back (Isolation)
+    ["Straight Arm Pulldown", "Weighted Pull Ups"], // Cross-variation
+
+    // Shoulders
+    ["Dumbbell Shoulder Press", "Arnold Press", "Machine Press"],
+    ["Lateral Raises", "Cable Lateral Raises"],
+    ["Face Pulls", "Rear Delt Fly (Dumbbells)", "Reverse Fly (Machine)"],
+
+    // Legs
+    ["Single Leg Curl", "Lying Leg Curl (Double)", "Seated Leg Curl"],
+    ["Seated Calf Raise", "Standing Calf Raise"],
+    ["Leg Press", "Hack Squat", "Bulgarian Split Squat", "Walking Lunges"],
+
+    // Arms
+    ["Dumbbell Bicep Curls", "Barbell Bicep Curls", "Concentration Curls", "Hammer Curls", "Preacher Curls", "Reverse Grip Curl"],
+    ["Triceps Pushdown", "Skullcrushers", "Overhead Triceps Extension (Cable)", "Diamond Pushups"]
+];
+
+function getSubstitutes(exName) {
+    const group = substituteGroups.find(g => g.includes(exName));
+    return group ? group.filter(n => n !== exName) : [];
+}
 
 // --- GLOBAL STATE ---
 let state = {
@@ -169,20 +209,27 @@ const StorageManager = {
 
         if (storedEx && storedEx.length > 0) {
             state.exercises = storedEx;
+            // UPDATE: Check if new V12.2.2 exercises exist in user DB, if not add them
+            const missing = defaultExercises.filter(def => !state.exercises.find(e => e.name === def.name));
+            if (missing.length > 0) {
+                console.log("Adding missing exercises to DB:", missing);
+                state.exercises = [...state.exercises, ...missing];
+                this.saveData(this.KEY_DB_EXERCISES, state.exercises);
+            }
         } else {
             state.exercises = JSON.parse(JSON.stringify(defaultExercises));
             this.saveData(this.KEY_DB_EXERCISES, state.exercises);
         }
 
         if (storedWo && Object.keys(storedWo).length > 0) {
-            // MIGRATION LOGIC: Convert Array of Strings -> Array of Objects
+            // MIGRATION LOGIC
             let hasChanges = false;
             Object.keys(storedWo).forEach(k => {
                 if (storedWo[k].length > 0 && typeof storedWo[k][0] === 'string') {
                     console.log(`Migrating workout ${k} to new format...`);
                     storedWo[k] = storedWo[k].map(exName => ({
                         name: exName,
-                        isMain: exName.includes("(Main)"), // Auto-detect old convention
+                        isMain: exName.includes("(Main)"), 
                         sets: 3
                     }));
                     hasChanges = true;
@@ -266,11 +313,6 @@ window.onload = () => {
     renderWorkoutMenu();
 };
 
-const variationMap = {
-    'B': { 1: ["Single Leg Curl", "Lying Leg Curl (Double)", "Seated Leg Curl"], 3: ["Cable Row", "Machine Row"], 4: ["Seated Calf Raise", "Standing Calf Raise"] },
-    'C': { 2: ["Dumbbell Peck Fly", "Machine Peck Fly", "Cable Fly"] }
-};
-
 // --- CORE SYSTEMS ---
 
 function haptic(type = 'light') {
@@ -325,7 +367,6 @@ function handleBackClick() {
 
     const currentScreen = state.historyStack[state.historyStack.length - 1];
 
-    // Case 1: Active Workout Screen (ui-main)
     if (currentScreen === 'ui-main') {
         if (state.setIdx > 0) {
             deleteLastSet();
@@ -339,7 +380,6 @@ function handleBackClick() {
         }
     }
 
-    // Case 2: Confirmation Screen (ui-confirm)
     if (currentScreen === 'ui-confirm') {
         if (state.log.length > 0 || state.completedExInSession.length > 0) {
             if(!confirm("האם לצאת מהאימון?")) return;
@@ -350,7 +390,6 @@ function handleBackClick() {
         return;
     }
 
-    // Special cases
     if (currentScreen === 'ui-workout-manager') { state.historyStack.pop(); navigate('ui-settings'); return; }
     if (currentScreen === 'ui-workout-editor') { 
         if(confirm("לצאת ללא שמירה?")) {
@@ -364,7 +403,6 @@ function handleBackClick() {
     if (currentScreen === 'ui-swap-list') { state.historyStack.pop(); navigate('ui-confirm'); return; }
     if (currentScreen === 'ui-settings') { state.historyStack.pop(); navigate('ui-week'); return; }
 
-    // Standard Stack Pop
     state.historyStack.pop();
     const prevScreen = state.historyStack[state.historyStack.length - 1];
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -453,7 +491,6 @@ function duplicateWorkout(key) {
         alert("שם התוכנית כבר קיים");
         return;
     }
-    // Deep Copy for objects
     state.workouts[newName] = JSON.parse(JSON.stringify(state.workouts[key]));
     StorageManager.saveData(StorageManager.KEY_DB_WORKOUTS, state.workouts);
     renderManagerList();
@@ -488,7 +525,6 @@ function renderEditorList() {
         const row = document.createElement('div');
         row.className = "editor-row";
         
-        // Define controls based on isMain
         let setControls = '';
         if (!item.isMain) {
             setControls = `
@@ -580,7 +616,6 @@ function setSelectorFilter(filter, btn) {
 
 function updateSelectorChips() {
     document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-    // Match by text or direct filter match if added to data attribute (simplified here)
     const btns = document.querySelectorAll('#ui-exercise-selector .chip');
     btns.forEach(b => {
         const onClickFn = b.getAttribute('onclick');
@@ -611,11 +646,10 @@ function renderSelectorList() {
         btn.className = "menu-card";
         btn.innerHTML = `<span>${ex.name}</span><div style="font-size:1.2em; color:var(--accent);">+</div>`;
         btn.onclick = () => {
-            // New structure logic
             const newExObj = {
                 name: ex.name,
                 isMain: false,
-                sets: 3 // Default
+                sets: 3 
             };
             managerState.exercises.push(newExObj);
             navigate('ui-workout-editor');
@@ -647,7 +681,7 @@ function startFreestyle() {
 
 function showExerciseList(muscle) {
     state.currentMuscle = muscle;
-    state.freestyleFilter = 'all'; // Reset filter
+    state.freestyleFilter = 'all'; 
 
     const chipContainer = document.getElementById('variation-chips');
     chipContainer.style.display = 'none';
@@ -658,7 +692,6 @@ function showExerciseList(muscle) {
     const options = document.getElementById('variation-options');
     options.innerHTML = "";
 
-    // Back Button for Freestyle
     if (state.isFreestyle) {
         const backBtn = document.createElement('button');
         backBtn.className = "btn-text";
@@ -671,7 +704,6 @@ function showExerciseList(muscle) {
         options.appendChild(backBtn);
     }
 
-    // Dynamic Filter Chips for Legs/Arms
     if (muscle === 'רגליים') {
         chipContainer.style.display = 'flex';
         renderFreestyleChips(['all', 'quads', 'hamstrings', 'calves'], 'רגליים');
@@ -699,8 +731,8 @@ function renderFreestyleChips(filters, mainMuscle) {
         btn.innerText = labels[f] || f;
         btn.onclick = () => {
             state.freestyleFilter = f;
-            renderFreestyleChips(filters, mainMuscle); // Re-render chips to update active class
-            renderFreestyleList(); // Filter list
+            renderFreestyleChips(filters, mainMuscle); 
+            renderFreestyleList(); 
         };
         container.appendChild(btn);
     });
@@ -708,7 +740,6 @@ function renderFreestyleChips(filters, mainMuscle) {
 
 function renderFreestyleList() {
     const options = document.getElementById('variation-options');
-    // Keep the back button if it exists
     const backBtn = options.querySelector('.btn-text');
     options.innerHTML = "";
     if(backBtn) options.appendChild(backBtn);
@@ -730,7 +761,6 @@ function renderFreestyleList() {
             state.currentEx = JSON.parse(JSON.stringify(ex));
             state.currentExName = ex.name;
             
-            // Default setup for Freestyle/Manual
             if(!state.currentEx.sets || state.currentEx.sets.length < 3) {
                  state.currentEx.sets = [{w:10, r:10}, {w:10, r:10}, {w:10, r:10}];
             }
@@ -762,13 +792,7 @@ function showConfirmScreen(forceExName = null) {
     let currentPlanItem = null;
 
     if (!exName) {
-        // Variation check
-        if (variationMap[state.type] && variationMap[state.type][state.exIdx]) {
-            showVariationSelect();
-            return;
-        }
-        
-        // Get from workout plan (Array of Objects now)
+        // Updated flow - no auto-variation check
         currentPlanItem = state.workouts[state.type][state.exIdx];
         exName = currentPlanItem.name;
     }
@@ -783,7 +807,6 @@ function showConfirmScreen(forceExName = null) {
     state.currentExName = exData.name;
     document.getElementById('confirm-ex-name').innerText = exData.name;
     
-    // Config Display
     const configDiv = document.getElementById('confirm-ex-config');
     if (currentPlanItem) {
         if (currentPlanItem.isMain) {
@@ -796,7 +819,6 @@ function showConfirmScreen(forceExName = null) {
         configDiv.style.display = 'none';
     }
 
-    // Buttons visibility
     const intBtn = document.getElementById('btn-interruption');
     if (intBtn) intBtn.style.display = (state.exIdx > 0) ? 'block' : 'none';
     const swapBtn = document.getElementById('btn-swap-confirm');
@@ -806,7 +828,6 @@ function showConfirmScreen(forceExName = null) {
         swapBtn.style.display = 'none';
     }
 
-    // Render History Card (Clean UI + RIR)
     const historyContainer = document.getElementById('history-container');
     historyContainer.innerHTML = "";
     
@@ -822,7 +843,7 @@ function showConfirmScreen(forceExName = null) {
                     const sub = parts[1].split('(');
                     r = sub[0].trim();
                     if (sub[1]) {
-                        rir = sub[1].replace(')', '').trim(); // "RIR 2"
+                        rir = sub[1].replace(')', '').trim(); 
                     }
                 }
             } catch (e) { w = setStr; }
@@ -852,31 +873,10 @@ function showConfirmScreen(forceExName = null) {
     navigate('ui-confirm');
 }
 
-function showVariationSelect() {
-    const options = document.getElementById('variation-options');
-    options.innerHTML = "";
-    document.getElementById('variation-title').innerText = "בחר וריאציה";
-    
-    // Hide chips in standard variation select
-    document.getElementById('variation-chips').style.display = 'none';
-
-    const possibleVariations = variationMap[state.type][state.exIdx];
-    const available = possibleVariations.filter(name => !state.completedExInSession.includes(name));
-    available.forEach(name => {
-        const btn = document.createElement('button');
-        btn.className = "menu-card";
-        btn.innerHTML = `<span>${name}</span><div class="arrow">➔</div>`;
-        btn.onclick = () => showConfirmScreen(name);
-        options.appendChild(btn);
-    });
-    navigate('ui-variation');
-}
-
 function confirmExercise(doEx) {
     if (!doEx) { state.log.push({ skip: true, exName: state.currentExName }); state.completedExInSession.push(state.currentExName); checkFlow(); return; }
     
-    // Check runtime configuration
-    let isMain = state.currentEx.isCalc; // Default from DB
+    let isMain = state.currentEx.isCalc; 
     let targetSets = null;
 
     if (!state.isFreestyle && !state.isExtraPhase && !state.isInterruption && !state.isArmPhase) {
@@ -888,10 +888,9 @@ function confirmExercise(doEx) {
     }
 
     if (isMain) {
-        state.currentEx.isCalc = true; // Force calc logic if main
+        state.currentEx.isCalc = true; 
         setupCalculatedEx(); 
     } else {
-        // Adjust sets based on plan settings
         if (targetSets && targetSets > 0) {
             resizeSets(targetSets);
         }
@@ -904,12 +903,10 @@ function resizeSets(count) {
     const templateSet = currentSets.length > 0 ? currentSets[currentSets.length - 1] : {w: 10, r: 10};
     
     if (count > currentSets.length) {
-        // Add sets
         while (currentSets.length < count) {
             currentSets.push({...templateSet});
         }
     } else if (count < currentSets.length) {
-        // Remove sets
         state.currentEx.sets = currentSets.slice(0, count);
     }
 }
@@ -918,9 +915,8 @@ function setupCalculatedEx() {
     document.getElementById('rm-title').innerText = `${state.currentExName} 1RM`;
     const lastRM = StorageManager.getLastRM(state.currentExName);
     
-    // Fallbacks for converted exercises (FIX FOR CRASH)
     const baseRM = state.currentEx.baseRM || 50; 
-    const rmRange = state.currentEx.rmRange || [20, 150]; // Reasonable default range
+    const rmRange = state.currentEx.rmRange || [20, 150]; 
     
     const defaultRM = lastRM ? lastRM : baseRM;
     const minRM = rmRange[0];
@@ -947,11 +943,8 @@ function save1RM() {
 function startRecording() { 
     state.setIdx = 0; 
     state.lastLoggedSet = null; 
-    
-    // Reset Inline UI
     document.getElementById('action-panel').style.display = 'none';
     document.getElementById('btn-submit-set').style.display = 'block';
-    
     navigate('ui-main'); 
     initPickers(); 
 }
@@ -978,7 +971,6 @@ function initPickers() {
     const btnWarmup = document.getElementById('btn-warmup');
     btnWarmup.style.display = (state.setIdx === 0 && isHeavy) ? 'block' : 'none';
     
-    // Timer Logic
     const timerArea = document.getElementById('timer-area');
     if (state.setIdx > 0 && document.getElementById('action-panel').style.display === 'none') { 
         timerArea.style.visibility = 'visible'; 
@@ -988,7 +980,6 @@ function initPickers() {
         stopRestTimer(); 
     }
 
-    // Skip Button Logic - Hide on Set 1
     const skipBtn = document.getElementById('btn-skip-exercise');
     skipBtn.style.display = (state.setIdx === 0) ? 'none' : 'block';
 
@@ -1001,7 +992,18 @@ function initPickers() {
         defaultW = state.lastLoggedSet ? state.lastLoggedSet.w : (state.setIdx === 0 && savedWeight ? savedWeight : (target ? target.w : 0));
         currentR = state.lastLoggedSet ? state.lastLoggedSet.r : (target ? target.r : 8);
     }
-    const minW = Math.max(0, defaultW - 40); const maxW = defaultW + 50;
+    
+    let minW = Math.max(0, defaultW - 40); 
+    let maxW = defaultW + 50;
+
+    // Apply strict weight limits if defined
+    if (state.currentEx.minW !== undefined) minW = Math.max(state.currentEx.minW, minW);
+    if (state.currentEx.maxW !== undefined) maxW = Math.min(state.currentEx.maxW, maxW);
+    
+    // Ensure defaultW is within range to avoid visual bug
+    if (defaultW < minW) minW = defaultW;
+    if (defaultW > maxW) maxW = defaultW;
+
     for(let i = minW; i <= maxW; i = parseFloat((i + step).toFixed(2))) {
         let o = new Option(i + " kg", i); if(i === defaultW) o.selected = true; wPick.add(o);
     }
@@ -1036,22 +1038,66 @@ function calcWarmup() {
 function closeWarmup() { document.getElementById('warmup-modal').style.display = 'none'; }
 function markWarmupDone() { state.log.push({ exName: state.currentExName, isWarmup: true }); closeWarmup(); }
 
+// --- REWRITTEN SWAP MENU (V12.2.2) ---
 function openSwapMenu() {
-    const swapList = document.getElementById('swap-options'); swapList.innerHTML = "";
-    const workoutList = state.workouts[state.type]; if (!workoutList) return;
+    const container = document.getElementById('swap-container'); 
+    container.innerHTML = "";
     
-    // Filter logic updated for objects
+    const workoutList = state.workouts[state.type]; if (!workoutList) return;
+
+    // 1. VARIATIONS SECTION (Replaces current exercise in-place)
+    const variations = getSubstitutes(state.currentExName).filter(name => !state.completedExInSession.includes(name));
+    
+    if (variations.length > 0) {
+        const titleVar = document.createElement('div');
+        titleVar.className = "section-label";
+        titleVar.innerText = `וריאציות (מחליף את הנוכחי)`;
+        container.appendChild(titleVar);
+
+        variations.forEach(vName => {
+            const btn = document.createElement('button'); 
+            btn.className = "menu-card"; 
+            btn.innerHTML = `<span>${vName}</span><div class="arrow">➔</div>`;
+            btn.onclick = () => {
+                // Swap logic: update state and reload confirm screen
+                const newExData = state.exercises.find(e => e.name === vName);
+                if (newExData) {
+                    state.currentExName = vName;
+                    showConfirmScreen(vName);
+                }
+            };
+            container.appendChild(btn);
+        });
+    }
+
+    // 2. REORDER SECTION (Skip/Jump to other exercise)
+    const titleOrder = document.createElement('div');
+    titleOrder.className = "section-label";
+    titleOrder.innerText = `שאר האימון (שינוי סדר)`;
+    titleOrder.style.marginTop = "20px";
+    container.appendChild(titleOrder);
+
     const remaining = workoutList.filter(item => !state.completedExInSession.includes(item.name) && item.name !== state.currentExName);
     
-    if (remaining.length === 0) { swapList.innerHTML = "<p style='text-align:center; color:gray;'>אין תרגילים נוספים להחלפה</p>"; }
-    remaining.forEach(item => {
-        const btn = document.createElement('button'); btn.className = "menu-card"; btn.innerHTML = `<span>${item.name}</span><div class="arrow">➔</div>`;
-        btn.onclick = () => { 
-            state.exIdx = state.workouts[state.type].findIndex(x => x.name === item.name); 
-            showConfirmScreen(); 
-        };
-        swapList.appendChild(btn);
-    });
+    if (remaining.length === 0) {
+        const empty = document.createElement('p');
+        empty.style.textAlign = 'center';
+        empty.style.color = 'var(--text-dim)';
+        empty.innerText = 'אין תרגילים נוספים להחלפה';
+        container.appendChild(empty);
+    } else {
+        remaining.forEach(item => {
+            const btn = document.createElement('button'); 
+            btn.className = "menu-card"; 
+            btn.innerHTML = `<span>${item.name}</span><div class="arrow">➔</div>`;
+            btn.onclick = () => { 
+                state.exIdx = state.workouts[state.type].findIndex(x => x.name === item.name); 
+                showConfirmScreen(); 
+            };
+            container.appendChild(btn);
+        });
+    }
+
     navigate('ui-swap-list');
 }
 
@@ -1084,14 +1130,9 @@ function getNextExerciseName() {
 
     for (let i = 0; i < workoutList.length; i++) {
         const defaultName = workoutList[i].name;
+        // Cleaned old variation checks
         let isDone = state.completedExInSession.includes(defaultName);
         
-        if (!isDone && variationMap[state.type] && variationMap[state.type][i]) {
-            const variations = variationMap[state.type][i];
-            if (variations.some(v => state.completedExInSession.includes(v))) {
-                isDone = true;
-            }
-        }
         if (!isDone && defaultName !== state.currentExName && !state.completedExInSession.includes(state.currentExName)) {
              if (i > state.exIdx) return defaultName; 
         }
@@ -1116,8 +1157,6 @@ function nextStep() {
     } else { 
         haptic('medium'); 
         document.getElementById('btn-submit-set').style.display = 'none';
-        
-        // Hide Skip Button in Action Panel
         document.getElementById('btn-skip-exercise').style.display = 'none';
         
         document.getElementById('action-panel').style.display = 'block';
@@ -1140,10 +1179,7 @@ function addExtraSet() {
     state.currentEx.sets.push({...state.currentEx.sets[state.setIdx-1]});
     document.getElementById('action-panel').style.display = 'none';
     document.getElementById('btn-submit-set').style.display = 'block';
-    
-    // Skip button logic (show only if not first set - logic handled in initPickers)
     initPickers();
-    
     document.getElementById('timer-area').style.visibility = 'visible'; 
     resetAndStartTimer();
 }
@@ -1165,14 +1201,8 @@ function checkFlow() {
 
     for (let i = 0; i < workoutList.length; i++) {
         const defaultName = workoutList[i].name;
+        // Cleaned old variation checks
         let isDone = state.completedExInSession.includes(defaultName);
-
-        if (!isDone && variationMap[state.type] && variationMap[state.type][i]) {
-            const variations = variationMap[state.type][i];
-            if (variations.some(v => state.completedExInSession.includes(v))) {
-                isDone = true;
-            }
-        }
 
         if (!isDone) {
             state.exIdx = i;
@@ -1244,7 +1274,6 @@ function finish() {
     
     document.getElementById('summary-note').value = "";
     
-    // Use the dynamic key as the name
     const workoutDisplayName = state.type; 
     const dateStr = new Date().toLocaleDateString('he-IL');
     let summaryText = `GYMPRO ELITE SUMMARY\n${workoutDisplayName} | ${dateStr} | ${state.workoutDurationMins}m\n\n`;
@@ -1292,7 +1321,7 @@ function copyResult() {
         type: workoutDisplayName, 
         duration: state.workoutDurationMins, 
         summary: text, 
-        details: state.lastWorkoutDetails,
+        details: state.lastWorkoutDetails, 
         generalNote: userNote
     };
 
