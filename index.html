@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>GymPro Elite 12.3.1</title>
+    <title>GymPro Elite 12.4.0</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="stylesheet" href="style.css">
@@ -79,7 +79,7 @@
                     <div class="card-text center-text">ארכיון וגיבוי</div>
                 </button>
 
-               <div class="version-footer">GymPro Elite v12.3.1</div>
+                <div class="version-footer">GymPro Elite v12.4.0</div>
             </div>
 
             <!-- SETTINGS SCREEN -->
@@ -93,9 +93,26 @@
 
                 <div class="glass-card">
                     <h3 style="margin-top:0">ניהול נתונים</h3>
-                    <p style="color:var(--text-dim); font-size:0.9em;">גרסה V12.3.1</p>
-                    <button class="btn-text" style="color: #ff453a; border: 1px solid #ff453a; border-radius: 12px;" onclick="resetToFactorySettings()">איפוס להגדרות יצרן</button>
+                    <p style="color:var(--text-dim); font-size:0.9em;">גרסה V12.4.0</p>
+                    
+                    <button class="btn-text" style="color: #ff453a; border: 1px solid #ff453a; border-radius: 12px; margin-bottom: 20px;" onclick="resetToFactorySettings()">איפוס להגדרות יצרן</button>
+                    
+                    <!-- Config Export/Import Section -->
+                    <div style="border-top: 1px solid var(--border); padding-top: 15px;">
+                        <label style="color:var(--text-dim); font-size:0.8em; display:block; margin-bottom:10px;">ניהול תבניות (ללא היסטוריה)</label>
+                        <div class="input-grid" style="grid-template-columns: 1fr 1fr;">
+                            <button class="glass-card compact" style="margin:0; border-color: var(--accent); color: var(--accent);" onclick="StorageManager.exportConfiguration()">
+                                שמור תבנית
+                            </button>
+                            <button class="glass-card compact" style="margin:0; border-color: var(--type-b); color: var(--type-b);" onclick="triggerConfigImport()">
+                                טען תבנית
+                            </button>
+                        </div>
+                    </div>
                 </div>
+                
+                <!-- Hidden Input for Config Import -->
+                <input type="file" id="import-config-file" style="display: none;" onchange="processConfigImport(this)">
             </div>
 
             <!-- WORKOUT MANAGER (LIST) -->
