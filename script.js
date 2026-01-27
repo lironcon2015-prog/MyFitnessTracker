@@ -1,8 +1,7 @@
 /**
- * GYMPRO ELITE V12.3.1
- * - Update: Renamed default workouts to Hebrew names (Removed A/B/C keys).
- * - Update: Added Week number to workout summary and archive.
- * - Logic: Improved swap flow logic (Refinement).
+ * GYMPRO ELITE V12.4.0
+ * - Feature: Configuration Export/Import (Save plans separately from history).
+ * - Core: Includes Hebrew workout names, Week tracking, and Smart Swap logic.
  */
 
 // --- DEFAULT DATA (Factory Settings) ---
@@ -311,6 +310,36 @@ const StorageManager = {
         if(dataObj.weights) this.saveData(this.KEY_WEIGHTS, dataObj.weights);
         if(dataObj.rms) this.saveData(this.KEY_RM, dataObj.rms);
         if(dataObj.archive) this.saveData(this.KEY_ARCHIVE, dataObj.archive);
+    },
+
+    // --- NEW: CONFIG EXPORT/IMPORT ---
+    exportConfiguration() {
+        const configData = {
+            type: 'config_only',
+            version: '12.4.0',
+            date: new Date().toISOString(),
+            workouts: this.getData(this.KEY_DB_WORKOUTS),
+            exercises: this.getData(this.KEY_DB_EXERCISES)
+        };
+        const a = document.createElement('a'); 
+        a.href = URL.createObjectURL(new Blob([JSON.stringify(configData, null, 2)], {type: "application/json"})); 
+        a.download = `gympro_config_${new Date().toISOString().slice(0,10)}.json`; 
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    },
+
+    importConfiguration(data) {
+        // Validation: Ensure it's a config file and not a full backup
+        if (data.type !== 'config_only') {
+            alert("שגיאה: הקובץ שנבחר אינו קובץ תבנית אימונים תקין.");
+            return;
+        }
+
+        if(confirm("פעולה זו תדרוס את התוכניות והתרגילים הקיימים במערכת (אך תשמור על היסטוריית הביצועים). האם להמשיך?")) {
+            this.saveData(this.KEY_DB_WORKOUTS, data.workouts);
+            this.saveData(this.KEY_DB_EXERCISES, data.exercises);
+            alert("התבניות נטענו בהצלחה! האפליקציה תרענן את עצמה.");
+            location.reload();
+        }
     }
 };
 
@@ -430,14 +459,12 @@ function renderWorkoutMenu() {
     const container = document.getElementById('workout-menu-container');
     container.innerHTML = "";
     
-    // Updated Logic: We no longer rely on 'A','B','C' keys.
     Object.keys(state.workouts).forEach(key => {
         const btn = document.createElement('button');
         btn.className = "menu-card tall";
         
         const count = state.workouts[key].length;
         
-        // Simple display of key as title
         btn.innerHTML = `<h3>${key}</h3><p>${count} תרגילים</p>`;
         btn.onclick = () => selectWorkout(key);
         container.appendChild(btn);
@@ -1528,6 +1555,21 @@ function importData(input) {
             const data = JSON.parse(e.target.result);
             if(confirm("האם לדרוס את הנתונים הקיימים ולשחזר מהגיבוי?")) { StorageManager.restoreData(data); alert("הנתונים שוחזרו בהצלחה! האפליקציה תרענן את עצמה."); location.reload(); }
         } catch(err) { alert("שגיאה בטעינת הקובץ. וודא שזהו קובץ גיבוי תקין."); }
+    };
+    reader.readAsText(file);
+}
+
+// --- NEW GLOBAL FUNCTIONS FOR CONFIG IMPORT ---
+function triggerConfigImport() { document.getElementById('import-config-file').click(); }
+
+function processConfigImport(input) {
+    const file = input.files[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+            StorageManager.importConfiguration(data);
+        } catch(err) { alert("שגיאה בטעינת הקובץ."); }
     };
     reader.readAsText(file);
 }
