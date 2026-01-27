@@ -1,7 +1,8 @@
 /**
- * GYMPRO ELITE V12.3.0
- * - Feature: Fixed Swap Flow (Original exercise marks as done if variation is done)
- * - UI: Clean text-based interface (Removed emojis from buttons/lists via JS generation)
+ * GYMPRO ELITE V12.3.1
+ * - Update: Renamed default workouts to Hebrew names (Removed A/B/C keys).
+ * - Update: Added Week number to workout summary and archive.
+ * - Logic: Improved swap flow logic (Refinement).
  */
 
 // --- DEFAULT DATA (Factory Settings) ---
@@ -84,7 +85,7 @@ const defaultExercises = [
 ];
 
 const defaultWorkouts = {
-    'A': [
+    'כתפיים - גב - חזה': [
         { name: "Overhead Press (Main)", isMain: true, sets: 0 },
         { name: "Barbell Shrugs", isMain: false, sets: 3 },
         { name: "Lateral Raises", isMain: false, sets: 3 },
@@ -92,7 +93,7 @@ const defaultWorkouts = {
         { name: "Face Pulls", isMain: false, sets: 3 },
         { name: "Incline Bench Press", isMain: false, sets: 3 }
     ],
-    'B': [
+    'רגליים - גב': [
         { name: "Leg Press", isMain: false, sets: 3 },
         { name: "Single Leg Curl", isMain: false, sets: 3 },
         { name: "Lat Pulldown", isMain: false, sets: 3 },
@@ -100,7 +101,7 @@ const defaultWorkouts = {
         { name: "Seated Calf Raise", isMain: false, sets: 3 },
         { name: "Straight Arm Pulldown", isMain: false, sets: 3 }
     ],
-    'C': [
+    'חזה - כתפיים': [
         { name: "Bench Press (Main)", isMain: true, sets: 0 },
         { name: "Incline Bench Press", isMain: false, sets: 3 },
         { name: "Dumbbell Peck Fly", isMain: false, sets: 3 },
@@ -230,6 +231,8 @@ const StorageManager = {
 
         if (storedWo && Object.keys(storedWo).length > 0) {
             let hasChanges = false;
+            // Migration logic: If user still has old A/B/C keys, we don't force rename to preserve user data,
+            // but new users (or reset) will get Hebrew names.
             Object.keys(storedWo).forEach(k => {
                 if (storedWo[k].length > 0 && typeof storedWo[k][0] === 'string') {
                     storedWo[k] = storedWo[k].map(exName => ({
@@ -427,18 +430,15 @@ function renderWorkoutMenu() {
     const container = document.getElementById('workout-menu-container');
     container.innerHTML = "";
     
+    // Updated Logic: We no longer rely on 'A','B','C' keys.
     Object.keys(state.workouts).forEach(key => {
         const btn = document.createElement('button');
         btn.className = "menu-card tall";
         
-        let desc = "מותאם אישית";
-        if (key === 'A') desc = "כתפיים - חזה - גב";
-        if (key === 'B') desc = "רגליים - גב";
-        if (key === 'C') desc = "חזה - כתפיים";
-        
         const count = state.workouts[key].length;
         
-        btn.innerHTML = `<h3>${key}</h3><p>${desc} (${count} תרגילים)</p>`;
+        // Simple display of key as title
+        btn.innerHTML = `<h3>${key}</h3><p>${count} תרגילים</p>`;
         btn.onclick = () => selectWorkout(key);
         container.appendChild(btn);
     });
@@ -1077,7 +1077,12 @@ function openSwapMenu() {
     titleOrder.style.marginTop = "20px";
     container.appendChild(titleOrder);
 
-    const remaining = workoutList.filter(item => !state.completedExInSession.includes(item.name) && item.name !== state.currentExName);
+    // FIXED LOGIC: Filter out any exercise OR its variations that are already done
+    const remaining = workoutList.filter(item => {
+        const isDone = isExOrVariationDone(item.name);
+        const isCurrent = item.name === state.currentExName;
+        return !isDone && !isCurrent;
+    });
     
     if (remaining.length === 0) {
         const empty = document.createElement('p');
@@ -1274,7 +1279,8 @@ function finish() {
     
     const workoutDisplayName = state.type; 
     const dateStr = new Date().toLocaleDateString('he-IL');
-    let summaryText = `GYMPRO ELITE SUMMARY\n${workoutDisplayName} | ${dateStr} | ${state.workoutDurationMins}m\n\n`;
+    // Added Week number to summary header
+    let summaryText = `GYMPRO ELITE SUMMARY\n${workoutDisplayName} | Week ${state.week} | ${dateStr} | ${state.workoutDurationMins}m\n\n`;
     let grouped = {};
     
     state.log.forEach(e => {
@@ -1317,6 +1323,7 @@ function copyResult() {
         date: dateStr, 
         timestamp: Date.now(), 
         type: workoutDisplayName, 
+        week: state.week, // Added week logging
         duration: state.workoutDurationMins, 
         summary: text, 
         details: state.lastWorkoutDetails, 
@@ -1374,7 +1381,9 @@ function renderArchiveList() {
     else {
         history.forEach(item => {
             const card = document.createElement('div'); card.className = "menu-card"; card.style.cursor = "default";
-            card.innerHTML = `<div class="archive-card-row"><input type="checkbox" class="archive-checkbox" data-id="${item.timestamp}"><div class="archive-info"><div style="display:flex; justify-content:space-between; width:100%;"><h3 style="margin:0;">${item.date}</h3><span style="font-size:0.8em; color:#8E8E93">${item.duration} דק'</span></div><p style="margin:0; color:#8E8E93; font-size:0.85em;">${item.type}</p></div><div class="chevron"></div></div>`;
+            // Display week in the list item
+            const weekStr = item.week ? ` • שבוע ${item.week}` : '';
+            card.innerHTML = `<div class="archive-card-row"><input type="checkbox" class="archive-checkbox" data-id="${item.timestamp}"><div class="archive-info"><div style="display:flex; justify-content:space-between; width:100%;"><h3 style="margin:0;">${item.date}</h3><span style="font-size:0.8em; color:#8E8E93">${item.duration} דק'</span></div><p style="margin:0; color:#8E8E93; font-size:0.85em;">${item.type}${weekStr}</p></div><div class="chevron"></div></div>`;
             const checkbox = card.querySelector('.archive-checkbox');
             checkbox.addEventListener('change', (e) => toggleArchiveSelection(parseInt(e.target.dataset.id)));
             checkbox.addEventListener('click', (e) => e.stopPropagation());
@@ -1439,9 +1448,10 @@ function renderCalendar() {
             dailyWorkouts.forEach(wo => {
                 const dot = document.createElement('div');
                 let dotClass = 'type-free';
-                if(wo.type.includes('A')) dotClass = 'type-a';
-                else if(wo.type.includes('B')) dotClass = 'type-b';
-                else if(wo.type.includes('C')) dotClass = 'type-c';
+                // Updated color mapping for Hebrew names + Backward compatibility for 'A'/'B'/'C'
+                if(wo.type.includes('כתפיים - גב - חזה') || wo.type.includes('A')) dotClass = 'type-a';
+                else if(wo.type.includes('רגליים - גב') || wo.type.includes('B')) dotClass = 'type-b';
+                else if(wo.type.includes('חזה - כתפיים') || wo.type.includes('C')) dotClass = 'type-c';
                 dot.className = `dot ${dotClass}`;
                 dotsContainer.appendChild(dot);
             });
@@ -1462,9 +1472,11 @@ function openDayDrawer(workouts, day, monthName) {
         html += `<p>נמצאו ${workouts.length} אימונים:</p>`;
         workouts.forEach(wo => {
             let dotColor = '#BF5AF2';
-            if(wo.type.includes('A')) dotColor = '#0A84FF';
-            else if(wo.type.includes('B')) dotColor = '#32D74B';
-            else if(wo.type.includes('C')) dotColor = '#FF9F0A';
+            // Color Logic for drawer
+            if(wo.type.includes('כתפיים - גב - חזה') || wo.type.includes('A')) dotColor = '#0A84FF';
+            else if(wo.type.includes('רגליים - גב') || wo.type.includes('B')) dotColor = '#32D74B';
+            else if(wo.type.includes('חזה - כתפיים') || wo.type.includes('C')) dotColor = '#FF9F0A';
+            
             html += `
             <div class="mini-workout-item" onclick='openArchiveFromDrawer(${JSON.stringify(wo).replace(/'/g, "&#39;")})'>
                 <div class="mini-dot" style="background:${dotColor}"></div>
