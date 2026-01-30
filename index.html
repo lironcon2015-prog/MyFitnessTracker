@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>GymPro Elite 12.4.0</title>
+    <title>GymPro Elite 12.5.2</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="stylesheet" href="style.css">
@@ -39,6 +39,35 @@
         </div>
     </div>
 
+    <!-- Exercise Settings Modal (Rest Timer) -->
+    <div id="exercise-settings-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 id="ex-settings-title">הגדרות תרגיל</h3>
+            <p class="sub-text">זמן מנוחה (שניות)</p>
+            
+            <div class="stepper-control">
+                <button class="stepper-btn" onclick="changeRestTime(-15)">-</button>
+                <span id="rest-time-display" class="stepper-value">90s</span>
+                <button class="stepper-btn" onclick="changeRestTime(15)">+</button>
+            </div>
+
+            <button class="btn-main primary-gradient" onclick="saveExerciseSettings()">שמור</button>
+            <button class="btn-text" onclick="closeExerciseSettings()">ביטול</button>
+        </div>
+    </div>
+
+    <!-- Recovery Modal (NEW) -->
+    <div id="recovery-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>נמצא אימון פעיל</h3>
+            <p class="sub-text">האם ברצונך להמשיך מהנקודה שבה הפסקת?</p>
+            <div class="vertical-stack">
+                <button class="btn-main primary-gradient" onclick="restoreSession()">כן, המשך אימון</button>
+                <button class="btn-text" style="color: #ff453a;" onclick="discardSession()">לא, התחל מחדש</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Bottom Sheet (Drawer) -->
     <div id="sheet-overlay" class="bottom-sheet-overlay" onclick="closeDayDrawer()"></div>
     <div id="sheet-modal" class="bottom-sheet">
@@ -53,8 +82,8 @@
                 <div class="chevron-back"></div>
             </button>
             <div class="brand-logo">GYMPRO <span>ELITE</span></div>
-            <!-- Settings Button (Kept as requested) -->
-            <button class="settings-btn" onclick="openSettings()">
+            <!-- Settings Button (Now with ID) -->
+            <button id="btn-settings" class="settings-btn" onclick="openSettings()">
                 ⚙️
             </button>
         </header>
@@ -79,7 +108,7 @@
                     <div class="card-text center-text">ארכיון וגיבוי</div>
                 </button>
 
-                <div class="version-footer">GymPro Elite v12.4.0</div>
+                <div class="version-footer">GymPro Elite v12.5.2</div>
             </div>
 
             <!-- SETTINGS SCREEN -->
@@ -93,7 +122,7 @@
 
                 <div class="glass-card">
                     <h3 style="margin-top:0">ניהול נתונים</h3>
-                    <p style="color:var(--text-dim); font-size:0.9em;">גרסה V12.4.0</p>
+                    <p style="color:var(--text-dim); font-size:0.9em;">גרסה V12.5.2</p>
                     
                     <button class="btn-text" style="color: #ff453a; border: 1px solid #ff453a; border-radius: 12px; margin-bottom: 20px;" onclick="resetToFactorySettings()">איפוס להגדרות יצרן</button>
                     
@@ -134,7 +163,10 @@
                 <div class="section-label">רשימת תרגילים</div>
                 <div id="editor-list" class="vertical-stack"></div>
 
-                <button class="btn-text" style="border: 1px dashed var(--accent); color: var(--accent); margin-top: 10px;" onclick="openExerciseSelector()">+ הוסף תרגיל</button>
+                <div class="input-grid" style="margin-top: 10px; grid-template-columns: 1fr 1fr;">
+                    <button class="btn-text" style="border: 1px dashed var(--accent); color: var(--accent);" onclick="openExerciseSelector()">+ הוסף תרגיל</button>
+                    <button class="btn-text" style="border: 1px dashed var(--type-free); color: var(--type-free);" onclick="addClusterToEditor()">+ צור סבב</button>
+                </div>
                 
                 <div style="margin-top: 30px;">
                     <button class="btn-main primary-gradient" onclick="saveWorkoutChanges()">שמור שינויים</button>
@@ -211,10 +243,7 @@
             <!-- SWAP SCREEN (Split View) -->
             <div id="ui-swap-list" class="screen">
                 <h2 class="section-title">אפשרויות החלפה</h2>
-                
-                <!-- Dynamic Content Here -->
                 <div id="swap-container" class="vertical-stack"></div>
-
                 <button class="btn-text" onclick="handleBackClick()">ביטול</button>
             </div>
 
@@ -227,35 +256,65 @@
                 <button class="btn-main primary-gradient" onclick="save1RM()">צור אימון</button>
             </div>
 
-            <!-- CONFIRM SCREEN -->
-            <div id="ui-confirm" class="screen flex-center">
-                <div class="confirm-box">
+            <!-- CONFIRM SCREEN (Redesigned) -->
+            <div id="ui-confirm" class="screen">
+                <div class="confirm-fixed-top">
                     <p>התרגיל הבא:</p>
                     <h2 id="confirm-ex-name"></h2>
                     <div id="confirm-ex-config" class="sub-text" style="margin-top: -10px; margin-bottom: 20px; font-size: 0.8em; color: var(--accent);"></div>
                     
                     <button class="btn-main primary-gradient" onclick="confirmExercise(true)">התחל אימון</button>
                     
-                    <!-- CONTROL GRID (Clean Text) -->
-                    <div class="action-grid">
-                        <button class="control-btn" onclick="confirmExercise(false)">
+                    <!-- NEW CONTROL GRID (3 Buttons: Skip, Swap, Add) -->
+                    <div class="secondary-buttons-grid">
+                        <!-- Right (Col 1 in Grid RTL) -->
+                        <button class="control-btn passive-action" onclick="confirmExercise(false)">
                             <span>דלג</span>
                         </button>
                         
-                        <!-- Swap kept as icon per request -->
-                        <button id="btn-swap-confirm" class="control-btn accent-border" onclick="openSwapMenu()">
-                            <div class="icon">⇄</div>
+                        <!-- Center (Col 2 in Grid RTL) -->
+                        <button id="btn-swap-confirm" class="control-btn outline-action" onclick="openSwapMenu()">
                             <span>החלף</span>
                         </button>
-                        
-                        <button id="btn-interruption" class="control-btn" onclick="interruptWorkout()">
+
+                        <!-- Left (Col 3 in Grid RTL) -->
+                        <button id="btn-add-exercise" class="control-btn outline-action" onclick="interruptWorkout()">
                             <span>הוסף</span>
                         </button>
                     </div>
+                </div>
 
-                    <!-- History Card -->
-                    <div id="history-container" style="width: 100%; margin-top: 30px;"></div>
+                <!-- History Card (Scrollable below) -->
+                <div id="history-container" style="width: 100%; margin-top: 20px;"></div>
+            </div>
 
+            <!-- CLUSTER REST SCREEN -->
+            <div id="ui-cluster-rest" class="screen flex-center">
+                <div class="confirm-box">
+                    <p style="color:var(--text-dim);">מנוחה בין סבבים</p>
+                    <h2 id="cluster-status-text">סיום סבב 1 מתוך 3</h2>
+                    
+                    <div class="timer-wrap" style="margin: 30px auto;">
+                        <svg class="timer-svg" viewBox="0 0 100 100">
+                            <circle class="timer-bg" cx="50" cy="50" r="45"></circle>
+                            <circle id="cluster-timer-bar" class="timer-bar" cx="50" cy="50" r="45"></circle>
+                        </svg>
+                        <div id="cluster-timer-text" class="timer-text">00:00</div>
+                    </div>
+
+                    <div id="next-round-preview" class="glass-card compact" style="text-align: right; margin-bottom: 20px;">
+                        <label>הסבב הבא כולל:</label>
+                        <div id="cluster-next-list" style="font-size: 0.9em; color: white;"></div>
+                    </div>
+
+                    <button id="btn-cluster-main" class="btn-main primary-gradient" onclick="startNextRound()">התחל סבב הבא</button>
+                    
+                    <!-- Option for Extra Round (Visible only on last round) -->
+                    <button id="btn-extra-round" class="btn-text secondary-action" style="display: none; margin-top: 15px;" onclick="addExtraRound()">
+                        + בצע סבב נוסף
+                    </button>
+                    
+                    <button id="btn-cluster-skip-text" class="btn-text" style="color: #ff453a; margin-top: 10px;" onclick="finishCluster()">סיים סבב זה והמשך</button>
                 </div>
             </div>
 
