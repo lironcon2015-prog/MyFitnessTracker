@@ -1,7 +1,12 @@
 /**
- * GYMPRO ELITE V12.4.0
- * - Feature: Configuration Export/Import (Save plans separately from history).
- * - Core: Includes Hebrew workout names, Week tracking, and Smart Swap logic.
+ * GYMPRO ELITE V12.5.2
+ * - Feature: Auto-Recovery System (Session Persistence).
+ * - Fix: 1RM Calculated exercises now prioritize planned reps over last set history.
+ * - UI: Settings button visible only on Home Screen.
+ * - Feature: Restored "Add" button logic in Confirm Screen (Interruption).
+ * - UI: Updated Confirm Screen Layout (Fixed Top, 3-Col Grid).
+ * - Logic: Improved Cluster Finish Flow (Main button becomes "Finish").
+ * - Data: Added "Arnold" and "Raises" to Unilateral detection.
  */
 
 // --- DEFAULT DATA (Factory Settings) ---
@@ -17,6 +22,10 @@ const defaultExercises = [
     { name: "Rear Delt Fly (Dumbbells)", muscles: ["כתפיים"], sets: [{w: 10, r: 15}, {w: 10, r: 15}, {w: 10, r: 15}], step: 1 },
     { name: "Barbell Shrugs", muscles: ["כתפיים"], sets: [{w: 140, r: 11}, {w: 140, r: 11}, {w: 140, r: 11}], step: 5 },
     { name: "Front Raises", muscles: ["כתפיים"], sets: [{w: 10, r: 12}, {w: 10, r: 12}, {w: 10, r: 12}], step: 1 },
+
+    // NEW EXERCISES
+    { name: "Y Raises", muscles: ["גב", "כתפיים"], sets: [{w: 4, r: 12}, {w: 4, r: 12}, {w: 4, r: 12}], step: 1 },
+    { name: "L Raises", muscles: ["גב", "כתפיים"], sets: [{w: 3, r: 12}, {w: 3, r: 12}, {w: 3, r: 12}], step: 1 },
 
     // BACK (גב)
     { name: "Weighted Pull Ups", muscles: ["גב", "קליסטניקס"], sets: [{w: 0, r: 8}, {w: 0, r: 8}, {w: 0, r: 8}], step: 5, minW: 0, maxW: 60, isBW: true },
@@ -111,29 +120,18 @@ const defaultWorkouts = {
 
 // --- SUBSTITUTION LOGIC ---
 const substituteGroups = [
-    // Chest
     ["Incline Bench Press", "Incline Dumbbell Bench Press"],
     ["Dumbbell Bench Press", "Machine Press"], 
     ["Dumbbell Peck Fly", "Machine Peck Fly", "Cable Fly"],
-    
-    // Back (Pullups)
     ["Weighted Pull Ups", "Pull Ups", "Chin Ups", "Wide Grip Pull Ups", "Lat Pulldown"],
-    // Back (Rows)
     ["Cable Row", "Machine Row", "T-Bar Row", "Single Arm Dumbbell Row", "Bodyweight Rows"],
-    // Back (Isolation)
     ["Straight Arm Pulldown", "Weighted Pull Ups"], 
-
-    // Shoulders
     ["Dumbbell Shoulder Press", "Arnold Press", "Machine Press"],
     ["Lateral Raises", "Cable Lateral Raises"],
     ["Face Pulls", "Rear Delt Fly (Dumbbells)", "Reverse Fly (Machine)"],
-
-    // Legs
     ["Single Leg Curl", "Lying Leg Curl (Double)", "Seated Leg Curl"],
     ["Seated Calf Raise", "Standing Calf Raise"],
     ["Leg Press", "Hack Squat", "Bulgarian Split Squat", "Walking Lunges"],
-
-    // Arms
     ["Dumbbell Bicep Curls", "Barbell Bicep Curls", "Concentration Curls", "Hammer Curls", "Preacher Curls", "Reverse Grip Curl"],
     ["Triceps Pushdown", "Skullcrushers", "Overhead Triceps Extension (Cable)", "Diamond Pushups"]
 ];
@@ -143,17 +141,12 @@ function getSubstitutes(exName) {
     return group ? group.filter(n => n !== exName) : [];
 }
 
-// *** NEW: Check if exercise OR any of its variations is completed ***
 function isExOrVariationDone(originalName) {
-    // 1. Check direct match
     if (state.completedExInSession.includes(originalName)) return true;
-    
-    // 2. Check group variations
     const group = substituteGroups.find(g => g.includes(originalName));
     if (group) {
         return group.some(varName => state.completedExInSession.includes(varName));
     }
-    
     return false;
 }
 
@@ -176,18 +169,27 @@ let state = {
     editingIndex: -1,
     freestyleFilter: 'all',
     exercises: [],
-    workouts: {}
+    workouts: {},
+    
+    // Cluster State
+    clusterMode: false,
+    activeCluster: null,
+    clusterIdx: 0, 
+    clusterRound: 1,
+    lastClusterRest: 0 // To carry over rest time
 };
 
 let managerState = {
     originalName: '',
     currentName: '',
     exercises: [],
-    selectorFilter: 'all'
+    selectorFilter: 'all',
+    activeClusterRef: null,
+    editingTimerEx: null 
 };
 
 const unilateralKeywords = [
-    "Dumbbell", "Cable Lateral", "Single", "Concentration", "Hammer", "Pistol", "Walking Lunges", "Bulgarian", "Kickback", "One Arm"
+    "Dumbbell", "Cable Lateral", "Single", "Concentration", "Hammer", "Pistol", "Walking Lunges", "Bulgarian", "Kickback", "One Arm", "Arnold", "Raises"
 ];
 
 let audioContext;
@@ -202,6 +204,7 @@ const StorageManager = {
     KEY_ARCHIVE: 'gympro_archive',
     KEY_DB_EXERCISES: 'gympro_db_exercises',
     KEY_DB_WORKOUTS: 'gympro_db_workouts',
+    KEY_SESSION: 'gympro_current_session', // NEW KEY for Auto-Recovery
 
     getData(key) {
         try { return JSON.parse(localStorage.getItem(key)); } 
@@ -229,33 +232,43 @@ const StorageManager = {
         }
 
         if (storedWo && Object.keys(storedWo).length > 0) {
-            let hasChanges = false;
-            // Migration logic: If user still has old A/B/C keys, we don't force rename to preserve user data,
-            // but new users (or reset) will get Hebrew names.
-            Object.keys(storedWo).forEach(k => {
-                if (storedWo[k].length > 0 && typeof storedWo[k][0] === 'string') {
-                    storedWo[k] = storedWo[k].map(exName => ({
-                        name: exName,
-                        isMain: exName.includes("(Main)"), 
-                        sets: 3
-                    }));
-                    hasChanges = true;
-                }
-            });
             state.workouts = storedWo;
-            if (hasChanges) {
-                this.saveData(this.KEY_DB_WORKOUTS, state.workouts);
-            }
         } else {
             state.workouts = JSON.parse(JSON.stringify(defaultWorkouts));
             this.saveData(this.KEY_DB_WORKOUTS, state.workouts);
         }
     },
 
+    // --- SESSION RECOVERY METHODS ---
+    saveSessionState() {
+        // Deep copy state to avoid reference issues
+        const sessionData = {
+            state: JSON.parse(JSON.stringify(state)),
+            timestamp: Date.now()
+        };
+        // Clean up transient things like timerInterval ID
+        sessionData.state.timerInterval = null; 
+        this.saveData(this.KEY_SESSION, sessionData);
+    },
+
+    clearSessionState() {
+        localStorage.removeItem(this.KEY_SESSION);
+    },
+
+    hasActiveSession() {
+        return !!localStorage.getItem(this.KEY_SESSION);
+    },
+
+    getSessionState() {
+        return this.getData(this.KEY_SESSION);
+    },
+    // ---------------------------------
+
     resetFactory() {
         if(confirm("פעולה זו תאפס את כל התרגילים והאימונים לברירת המחדל, אך תשמור על היסטוריית הביצועים והמשקלים. האם להמשיך?")) {
             localStorage.removeItem(this.KEY_DB_EXERCISES);
             localStorage.removeItem(this.KEY_DB_WORKOUTS);
+            localStorage.removeItem(this.KEY_SESSION); // Clear any stuck session
             location.reload();
         }
     },
@@ -312,11 +325,10 @@ const StorageManager = {
         if(dataObj.archive) this.saveData(this.KEY_ARCHIVE, dataObj.archive);
     },
 
-    // --- NEW: CONFIG EXPORT/IMPORT ---
     exportConfiguration() {
         const configData = {
             type: 'config_only',
-            version: '12.4.0',
+            version: '12.5.2',
             date: new Date().toISOString(),
             workouts: this.getData(this.KEY_DB_WORKOUTS),
             exercises: this.getData(this.KEY_DB_EXERCISES)
@@ -328,7 +340,6 @@ const StorageManager = {
     },
 
     importConfiguration(data) {
-        // Validation: Ensure it's a config file and not a full backup
         if (data.type !== 'config_only') {
             alert("שגיאה: הקובץ שנבחר אינו קובץ תבנית אימונים תקין.");
             return;
@@ -347,7 +358,62 @@ const StorageManager = {
 window.onload = () => {
     StorageManager.initDB();
     renderWorkoutMenu();
+    checkRecovery(); // Check for interrupted session
 };
+
+// --- RECOVERY LOGIC ---
+function checkRecovery() {
+    if (StorageManager.hasActiveSession()) {
+        const session = StorageManager.getSessionState();
+        // Check if session is not too old (e.g., 24 hours) - Optional, here keeping it simple
+        document.getElementById('recovery-modal').style.display = 'flex';
+    }
+}
+
+function restoreSession() {
+    const session = StorageManager.getSessionState();
+    if (session && session.state) {
+        state = session.state;
+        
+        // Hide modal
+        document.getElementById('recovery-modal').style.display = 'none';
+        
+        // Determine where to navigate
+        const lastScreen = state.historyStack[state.historyStack.length - 1];
+        
+        // If we are deep in execution (ui-main), we need to re-init pickers
+        if (lastScreen === 'ui-main') {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById('ui-main').classList.add('active');
+            
+            // Re-render pickers based on restored state
+            initPickers();
+            
+            // If timer was running, we can't really restore exact second accurately without diffing timestamps, 
+            // but we can at least show the timer area if needed.
+            if (state.seconds > 0) {
+                 document.getElementById('timer-area').style.visibility = 'visible';
+                 // Optionally restart timer? keeping it paused/stopped is safer.
+            }
+        } else {
+            // Just navigate to the screen
+            navigate(lastScreen);
+            
+            // If it was confirm screen, re-render it
+            if (lastScreen === 'ui-confirm') {
+                showConfirmScreen(state.currentExName);
+            }
+        }
+        haptic('success');
+    } else {
+        discardSession();
+    }
+}
+
+function discardSession() {
+    StorageManager.clearSessionState();
+    document.getElementById('recovery-modal').style.display = 'none';
+}
 
 // --- CORE SYSTEMS ---
 
@@ -395,6 +461,12 @@ function navigate(id) {
     if (state.historyStack[state.historyStack.length - 1] !== id) state.historyStack.push(id);
     
     document.getElementById('global-back').style.visibility = (id === 'ui-week') ? 'hidden' : 'visible';
+
+    // --- SETTINGS BUTTON VISIBILITY LOGIC ---
+    const settingsBtn = document.getElementById('btn-settings');
+    if (settingsBtn) {
+        settingsBtn.style.visibility = (id === 'ui-week') ? 'visible' : 'hidden';
+    }
 }
 
 function handleBackClick() {
@@ -418,7 +490,12 @@ function handleBackClick() {
 
     if (currentScreen === 'ui-confirm') {
         if (state.log.length > 0 || state.completedExInSession.length > 0) {
-            if(!confirm("האם לצאת מהאימון?")) return;
+            if(confirm("האם לצאת מהאימון?")) {
+                // If exiting, clear session
+                StorageManager.clearSessionState();
+            } else {
+                return;
+            }
         }
         state.historyStack.pop(); 
         const prev = state.historyStack[state.historyStack.length - 1];
@@ -444,6 +521,12 @@ function handleBackClick() {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById(prevScreen).classList.add('active');
     document.getElementById('global-back').style.visibility = (prevScreen === 'ui-week') ? 'hidden' : 'visible';
+    
+    // Update settings visibility on back
+    const settingsBtn = document.getElementById('btn-settings');
+    if (settingsBtn) {
+        settingsBtn.style.visibility = (prevScreen === 'ui-week') ? 'visible' : 'hidden';
+    }
 }
 
 function openSettings() {
@@ -463,7 +546,11 @@ function renderWorkoutMenu() {
         const btn = document.createElement('button');
         btn.className = "menu-card tall";
         
-        const count = state.workouts[key].length;
+        let count = 0;
+        state.workouts[key].forEach(item => {
+            if(item.type === 'cluster') count += item.exercises.length;
+            else count++;
+        });
         
         btn.innerHTML = `<h3>${key}</h3><p>${count} תרגילים</p>`;
         btn.onclick = () => selectWorkout(key);
@@ -492,15 +579,22 @@ function renderManagerList() {
         const wo = state.workouts[key];
         const el = document.createElement('div');
         el.className = "manager-item";
+        el.onclick = () => editWorkout(key); 
+        
+        let count = 0;
+        wo.forEach(item => {
+            if(item.type === 'cluster') count += item.exercises.length;
+            else count++;
+        });
+
         el.innerHTML = `
             <div class="manager-info">
                 <h3>${key}</h3>
-                <p>${wo.length} תרגילים</p>
+                <p>${count} תרגילים</p>
             </div>
             <div class="manager-actions">
-                <button class="btn-text-action" onclick="duplicateWorkout('${key}')">שכפל</button>
-                <button class="btn-text-action" onclick="editWorkout('${key}')">ערוך</button>
-                <button class="btn-text-action delete" onclick="deleteWorkout('${key}')">מחק</button>
+                <button class="btn-text-action" onclick="event.stopPropagation(); duplicateWorkout('${key}')">שכפל</button>
+                <button class="btn-text-action delete" onclick="event.stopPropagation(); deleteWorkout('${key}')">מחק</button>
             </div>
         `;
         list.appendChild(el);
@@ -548,41 +642,106 @@ function openEditorUI() {
     navigate('ui-workout-editor');
 }
 
+// --- WORKOUT EDITOR & CLUSTER SUPPORT ---
+
 function renderEditorList() {
     const list = document.getElementById('editor-list');
     list.innerHTML = "";
     
     managerState.exercises.forEach((item, idx) => {
-        const row = document.createElement('div');
-        row.className = "editor-row";
-        
-        let setControls = '';
-        if (!item.isMain) {
-            setControls = `
-                <div class="set-selector">
-                    <button class="set-btn" onclick="changeSetCount(${idx}, -1)">-</button>
-                    <span class="set-val">${item.sets}</span>
-                    <button class="set-btn" onclick="changeSetCount(${idx}, 1)">+</button>
-                </div>
-            `;
+        if (item.type === 'cluster') {
+            renderClusterItem(item, idx, list);
         } else {
-            setControls = `<span style="font-size:0.8em; color:var(--text-dim); margin:0 5px;">1RM Auto</span>`;
+            renderRegularItem(item, idx, list);
         }
-
-        row.innerHTML = `
-            <div class="row-info">${idx + 1}. ${item.name}</div>
-            <div class="editor-controls">
-                <button class="badge-main ${item.isMain ? 'active' : ''}" onclick="toggleMainStatus(${idx})">MAIN</button>
-                ${setControls}
-                <button class="control-icon-btn" onclick="moveExInEditor(${idx}, -1)">▲</button>
-                <button class="control-icon-btn" onclick="moveExInEditor(${idx}, 1)">▼</button>
-                <button class="control-icon-btn" onclick="removeExFromEditor(${idx})" style="color:#ff453a; border-color: rgba(255,69,58,0.3);">✕</button>
-            </div>
-        `;
-        list.appendChild(row);
     });
 }
 
+function renderRegularItem(item, idx, list) {
+    const row = document.createElement('div');
+    row.className = "editor-row";
+    
+    let setControls = '';
+    if (!item.isMain) {
+        setControls = `
+            <div class="set-selector">
+                <button class="set-btn" onclick="changeSetCount(${idx}, -1)">-</button>
+                <span class="set-val">${item.sets}</span>
+                <button class="set-btn" onclick="changeSetCount(${idx}, 1)">+</button>
+            </div>
+        `;
+    } else {
+        setControls = `<span style="font-size:0.8em; color:var(--text-dim); margin:0 5px;">1RM</span>`;
+    }
+
+    row.innerHTML = `
+        <div class="row-info" onclick="openRestTimerModal(${idx})">${item.name}</div>
+        <div class="editor-controls">
+            <button class="badge-main ${item.isMain ? 'active' : ''}" onclick="toggleMainStatus(${idx})">MAIN</button>
+            ${setControls}
+            <button class="control-icon-btn" onclick="moveExInEditor(${idx}, -1)">▲</button>
+            <button class="control-icon-btn" onclick="moveExInEditor(${idx}, 1)">▼</button>
+            <button class="control-icon-btn" onclick="removeExFromEditor(${idx})" style="color:#ff453a; border-color: rgba(255,69,58,0.3);">✕</button>
+        </div>
+    `;
+    list.appendChild(row);
+}
+
+function renderClusterItem(cluster, idx, list) {
+    const box = document.createElement('div');
+    box.className = "cluster-box";
+    
+    // Cluster Header
+    let html = `
+    <div class="cluster-header">
+        <div class="cluster-title">סבב / מעגל (Cluster)</div>
+        <div class="editor-controls">
+            <button class="control-icon-btn" onclick="moveExInEditor(${idx}, -1)">▲</button>
+            <button class="control-icon-btn" onclick="moveExInEditor(${idx}, 1)">▼</button>
+            <button class="control-icon-btn" onclick="removeExFromEditor(${idx})" style="color:#ff453a;">✕</button>
+        </div>
+    </div>
+    <div class="input-grid" style="grid-template-columns: 1fr 1fr; margin-bottom:10px;">
+        <div class="glass-card compact" style="margin:0; padding:8px;">
+            <label>מס' סבבים</label>
+            <div class="set-selector" style="justify-content:center;">
+                <button class="set-btn" onclick="changeClusterRounds(${idx}, -1)">-</button>
+                <span class="set-val">${cluster.rounds}</span>
+                <button class="set-btn" onclick="changeClusterRounds(${idx}, 1)">+</button>
+            </div>
+        </div>
+        <div class="glass-card compact" style="margin:0; padding:8px;">
+            <label>מנוחה בסוף סבב</label>
+            <div class="set-selector" style="justify-content:center;">
+                <button class="set-btn" onclick="changeClusterRest(${idx}, -30)">-</button>
+                <span class="set-val" style="width:40px;">${cluster.clusterRest}s</span>
+                <button class="set-btn" onclick="changeClusterRest(${idx}, 30)">+</button>
+            </div>
+        </div>
+    </div>
+    <div class="cluster-content vertical-stack">
+    `;
+
+    // Inner Exercises
+    cluster.exercises.forEach((ex, internalIdx) => {
+        html += `
+        <div class="editor-row" style="padding: 8px; background:rgba(255,255,255,0.05);">
+            <div class="row-info" onclick="openRestTimerModal(${idx}, ${internalIdx})">${internalIdx+1}. ${ex.name}</div>
+            <div class="editor-controls">
+                 <button class="control-icon-btn" style="width:24px; height:24px;" onclick="removeExFromCluster(${idx}, ${internalIdx})">✕</button>
+            </div>
+        </div>`;
+    });
+
+    html += `
+        <button class="btn-text" style="font-size:0.8em; padding:8px; color:var(--type-free);" onclick="openExerciseSelectorForCluster(${idx})">+ הוסף תרגיל לסבב</button>
+    </div>`;
+
+    box.innerHTML = html;
+    list.appendChild(box);
+}
+
+// Editor Actions
 function toggleMainStatus(idx) {
     managerState.exercises[idx].isMain = !managerState.exercises[idx].isMain;
     renderEditorList();
@@ -610,6 +769,35 @@ function removeExFromEditor(idx) {
     renderEditorList();
 }
 
+function changeClusterRounds(idx, delta) {
+    let val = managerState.exercises[idx].rounds + delta;
+    if (val < 1) val = 1;
+    managerState.exercises[idx].rounds = val;
+    renderEditorList();
+}
+
+function changeClusterRest(idx, delta) {
+    let val = managerState.exercises[idx].clusterRest + delta;
+    if (val < 0) val = 0;
+    managerState.exercises[idx].clusterRest = val;
+    renderEditorList();
+}
+
+function addClusterToEditor() {
+    managerState.exercises.push({
+        type: 'cluster',
+        rounds: 3,
+        clusterRest: 120,
+        exercises: []
+    });
+    renderEditorList();
+}
+
+function removeExFromCluster(clusterIdx, exIdx) {
+    managerState.exercises[clusterIdx].exercises.splice(exIdx, 1);
+    renderEditorList();
+}
+
 function saveWorkoutChanges() {
     const newName = document.getElementById('editor-workout-name').value.trim();
     if (!newName) { alert("נא להזין שם לתוכנית"); return; }
@@ -629,9 +817,63 @@ function saveWorkoutChanges() {
     renderManagerList();
 }
 
+// --- REST TIMER EDITING ---
+
+function openRestTimerModal(idx, internalIdx = null) {
+    let ex;
+    if (internalIdx !== null) {
+        ex = managerState.exercises[idx].exercises[internalIdx];
+        managerState.editingTimerEx = { idx, internalIdx };
+    } else {
+        ex = managerState.exercises[idx];
+        managerState.editingTimerEx = { idx, internalIdx: null };
+    }
+
+    document.getElementById('ex-settings-title').innerText = ex.name;
+    const time = ex.restTime || (ex.isMain ? 120 : 90);
+    document.getElementById('rest-time-display').innerText = time + "s";
+    document.getElementById('exercise-settings-modal').style.display = 'flex';
+}
+
+function changeRestTime(delta) {
+    const display = document.getElementById('rest-time-display');
+    let current = parseInt(display.innerText.replace('s', ''));
+    current += delta;
+    if (current < 0) current = 0;
+    display.innerText = current + "s";
+}
+
+function saveExerciseSettings() {
+    const val = parseInt(document.getElementById('rest-time-display').innerText.replace('s', ''));
+    const { idx, internalIdx } = managerState.editingTimerEx;
+    
+    if (internalIdx !== null) {
+        managerState.exercises[idx].exercises[internalIdx].restTime = val;
+    } else {
+        managerState.exercises[idx].restTime = val;
+    }
+    
+    closeExerciseSettings();
+}
+
+function closeExerciseSettings() {
+    document.getElementById('exercise-settings-modal').style.display = 'none';
+    managerState.editingTimerEx = null;
+}
+
 // --- SMART EXERCISE SELECTOR ---
 
 function openExerciseSelector() {
+    managerState.activeClusterRef = null; 
+    prepareSelector();
+}
+
+function openExerciseSelectorForCluster(clusterIdx) {
+    managerState.activeClusterRef = clusterIdx;
+    prepareSelector();
+}
+
+function prepareSelector() {
     document.getElementById('selector-search').value = "";
     managerState.selectorFilter = 'all';
     updateSelectorChips();
@@ -680,9 +922,17 @@ function renderSelectorList() {
             const newExObj = {
                 name: ex.name,
                 isMain: false,
-                sets: 3 
+                sets: 3,
+                restTime: 90 
             };
-            managerState.exercises.push(newExObj);
+            
+            if (managerState.activeClusterRef !== null) {
+                newExObj.restTime = 30; // Default circuit rest
+                managerState.exercises[managerState.activeClusterRef].exercises.push(newExObj);
+            } else {
+                managerState.exercises.push(newExObj);
+            }
+            
             navigate('ui-workout-editor');
             renderEditorList();
         };
@@ -690,7 +940,7 @@ function renderSelectorList() {
     });
 }
 
-// --- WORKOUT FLOW ---
+// --- WORKOUT FLOW ENGINE (ZIG-ZAG & CLUSTERS) ---
 
 function selectWeek(w) { state.week = w; navigate('ui-workout-type'); }
 
@@ -698,8 +948,643 @@ function selectWorkout(t) {
     state.type = t; state.exIdx = 0; state.log = []; 
     state.completedExInSession = []; state.isArmPhase = false; state.isFreestyle = false; state.isExtraPhase = false; state.isInterruption = false;
     state.workoutStartTime = Date.now();
-    showConfirmScreen();
+    state.clusterMode = false;
+    
+    StorageManager.saveSessionState(); // SAVE STATE
+    checkFlow();
 }
+
+function checkFlow() {
+    const workoutList = state.workouts[state.type];
+    
+    if (state.exIdx >= workoutList.length) {
+        navigate('ui-ask-extra');
+        return;
+    }
+
+    const item = workoutList[state.exIdx];
+
+    // IF CLUSTER
+    if (item.type === 'cluster') {
+        state.clusterMode = true;
+        state.activeCluster = JSON.parse(JSON.stringify(item)); 
+        state.clusterIdx = 0;
+        state.clusterRound = 1;
+        state.lastClusterRest = 30; // Default init
+        
+        // Show Cluster Entry Screen (New Requirement)
+        showConfirmScreen();
+    } 
+    // IF REGULAR
+    else {
+        state.clusterMode = false;
+        state.activeCluster = null;
+        if (isExOrVariationDone(item.name)) {
+            state.exIdx++;
+            checkFlow(); 
+        } else {
+            showConfirmScreen();
+        }
+    }
+}
+
+function showConfirmScreen(forceExName = null) {
+    StorageManager.saveSessionState(); // SAVE STATE
+    
+    // --- CLUSTER ENTRY SCREEN LOGIC ---
+    if (state.clusterMode && state.clusterIdx === 0 && !forceExName) {
+        // Render special Cluster Entry screen inside ui-confirm
+        document.getElementById('confirm-ex-name').innerText = "סבב / מעגל (Cluster)";
+        document.getElementById('confirm-ex-config').innerText = `סבב ${state.clusterRound} מתוך ${state.activeCluster.rounds}`;
+        document.getElementById('confirm-ex-config').style.display = 'block';
+
+        const historyContainer = document.getElementById('history-container');
+        // List exercises
+        let listHtml = `<div class="vertical-stack" style="text-align:right; margin: 20px 0;">`;
+        state.activeCluster.exercises.forEach((ex, i) => {
+            listHtml += `<div style="background:rgba(255,255,255,0.05); padding:12px; border-radius:12px; margin-bottom:5px;">${i+1}. ${ex.name}</div>`;
+        });
+        listHtml += `</div>`;
+        historyContainer.innerHTML = listHtml;
+        
+        // Hide standard buttons, we only need Start
+        document.querySelector('.secondary-buttons-grid').style.display = 'none';
+        
+        // FIX: Navigation logic missing in previous version causing broken state
+        navigate('ui-confirm');
+        
+        return;
+    }
+
+    // --- STANDARD EXERCISE LOGIC (Or triggered manually inside cluster) ---
+    document.querySelector('.secondary-buttons-grid').style.display = 'grid'; // Restore buttons
+
+    let exName = forceExName;
+    let currentPlanItem = null;
+
+    if (!exName) {
+        currentPlanItem = state.workouts[state.type][state.exIdx];
+        exName = currentPlanItem.name;
+    }
+    
+    // Logic for loading exercise data...
+    const exData = state.exercises.find(e => e.name === exName);
+    if (!exData) { alert("שגיאה: התרגיל לא נמצא במאגר."); return; }
+
+    state.currentEx = JSON.parse(JSON.stringify(exData));
+    state.currentExName = exData.name;
+    
+    if (state.clusterMode) {
+        const clusterEx = state.activeCluster.exercises[state.clusterIdx];
+        if (clusterEx.restTime) state.currentEx.restTime = clusterEx.restTime;
+    } else if (currentPlanItem && currentPlanItem.restTime) {
+        state.currentEx.restTime = currentPlanItem.restTime;
+    }
+
+    document.getElementById('confirm-ex-name').innerText = exData.name;
+    const configDiv = document.getElementById('confirm-ex-config');
+    
+    if (state.clusterMode) {
+        configDiv.innerHTML = `חלק מסבב (${state.clusterRound}/${state.activeCluster.rounds})`;
+        configDiv.style.display = 'block';
+    } else if (currentPlanItem) {
+        if (currentPlanItem.isMain) {
+            configDiv.innerHTML = "MAIN (מחושב 1RM)";
+        } else {
+            configDiv.innerHTML = `תוכנית: ${currentPlanItem.sets} סטים`;
+        }
+        configDiv.style.display = 'block';
+    } else {
+        configDiv.style.display = 'none';
+    }
+
+    // New button logic - specific hidden state
+    const swapBtn = document.getElementById('btn-swap-confirm');
+    const addBtn = document.getElementById('btn-add-exercise');
+    
+    if (!state.isFreestyle && !state.isExtraPhase && !state.isInterruption && !state.isArmPhase) {
+        swapBtn.style.visibility = 'visible';
+        addBtn.style.visibility = 'visible'; // Show Add button in normal flow
+    } else {
+        swapBtn.style.visibility = 'hidden'; // Keep layout but hide
+        addBtn.style.visibility = 'hidden'; 
+    }
+
+    // --- HISTORY UI (NEW GRID SYSTEM) ---
+    const historyContainer = document.getElementById('history-container');
+    historyContainer.innerHTML = "";
+    
+    const history = getLastPerformance(exName);
+    
+    if (history) {
+        let rowsHtml = "";
+        history.sets.forEach((setStr, idx) => {
+            // Parse set string: "80kg x 8 (RIR 2) | Note..."
+            let weight = "-", reps = "-", rir = "-";
+            
+            try {
+                const parts = setStr.split('x');
+                if(parts.length > 1) {
+                    weight = parts[0].replace('kg', '').trim();
+                    const rest = parts[1];
+                    const rirMatch = rest.match(/\(RIR (.*?)\)/);
+                    reps = rest.split('(')[0].trim();
+                    if(rirMatch) rir = rirMatch[1];
+                }
+            } catch(e) {}
+
+            rowsHtml += `
+            <div class="history-row">
+                <div class="history-col set-idx">#${idx + 1}</div>
+                <div class="history-col">${weight}</div>
+                <div class="history-col">${reps}</div>
+                <div class="history-col rir-note">${rir}</div>
+            </div>`;
+        });
+
+        const gridHtml = `
+        <div class="history-card-container">
+            <div style="font-size:0.85em; color:var(--text-dim); text-align:right; margin-bottom:10px;">📅 ביצוע אחרון: ${history.date}</div>
+            <div class="history-header">
+                <div>סט</div>
+                <div>משקל</div>
+                <div>חזרות</div>
+                <div>RIR</div>
+            </div>
+            <div class="history-list">
+                ${rowsHtml}
+            </div>
+        </div>
+        `;
+        historyContainer.innerHTML = gridHtml;
+    }
+
+    navigate('ui-confirm');
+}
+
+function getLastPerformance(exName) {
+    const archive = StorageManager.getArchive();
+    for (const item of archive) {
+        if (item.details && item.details[exName]) {
+            return { date: item.date, sets: item.details[exName].sets };
+        }
+    }
+    return null;
+}
+
+function confirmExercise(doEx) {
+    if (state.clusterMode && state.clusterIdx === 0 && document.getElementById('confirm-ex-name').innerText.includes("Cluster")) {
+        // Clicked Start on Cluster Entry Screen
+        // Start first exercise
+        const firstExName = state.activeCluster.exercises[0].name;
+        // Proceed to setup
+        // Need to set up state.currentEx correctly
+        const exData = state.exercises.find(e => e.name === firstExName);
+        state.currentEx = JSON.parse(JSON.stringify(exData));
+        state.currentExName = exData.name;
+        if(state.activeCluster.exercises[0].restTime) state.currentEx.restTime = state.activeCluster.exercises[0].restTime;
+        
+        // Fall through to startRecording
+        // Set target sets to 1 for flow
+        resizeSets(1);
+        startRecording();
+        return;
+    }
+
+    if (!doEx) { 
+        state.log.push({ skip: true, exName: state.currentExName }); 
+        if(!state.clusterMode) state.completedExInSession.push(state.currentExName); 
+        finishCurrentExercise(); 
+        return; 
+    }
+    
+    let isMain = state.currentEx.isCalc; 
+    let targetSets = null;
+
+    if (!state.isFreestyle && !state.isExtraPhase && !state.isInterruption && !state.isArmPhase) {
+        if (state.clusterMode) {
+             targetSets = 1;
+             isMain = false;
+        } else {
+            const planItem = state.workouts[state.type][state.exIdx];
+            if (planItem) {
+                isMain = planItem.isMain;
+                targetSets = planItem.sets;
+            }
+        }
+    }
+
+    if (isMain) {
+        state.currentEx.isCalc = true; 
+        setupCalculatedEx(); 
+    } else {
+        if (targetSets && targetSets > 0) {
+            resizeSets(targetSets);
+        }
+        startRecording();
+    }
+}
+
+function resizeSets(count) {
+    // FIX: Try to preserve default reps from first set if possible, otherwise default to 10
+    const defaultReps = (state.currentEx.sets && state.currentEx.sets[0]) ? state.currentEx.sets[0].r : 10;
+    const defaultWeight = (state.currentEx.sets && state.currentEx.sets[0]) ? state.currentEx.sets[0].w : 10;
+    
+    state.currentEx.sets = Array(count).fill({w: defaultWeight, r: defaultReps});
+}
+
+function setupCalculatedEx() {
+    document.getElementById('rm-title').innerText = `${state.currentExName} 1RM`;
+    const lastRM = StorageManager.getLastRM(state.currentExName);
+    const baseRM = state.currentEx.baseRM || 50; 
+    const p = document.getElementById('rm-picker'); p.innerHTML = "";
+    const defaultRM = lastRM ? lastRM : baseRM;
+    for(let i = 20; i <= 200; i += 2.5) {
+        let o = new Option(i + " kg", i); if(i === defaultRM) o.selected = true; p.add(o);
+    }
+    navigate('ui-1rm');
+}
+
+function save1RM() {
+    state.rm = parseFloat(document.getElementById('rm-picker').value);
+    StorageManager.saveRM(state.currentExName, state.rm);
+    
+    let percentages = []; let reps = [];
+    
+    // SAFETY: Parse int to ensure week is treated as number
+    const w = parseInt(state.week);
+    
+    if (w === 1) { percentages = [0.65, 0.75, 0.85, 0.75, 0.65]; reps = [5, 5, 5, 8, 10]; } 
+    else if (w === 2) { percentages = [0.70, 0.80, 0.90, 0.80, 0.70, 0.70]; reps = [3, 3, 3, 8, 10, 10]; } 
+    else if (w === 3) { percentages = [0.75, 0.85, 0.95, 0.85, 0.75, 0.75]; reps = [5, 3, 1, 8, 10, 10]; }
+    else { 
+        // Fallback default (Treat like week 1) if data is corrupted
+        percentages = [0.65, 0.75, 0.85, 0.75, 0.65]; reps = [5, 5, 5, 8, 10]; 
+    }
+
+    state.currentEx.sets = percentages.map((pct, i) => ({ w: Math.round((state.rm * pct) / 2.5) * 2.5, r: reps[i] }));
+    startRecording();
+}
+
+function startRecording() { 
+    state.setIdx = 0; 
+    state.lastLoggedSet = null; // Clear last set for new exercise
+    document.getElementById('action-panel').style.display = 'none';
+    document.getElementById('btn-submit-set').style.display = 'block';
+    
+    StorageManager.saveSessionState(); // SAVE STATE
+    
+    navigate('ui-main'); 
+    initPickers(); 
+}
+
+function isUnilateral(exName) {
+    return unilateralKeywords.some(keyword => exName.includes(keyword));
+}
+
+function initPickers() {
+    document.getElementById('ex-display-name').innerText = state.currentExName;
+    
+    // Inject Cluster Queue if needed
+    const exHeader = document.querySelector('.exercise-header');
+    const existingQueue = document.querySelector('.cluster-queue-container');
+    if (existingQueue) existingQueue.remove();
+
+    if (state.clusterMode) {
+        const queueDiv = document.createElement('div');
+        queueDiv.className = 'cluster-queue-container';
+        let queueHtml = `<div class="queue-title">בהמשך הסבב:</div>`;
+        
+        let foundNext = false;
+        for (let i = state.clusterIdx + 1; i < state.activeCluster.exercises.length; i++) {
+            const exName = state.activeCluster.exercises[i].name;
+            const isNext = !foundNext;
+            queueHtml += `<div class="queue-item ${isNext ? 'next' : ''}">${isNext ? '• הבא: ' : ''}${exName}</div>`;
+            foundNext = true;
+        }
+        if (!foundNext) queueHtml += `<div class="queue-item">--- סוף סבב ---</div>`;
+        
+        queueDiv.innerHTML = queueHtml;
+        // Insert after header
+        exHeader.parentNode.insertBefore(queueDiv, exHeader.nextSibling);
+    }
+
+    // Badge Update
+    const badge = document.getElementById('set-counter');
+    if (state.clusterMode) {
+        badge.innerText = `ROUND ${state.clusterRound}/${state.activeCluster.rounds}`;
+        badge.style.background = "var(--type-free)";
+    } else {
+        badge.innerText = `SET ${state.setIdx + 1}/${state.currentEx.sets.length}`;
+        badge.style.background = "var(--accent)";
+    }
+
+    const target = state.currentEx.sets[state.setIdx];
+    document.getElementById('set-notes').value = '';
+    
+    // History
+    const hist = document.getElementById('last-set-info');
+    if (state.lastLoggedSet) {
+        hist.innerText = `סט אחרון: ${state.lastLoggedSet.w}kg x ${state.lastLoggedSet.r} (RIR ${state.lastLoggedSet.rir})`;
+        hist.style.display = 'block';
+    } else hist.style.display = 'none';
+    
+    document.getElementById('unilateral-note').style.display = isUnilateral(state.currentExName) ? 'block' : 'none';
+    document.getElementById('btn-warmup').style.display = (state.setIdx === 0 && !state.clusterMode && ["Squat", "Deadlift", "Bench", "Overhead"].some(k => state.currentExName.includes(k))) ? 'block' : 'none';
+    
+    // Timer visibility (Hide unless explicitly shown in standard flow, or active in cluster)
+    const timerArea = document.getElementById('timer-area');
+    // If we just arrived here in Cluster mode with a running timer
+    if (state.clusterMode && state.timerInterval) {
+        timerArea.style.visibility = 'visible';
+    } else if (state.setIdx > 0 && document.getElementById('action-panel').style.display === 'none') { 
+        timerArea.style.visibility = 'visible'; 
+        resetAndStartTimer(); 
+    } else { 
+        timerArea.style.visibility = 'hidden'; 
+        // Do not stop timer if cluster flow is active!
+        if (!state.clusterMode) stopRestTimer(); 
+    }
+
+    const skipBtn = document.getElementById('btn-skip-exercise');
+    skipBtn.style.display = (state.setIdx === 0) ? 'none' : 'block';
+
+    // Weights & Reps - FIX 1RM PRIORITY
+    const wPick = document.getElementById('weight-picker'); wPick.innerHTML = "";
+    const step = state.currentEx.step || 2.5;
+    const savedWeight = StorageManager.getLastWeight(state.currentExName);
+    
+    let defaultW;
+    if (state.currentEx.isCalc) {
+        defaultW = target.w; // Priority to calculated weight
+    } else {
+        defaultW = state.lastLoggedSet ? state.lastLoggedSet.w : (state.setIdx === 0 && savedWeight ? savedWeight : (target ? target.w : 0));
+    }
+    
+    let minW = Math.max(0, defaultW - 40); 
+    let maxW = defaultW + 50;
+    if (state.currentEx.minW !== undefined) minW = Math.max(state.currentEx.minW, minW);
+    
+    for(let i = minW; i <= maxW; i = parseFloat((i + step).toFixed(2))) {
+        let o = new Option(i + " kg", i); if(i === defaultW) o.selected = true; wPick.add(o);
+    }
+    
+    // --- 1RM FIX: Logic for default Reps ---
+    const rPick = document.getElementById('reps-picker'); rPick.innerHTML = "";
+    
+    let currentR;
+    if (state.currentEx.isCalc) {
+        // If Calculated/Main: Use TARGET reps (ignore last set history)
+        currentR = target ? target.r : 5;
+    } else {
+        // If Regular: Use Last Set (if exists) for comfort, else target
+        currentR = state.lastLoggedSet ? state.lastLoggedSet.r : (target ? target.r : 8);
+    }
+    
+    for(let i = 1; i <= 30; i++) { let o = new Option(i, i); if(i === currentR) o.selected = true; rPick.add(o); }
+    
+    const rirPick = document.getElementById('rir-picker'); rirPick.innerHTML = "";
+    [0, 0.5, 1, 1.5, 2, 2.5, 3, 4, 5].forEach(v => {
+        let o = new Option(v === 0 ? "Fail" : v, v); if(v === 2) o.selected = true; rirPick.add(o);
+    });
+}
+
+// --- TIMER LOGIC ---
+
+function resetAndStartTimer(customTime = null) {
+    stopRestTimer(); state.seconds = 0; state.startTime = Date.now();
+    
+    let target = 90;
+    if (customTime !== null) {
+        target = customTime;
+    } else {
+        if (state.currentEx.restTime) {
+            target = state.currentEx.restTime;
+        } else {
+             target = (state.exIdx === 0 && !state.clusterMode && !state.isArmPhase) ? 120 : 90;
+        }
+    }
+    
+    const circle = document.getElementById('timer-progress'); 
+    const text = document.getElementById('rest-timer');
+    const clusterBar = document.getElementById('cluster-timer-bar');
+    const clusterText = document.getElementById('cluster-timer-text');
+
+    const updateUI = (mins, secs, progress) => {
+        if(text) text.innerText = `${mins}:${secs}`;
+        if(circle) circle.style.strokeDashoffset = 283 - (progress * 283);
+        
+        if(clusterText) clusterText.innerText = `${mins}:${secs}`;
+        if(clusterBar) clusterBar.style.strokeDashoffset = 283 - (progress * 283);
+    };
+
+    state.timerInterval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - state.startTime) / 1000);
+        state.seconds = elapsed;
+        const mins = Math.floor(state.seconds / 60).toString().padStart(2, '0');
+        const secs = (state.seconds % 60).toString().padStart(2, '0');
+        const progress = Math.min(state.seconds / target, 1);
+        
+        updateUI(mins, secs, progress);
+        
+        if (state.seconds === target) playBeep(2);
+    }, 100); 
+}
+
+function stopRestTimer() { if (state.timerInterval) { clearInterval(state.timerInterval); state.timerInterval = null; } }
+
+function nextStep() {
+    haptic('light');
+    const wVal = parseFloat(document.getElementById('weight-picker').value);
+    const noteVal = document.getElementById('set-notes').value.trim();
+    const entry = { exName: state.currentExName, w: wVal, r: parseInt(document.getElementById('reps-picker').value), rir: document.getElementById('rir-picker').value, note: noteVal };
+    StorageManager.saveWeight(state.currentExName, wVal);
+    state.log.push(entry); state.lastLoggedSet = entry;
+
+    StorageManager.saveSessionState(); // SAVE STATE
+
+    // --- CLUSTER FLOW LOGIC (Instant Transition) ---
+    if (state.clusterMode) {
+        // Store current rest time before switching
+        state.lastClusterRest = state.currentEx.restTime || 30;
+
+        // Is there another exercise in this round?
+        if (state.clusterIdx < state.activeCluster.exercises.length - 1) {
+            // YES: Switch immediately
+            state.clusterIdx++;
+            const nextExName = state.activeCluster.exercises[state.clusterIdx].name;
+            const exData = state.exercises.find(e => e.name === nextExName);
+            
+            // Set up next exercise
+            state.currentEx = JSON.parse(JSON.stringify(exData));
+            state.currentExName = exData.name;
+            if(state.activeCluster.exercises[state.clusterIdx].restTime) state.currentEx.restTime = state.activeCluster.exercises[state.clusterIdx].restTime;
+            state.currentEx.sets = [{w:10, r:10}]; // Dummy set structure
+            
+            // Reset state for new exercise input
+            state.setIdx = 0;
+            state.lastLoggedSet = null; // Important: Clear visual history of previous different exercise
+            
+            // Re-render UI
+            initPickers();
+            
+            // Start Timer (using previous exercise rest time)
+            document.getElementById('timer-area').style.visibility = 'visible';
+            resetAndStartTimer(state.lastClusterRest);
+            
+            return; // EXIT FUNCTION, Stay in ui-main
+        } else {
+            // End of round exercises.
+            // FIX: If this is the last exercise of the round, finish immediately! No action panel.
+             finishCurrentExercise();
+             return;
+        }
+    }
+
+    if (state.setIdx < state.currentEx.sets.length - 1) { 
+        state.setIdx++; 
+        initPickers(); 
+        // In-set timer (Regular mode)
+        document.getElementById('timer-area').style.visibility = 'visible'; 
+        resetAndStartTimer();
+    } else { 
+        haptic('medium'); 
+        document.getElementById('btn-submit-set').style.display = 'none';
+        document.getElementById('btn-skip-exercise').style.display = 'none';
+        
+        document.getElementById('action-panel').style.display = 'block';
+        
+        let nextName = getNextExerciseName();
+        document.getElementById('next-ex-preview').innerText = `הבא בתור: ${nextName}`;
+        
+        // --- FIX: NO TIMER IN STANDARD ACTION PANEL ---
+        if (!state.clusterMode) {
+            document.getElementById('timer-area').style.visibility = 'hidden';
+            stopRestTimer();
+        }
+    }
+}
+
+function getNextExerciseName() {
+    if (state.isInterruption) return "חזרה למסלול";
+    if (state.isExtraPhase) return "תרגיל נוסף";
+    if (state.isArmPhase) return "ידיים";
+    if (state.exIdx < state.workouts[state.type].length - 1) return state.workouts[state.type][state.exIdx + 1].name;
+    return "סיום אימון";
+}
+
+function finishCurrentExercise() {
+    state.historyStack = state.historyStack.filter(s => s !== 'ui-main');
+    
+    StorageManager.saveSessionState(); // SAVE STATE
+
+    if (state.clusterMode) {
+        handleClusterFlow();
+    } else {
+        if (!state.completedExInSession.includes(state.currentExName)) state.completedExInSession.push(state.currentExName);
+        
+        if (state.isInterruption) { state.isInterruption = false; navigate('ui-confirm'); } 
+        else if (state.isExtraPhase) { navigate('ui-ask-extra'); } 
+        else if (state.isArmPhase) { showArmSelection(); } 
+        else if (state.isFreestyle) { showExerciseList(state.currentMuscle); } 
+        else { checkFlow(); }
+    }
+}
+
+function handleClusterFlow() {
+    // If we are here, it means we finished the last exercise of the round (via nextStep branching)
+    navigate('ui-cluster-rest');
+    
+    const btnMain = document.getElementById('btn-cluster-main');
+    const btnSkip = document.getElementById('btn-cluster-skip-text');
+        
+    if (state.clusterRound < state.activeCluster.rounds) {
+        document.getElementById('cluster-status-text').innerText = `סיום סבב ${state.clusterRound} מתוך ${state.activeCluster.rounds}`;
+        document.getElementById('btn-extra-round').style.display = 'none';
+        
+        // Normal Flow Buttons
+        btnMain.innerText = "התחל סבב הבא";
+        btnMain.onclick = startNextRound;
+        btnSkip.style.display = 'block';
+        
+        resetAndStartTimer(state.activeCluster.clusterRest);
+    } else {
+        document.getElementById('cluster-status-text').innerText = `הסבבים הושלמו (${state.activeCluster.rounds})`;
+        document.getElementById('btn-extra-round').style.display = 'block';
+        stopRestTimer();
+        document.getElementById('cluster-timer-text').innerText = "✓";
+        
+        // Finish Flow Buttons
+        btnMain.innerText = "סיום";
+        btnMain.onclick = finishCluster;
+        btnSkip.style.display = 'none'; // Hide red button
+    }
+    
+    const listDiv = document.getElementById('cluster-next-list');
+    listDiv.innerHTML = state.activeCluster.exercises.map((e,i) => `<div>${i+1}. ${e.name}</div>`).join('');
+}
+
+function startNextRound() {
+    state.clusterRound++;
+    state.clusterIdx = 0;
+    stopRestTimer();
+    
+    // Jump straight to first exercise of next round (similar to Instant Transition)
+    const nextExName = state.activeCluster.exercises[0].name;
+    const exData = state.exercises.find(e => e.name === nextExName);
+    
+    state.currentEx = JSON.parse(JSON.stringify(exData));
+    state.currentExName = exData.name;
+    if(state.activeCluster.exercises[0].restTime) state.currentEx.restTime = state.activeCluster.exercises[0].restTime;
+    
+    state.currentEx.sets = [{w:10, r:10}];
+    
+    // Manual setup like confirmExercise(true)
+    startRecording();
+}
+
+function addExtraRound() {
+    state.activeCluster.rounds++;
+    // Re-render rest screen logic
+    handleClusterFlow();
+}
+
+function finishCluster() {
+    state.clusterMode = false;
+    state.activeCluster = null;
+    state.exIdx++; 
+    checkFlow();
+}
+
+// --- STANDARD FUNCTIONS ---
+
+function skipCurrentExercise() {
+    if(confirm("לדלג על תרגיל זה ולעבור לבא?")) {
+        state.log.push({ skip: true, exName: state.currentExName });
+        finishCurrentExercise();
+    }
+}
+
+function addExtraSet() {
+    state.setIdx++;
+    state.currentEx.sets.push({...state.currentEx.sets[state.setIdx-1]});
+    document.getElementById('action-panel').style.display = 'none';
+    document.getElementById('btn-submit-set').style.display = 'block';
+    initPickers();
+    document.getElementById('timer-area').style.visibility = 'visible'; 
+    resetAndStartTimer();
+}
+
+function interruptWorkout() {
+    state.isInterruption = true;
+    document.getElementById('btn-resume-flow').style.display = 'flex';
+    document.getElementById('btn-finish-extra').style.display = 'none';
+    navigate('ui-muscle-select');
+}
+
+function resumeWorkout() { state.isInterruption = false; navigate('ui-confirm'); }
+function startExtraPhase() { state.isExtraPhase = true; document.getElementById('btn-resume-flow').style.display = 'none'; document.getElementById('btn-finish-extra').style.display = 'block'; navigate('ui-muscle-select'); }
+function finishExtraPhase() { navigate('ui-ask-arms'); }
 
 function startFreestyle() {
     state.type = 'Freestyle'; state.log = []; state.completedExInSession = [];
@@ -707,19 +1592,19 @@ function startFreestyle() {
     state.workoutStartTime = Date.now();
     document.getElementById('btn-resume-flow').style.display = 'none';
     document.getElementById('btn-finish-extra').style.display = 'none';
+    
+    StorageManager.saveSessionState(); // SAVE STATE
+    
     navigate('ui-muscle-select');
 }
 
 function showExerciseList(muscle) {
     state.currentMuscle = muscle;
     state.freestyleFilter = 'all'; 
-
     const chipContainer = document.getElementById('variation-chips');
     chipContainer.style.display = 'none';
     chipContainer.innerHTML = '';
-    
     document.getElementById('variation-title').innerText = `תרגילי ${muscle}`;
-    
     const options = document.getElementById('variation-options');
     options.innerHTML = "";
 
@@ -729,7 +1614,6 @@ function showExerciseList(muscle) {
         backBtn.style.color = "var(--accent)";
         backBtn.style.textAlign = "right";
         backBtn.style.marginBottom = "10px";
-        backBtn.style.padding = "5px";
         backBtn.innerText = "חזור לבחירת קבוצת שריר";
         backBtn.onclick = () => navigate('ui-muscle-select'); 
         options.appendChild(backBtn);
@@ -750,21 +1634,12 @@ function showExerciseList(muscle) {
 function renderFreestyleChips(filters, mainMuscle) {
     const container = document.getElementById('variation-chips');
     container.innerHTML = "";
-    
-    const labels = {
-        'all': 'הכל', 'quads': 'ארבע ראשי', 'hamstrings': 'ירך אחורית', 'calves': 'תאומים',
-        'biceps': 'יד קדמית', 'triceps': 'יד אחורית'
-    };
-
+    const labels = { 'all': 'הכל', 'quads': 'ארבע ראשי', 'hamstrings': 'ירך אחורית', 'calves': 'תאומים', 'biceps': 'יד קדמית', 'triceps': 'יד אחורית' };
     filters.forEach(f => {
         const btn = document.createElement('button');
         btn.className = `chip ${state.freestyleFilter === f ? 'active' : ''}`;
         btn.innerText = labels[f] || f;
-        btn.onclick = () => {
-            state.freestyleFilter = f;
-            renderFreestyleChips(filters, mainMuscle); 
-            renderFreestyleList(); 
-        };
+        btn.onclick = () => { state.freestyleFilter = f; renderFreestyleChips(filters, mainMuscle); renderFreestyleList(); };
         container.appendChild(btn);
     });
 }
@@ -774,489 +1649,20 @@ function renderFreestyleList() {
     const backBtn = options.querySelector('.btn-text');
     options.innerHTML = "";
     if(backBtn) options.appendChild(backBtn);
-
-    let filtered = state.exercises.filter(ex => 
-        ex.muscles.includes(state.currentMuscle) && 
-        !state.completedExInSession.includes(ex.name)
-    );
-
-    if (state.freestyleFilter !== 'all') {
-        filtered = filtered.filter(ex => ex.muscles.includes(state.freestyleFilter));
-    }
-
+    let filtered = state.exercises.filter(ex => ex.muscles.includes(state.currentMuscle) && !state.completedExInSession.includes(ex.name));
+    if (state.freestyleFilter !== 'all') filtered = filtered.filter(ex => ex.muscles.includes(state.freestyleFilter));
     filtered.forEach(ex => {
-        const btn = document.createElement('button');
-        btn.className = "menu-card";
+        const btn = document.createElement('button'); btn.className = "menu-card";
         btn.innerHTML = `<span>${ex.name}</span><div class="chevron"></div>`;
         btn.onclick = () => {
             state.currentEx = JSON.parse(JSON.stringify(ex));
             state.currentExName = ex.name;
-            
-            if(!state.currentEx.sets || state.currentEx.sets.length < 3) {
-                 state.currentEx.sets = [{w:10, r:10}, {w:10, r:10}, {w:10, r:10}];
-            }
-            if (state.currentEx.isCalc) {
-                state.currentEx.sets = Array(3).fill({w: state.currentEx.manualRange.base, r: 8});
-                state.currentEx.step = state.currentEx.manualRange.step;
-            }
+            if(!state.currentEx.sets || state.currentEx.sets.length < 3) state.currentEx.sets = [{w:10, r:10}, {w:10, r:10}, {w:10, r:10}];
             startRecording();
         };
         options.appendChild(btn);
     });
 }
-
-function getLastPerformance(exName) {
-    const archive = StorageManager.getArchive();
-    for (const item of archive) {
-        if (item.details && item.details[exName]) {
-            return {
-                date: item.date,
-                sets: item.details[exName].sets
-            };
-        }
-    }
-    return null;
-}
-
-function showConfirmScreen(forceExName = null) {
-    let exName = forceExName;
-    let currentPlanItem = null;
-
-    if (!exName) {
-        currentPlanItem = state.workouts[state.type][state.exIdx];
-        exName = currentPlanItem.name;
-    }
-    
-    const exData = state.exercises.find(e => e.name === exName);
-    if (!exData) {
-        alert("שגיאה: התרגיל לא נמצא במאגר (אולי נמחק?).");
-        return;
-    }
-
-    state.currentEx = JSON.parse(JSON.stringify(exData));
-    state.currentExName = exData.name;
-    document.getElementById('confirm-ex-name').innerText = exData.name;
-    
-    const configDiv = document.getElementById('confirm-ex-config');
-    if (currentPlanItem) {
-        if (currentPlanItem.isMain) {
-            configDiv.innerHTML = "MAIN (מחושב 1RM)";
-        } else {
-            configDiv.innerHTML = `תוכנית: ${currentPlanItem.sets} סטים`;
-        }
-        configDiv.style.display = 'block';
-    } else {
-        configDiv.style.display = 'none';
-    }
-
-    const intBtn = document.getElementById('btn-interruption');
-    if (intBtn) intBtn.style.display = (state.exIdx > 0) ? 'flex' : 'none';
-    const swapBtn = document.getElementById('btn-swap-confirm');
-    if (!state.isFreestyle && !state.isExtraPhase && !state.isInterruption && !state.isArmPhase) {
-        swapBtn.style.display = 'flex';
-    } else {
-        swapBtn.style.display = 'none';
-    }
-
-    const historyContainer = document.getElementById('history-container');
-    historyContainer.innerHTML = "";
-    
-    const history = getLastPerformance(exName);
-    if (history) {
-        let historyListHtml = "";
-        history.sets.forEach((setStr, idx) => {
-            let w = "", r = "", rir = "";
-            try {
-                const parts = setStr.split('x');
-                w = parts[0] ? parts[0].trim() : "-";
-                if (parts[1]) {
-                    const sub = parts[1].split('(');
-                    r = sub[0].trim();
-                    if (sub[1]) {
-                        rir = sub[1].replace(')', '').trim(); 
-                    }
-                }
-            } catch (e) { w = setStr; }
-
-            historyListHtml += `
-            <div class="history-item">
-                <span style="color:var(--text-dim); font-size:0.9em; width:30px;">#${idx + 1}</span>
-                <span style="font-weight:600; color:white; flex:1; text-align:center;">${w}</span>
-                <span style="font-weight:600; color:white; flex:1; text-align:center;">${r}</span>
-                <span style="font-size:0.8em; color:var(--accent); width:60px; text-align:left;">${rir}</span>
-            </div>`;
-        });
-
-        const historyCard = `
-            <div class="glass-card compact" style="width:100%; box-sizing:border-box; padding: 15px;">
-                <div style="font-size:0.85em; color:var(--text-dim); margin-bottom:10px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:8px; text-align:right;">
-                    📅 ביצוע אחרון: ${history.date}
-                </div>
-                <div class="history-list">
-                    ${historyListHtml}
-                </div>
-            </div>
-        `;
-        historyContainer.innerHTML = historyCard;
-    }
-
-    navigate('ui-confirm');
-}
-
-function confirmExercise(doEx) {
-    if (!doEx) { state.log.push({ skip: true, exName: state.currentExName }); state.completedExInSession.push(state.currentExName); checkFlow(); return; }
-    
-    let isMain = state.currentEx.isCalc; 
-    let targetSets = null;
-
-    if (!state.isFreestyle && !state.isExtraPhase && !state.isInterruption && !state.isArmPhase) {
-        const planItem = state.workouts[state.type][state.exIdx];
-        if (planItem) {
-            isMain = planItem.isMain;
-            targetSets = planItem.sets;
-        }
-    }
-
-    if (isMain) {
-        state.currentEx.isCalc = true; 
-        setupCalculatedEx(); 
-    } else {
-        if (targetSets && targetSets > 0) {
-            resizeSets(targetSets);
-        }
-        startRecording();
-    }
-}
-
-function resizeSets(count) {
-    const currentSets = state.currentEx.sets;
-    const templateSet = currentSets.length > 0 ? currentSets[currentSets.length - 1] : {w: 10, r: 10};
-    
-    if (count > currentSets.length) {
-        while (currentSets.length < count) {
-            currentSets.push({...templateSet});
-        }
-    } else if (count < currentSets.length) {
-        state.currentEx.sets = currentSets.slice(0, count);
-    }
-}
-
-function setupCalculatedEx() {
-    document.getElementById('rm-title').innerText = `${state.currentExName} 1RM`;
-    const lastRM = StorageManager.getLastRM(state.currentExName);
-    
-    const baseRM = state.currentEx.baseRM || 50; 
-    const rmRange = state.currentEx.rmRange || [20, 150]; 
-    
-    const defaultRM = lastRM ? lastRM : baseRM;
-    const minRM = rmRange[0];
-    const maxRM = rmRange[1];
-    
-    const p = document.getElementById('rm-picker'); p.innerHTML = "";
-    for(let i = minRM; i <= maxRM; i += 2.5) {
-        let o = new Option(i + " kg", i); if(i === defaultRM) o.selected = true; p.add(o);
-    }
-    navigate('ui-1rm');
-}
-
-function save1RM() {
-    state.rm = parseFloat(document.getElementById('rm-picker').value);
-    StorageManager.saveRM(state.currentExName, state.rm);
-    let percentages = []; let reps = [];
-    if (state.week === 1) { percentages = [0.65, 0.75, 0.85, 0.75, 0.65]; reps = [5, 5, 5, 8, 10]; } 
-    else if (state.week === 2) { percentages = [0.70, 0.80, 0.90, 0.80, 0.70, 0.70]; reps = [3, 3, 3, 8, 10, 10]; } 
-    else if (state.week === 3) { percentages = [0.75, 0.85, 0.95, 0.85, 0.75, 0.75]; reps = [5, 3, 1, 8, 10, 10]; }
-    state.currentEx.sets = percentages.map((pct, i) => ({ w: Math.round((state.rm * pct) / 2.5) * 2.5, r: reps[i] }));
-    startRecording();
-}
-
-function startRecording() { 
-    state.setIdx = 0; 
-    state.lastLoggedSet = null; 
-    document.getElementById('action-panel').style.display = 'none';
-    document.getElementById('btn-submit-set').style.display = 'block';
-    navigate('ui-main'); 
-    initPickers(); 
-}
-
-function isUnilateral(exName) {
-    return unilateralKeywords.some(keyword => exName.includes(keyword));
-}
-
-function initPickers() {
-    const target = state.currentEx.sets[state.setIdx];
-    document.getElementById('ex-display-name').innerText = state.currentExName;
-    document.getElementById('set-counter').innerText = `SET ${state.setIdx + 1}/${state.currentEx.sets.length}`;
-    document.getElementById('set-notes').value = '';
-    const hist = document.getElementById('last-set-info');
-    if (state.lastLoggedSet) {
-        hist.innerText = `סט אחרון: ${state.lastLoggedSet.w}kg x ${state.lastLoggedSet.r} (RIR ${state.lastLoggedSet.rir})`;
-        hist.style.display = 'block';
-    } else hist.style.display = 'none';
-    
-    const isUni = isUnilateral(state.currentExName);
-    document.getElementById('unilateral-note').style.display = isUni ? 'block' : 'none';
-    
-    const isHeavy = ["Squat", "Deadlift", "Bench Press", "Overhead Press"].some(k => state.currentExName.includes(k));
-    const btnWarmup = document.getElementById('btn-warmup');
-    btnWarmup.style.display = (state.setIdx === 0 && isHeavy) ? 'block' : 'none';
-    
-    const timerArea = document.getElementById('timer-area');
-    if (state.setIdx > 0 && document.getElementById('action-panel').style.display === 'none') { 
-        timerArea.style.visibility = 'visible'; 
-        resetAndStartTimer(); 
-    } else { 
-        timerArea.style.visibility = 'hidden'; 
-        stopRestTimer(); 
-    }
-
-    const skipBtn = document.getElementById('btn-skip-exercise');
-    skipBtn.style.display = (state.setIdx === 0) ? 'none' : 'block';
-
-    const wPick = document.getElementById('weight-picker'); wPick.innerHTML = "";
-    const step = state.currentEx.step || 2.5;
-    const savedWeight = StorageManager.getLastWeight(state.currentExName);
-    let defaultW; let currentR;
-    if (state.currentEx.isCalc && target) { defaultW = target.w; currentR = target.r; } 
-    else {
-        defaultW = state.lastLoggedSet ? state.lastLoggedSet.w : (state.setIdx === 0 && savedWeight ? savedWeight : (target ? target.w : 0));
-        currentR = state.lastLoggedSet ? state.lastLoggedSet.r : (target ? target.r : 8);
-    }
-    
-    let minW = Math.max(0, defaultW - 40); 
-    let maxW = defaultW + 50;
-
-    if (state.currentEx.minW !== undefined) minW = Math.max(state.currentEx.minW, minW);
-    if (state.currentEx.maxW !== undefined) maxW = Math.min(state.currentEx.maxW, maxW);
-    
-    if (defaultW < minW) minW = defaultW;
-    if (defaultW > maxW) maxW = defaultW;
-
-    for(let i = minW; i <= maxW; i = parseFloat((i + step).toFixed(2))) {
-        let o = new Option(i + " kg", i); if(i === defaultW) o.selected = true; wPick.add(o);
-    }
-    const rPick = document.getElementById('reps-picker'); rPick.innerHTML = "";
-    for(let i = 1; i <= 30; i++) { let o = new Option(i, i); if(i === currentR) o.selected = true; rPick.add(o); }
-    const rirPick = document.getElementById('rir-picker'); rirPick.innerHTML = "";
-    [0, 0.5, 1, 1.5, 2, 2.5, 3, 4, 5].forEach(v => {
-        let o = new Option(v === 0 ? "Fail" : v, v); if(v === 2) o.selected = true; rirPick.add(o);
-    });
-}
-
-function calcWarmup() {
-    const targetW = parseFloat(document.getElementById('weight-picker').value);
-    const list = document.getElementById('warmup-list'); list.innerHTML = "";
-    const percentages = [0, 0.4, 0.6, 0.8];
-    percentages.forEach((pct, idx) => {
-        let w; let reps;
-        if(idx === 0) { w = 20; reps = 10; }
-        else {
-            w = Math.round((targetW * pct) / 2.5) * 2.5;
-            if (w < 20) w = 20;
-            reps = idx === 1 ? 5 : (idx === 2 ? 3 : 2);
-        }
-        if (w >= targetW) return;
-        const row = document.createElement('div'); row.className = "warmup-row";
-        row.innerHTML = `<span>סט ${idx + 1}</span><span>${w}kg x ${reps}</span>`;
-        list.appendChild(row);
-    });
-    document.getElementById('warmup-modal').style.display = 'flex';
-}
-
-function closeWarmup() { document.getElementById('warmup-modal').style.display = 'none'; }
-function markWarmupDone() { state.log.push({ exName: state.currentExName, isWarmup: true }); closeWarmup(); }
-
-// --- SWAP MENU (CLEAN UI) ---
-function openSwapMenu() {
-    const container = document.getElementById('swap-container'); 
-    container.innerHTML = "";
-    
-    const workoutList = state.workouts[state.type]; if (!workoutList) return;
-
-    // 1. VARIATIONS
-    const variations = getSubstitutes(state.currentExName).filter(name => !state.completedExInSession.includes(name));
-    
-    if (variations.length > 0) {
-        const titleVar = document.createElement('div');
-        titleVar.className = "section-label";
-        titleVar.innerText = `וריאציות (מחליף את הנוכחי)`;
-        container.appendChild(titleVar);
-
-        variations.forEach(vName => {
-            const btn = document.createElement('button'); 
-            btn.className = "menu-card"; 
-            btn.innerHTML = `<span>${vName}</span><div class="chevron"></div>`;
-            btn.onclick = () => {
-                const newExData = state.exercises.find(e => e.name === vName);
-                if (newExData) {
-                    state.currentExName = vName;
-                    showConfirmScreen(vName);
-                }
-            };
-            container.appendChild(btn);
-        });
-    }
-
-    // 2. REORDER
-    const titleOrder = document.createElement('div');
-    titleOrder.className = "section-label";
-    titleOrder.innerText = `שאר האימון (שינוי סדר)`;
-    titleOrder.style.marginTop = "20px";
-    container.appendChild(titleOrder);
-
-    // FIXED LOGIC: Filter out any exercise OR its variations that are already done
-    const remaining = workoutList.filter(item => {
-        const isDone = isExOrVariationDone(item.name);
-        const isCurrent = item.name === state.currentExName;
-        return !isDone && !isCurrent;
-    });
-    
-    if (remaining.length === 0) {
-        const empty = document.createElement('p');
-        empty.style.textAlign = 'center';
-        empty.style.color = 'var(--text-dim)';
-        empty.innerText = 'אין תרגילים נוספים להחלפה';
-        container.appendChild(empty);
-    } else {
-        remaining.forEach(item => {
-            const btn = document.createElement('button'); 
-            btn.className = "menu-card"; 
-            btn.innerHTML = `<span>${item.name}</span><div class="chevron"></div>`;
-            btn.onclick = () => { 
-                state.exIdx = state.workouts[state.type].findIndex(x => x.name === item.name); 
-                showConfirmScreen(); 
-            };
-            container.appendChild(btn);
-        });
-    }
-
-    navigate('ui-swap-list');
-}
-
-function resetAndStartTimer() {
-    stopRestTimer(); state.seconds = 0; state.startTime = Date.now();
-    const target = (state.exIdx === 0 && !state.isArmPhase && !state.isFreestyle && !state.isExtraPhase && !state.isInterruption) ? 120 : 90;
-    const circle = document.getElementById('timer-progress'); const text = document.getElementById('rest-timer');
-    text.innerText = "00:00"; circle.style.strokeDashoffset = 283;
-    state.timerInterval = setInterval(() => {
-        const elapsed = Math.floor((Date.now() - state.startTime) / 1000);
-        state.seconds = elapsed;
-        const mins = Math.floor(state.seconds / 60).toString().padStart(2, '0');
-        const secs = (state.seconds % 60).toString().padStart(2, '0');
-        text.innerText = `${mins}:${secs}`;
-        const progress = Math.min(state.seconds / target, 1);
-        circle.style.strokeDashoffset = 283 - (progress * 283);
-        if (state.seconds === target) playBeep(2);
-    }, 100); 
-}
-
-function stopRestTimer() { if (state.timerInterval) { clearInterval(state.timerInterval); state.timerInterval = null; } }
-
-function getNextExerciseName() {
-    if (state.isInterruption) return "חזרה למסלול המקורי";
-    if (state.isExtraPhase) return "בחירת תרגיל נוסף";
-    if (state.isArmPhase) return "תרגיל ידיים הבא / סיום";
-
-    const workoutList = state.workouts[state.type];
-    if (!workoutList) return "סיום אימון";
-
-    for (let i = 0; i < workoutList.length; i++) {
-        const defaultName = workoutList[i].name;
-        // Fixed: Check variations too
-        if (!isExOrVariationDone(defaultName) && defaultName !== state.currentExName) {
-             if (i > state.exIdx) return defaultName; 
-        }
-    }
-    if (state.exIdx < workoutList.length - 1) {
-         return workoutList[state.exIdx + 1].name;
-    }
-    return "סיום אימון / תוספות";
-}
-
-function nextStep() {
-    haptic('light');
-    const wVal = parseFloat(document.getElementById('weight-picker').value);
-    const noteVal = document.getElementById('set-notes').value.trim();
-    const entry = { exName: state.currentExName, w: wVal, r: parseInt(document.getElementById('reps-picker').value), rir: document.getElementById('rir-picker').value, note: noteVal };
-    StorageManager.saveWeight(state.currentExName, wVal);
-    state.log.push(entry); state.lastLoggedSet = entry;
-
-    if (state.setIdx < state.currentEx.sets.length - 1) { 
-        state.setIdx++; 
-        initPickers(); 
-    } else { 
-        haptic('medium'); 
-        document.getElementById('btn-submit-set').style.display = 'none';
-        document.getElementById('btn-skip-exercise').style.display = 'none';
-        
-        document.getElementById('action-panel').style.display = 'block';
-        const nextName = getNextExerciseName();
-        document.getElementById('next-ex-preview').innerText = `הבא בתור: ${nextName}`;
-        stopRestTimer();
-        document.getElementById('timer-area').style.visibility = 'hidden';
-    }
-}
-
-function skipCurrentExercise() {
-    if(confirm("לדלג על תרגיל זה ולעבור לבא?")) {
-        state.log.push({ skip: true, exName: state.currentExName });
-        finishCurrentExercise();
-    }
-}
-
-function addExtraSet() {
-    state.setIdx++;
-    state.currentEx.sets.push({...state.currentEx.sets[state.setIdx-1]});
-    document.getElementById('action-panel').style.display = 'none';
-    document.getElementById('btn-submit-set').style.display = 'block';
-    initPickers();
-    document.getElementById('timer-area').style.visibility = 'visible'; 
-    resetAndStartTimer();
-}
-
-function finishCurrentExercise() {
-    state.historyStack = state.historyStack.filter(s => s !== 'ui-main');
-    if (!state.completedExInSession.includes(state.currentExName)) state.completedExInSession.push(state.currentExName);
-    
-    if (state.isInterruption) { state.isInterruption = false; navigate('ui-confirm'); } 
-    else if (state.isExtraPhase) { navigate('ui-ask-extra'); } 
-    else if (state.isArmPhase) { showArmSelection(); } 
-    else if (state.isFreestyle) { showExerciseList(state.currentMuscle); } 
-    else { checkFlow(); }
-}
-
-function checkFlow() {
-    const workoutList = state.workouts[state.type];
-    let foundNext = false;
-
-    for (let i = 0; i < workoutList.length; i++) {
-        const defaultName = workoutList[i].name;
-        // Fixed: Check variations too
-        const isDone = isExOrVariationDone(defaultName);
-
-        if (!isDone) {
-            state.exIdx = i;
-            showConfirmScreen();
-            foundNext = true;
-            break;
-        }
-    }
-
-    if (!foundNext) {
-        navigate('ui-ask-extra');
-    }
-}
-
-function interruptWorkout() {
-    state.isInterruption = true;
-    document.getElementById('btn-resume-flow').style.display = 'flex';
-    document.getElementById('btn-finish-extra').style.display = 'none';
-    navigate('ui-muscle-select');
-}
-
-function resumeWorkout() { state.isInterruption = false; navigate('ui-confirm'); }
-function startExtraPhase() { state.isExtraPhase = true; document.getElementById('btn-resume-flow').style.display = 'none'; document.getElementById('btn-finish-extra').style.display = 'block'; navigate('ui-muscle-select'); }
-function finishExtraPhase() { navigate('ui-ask-arms'); }
 
 function startArmWorkout() { 
     state.isArmPhase = true; 
@@ -1299,38 +1705,31 @@ function showArmSelection() {
 
 function finish() {
     haptic('success');
+    StorageManager.clearSessionState(); // CLEAR SESSION
+
     state.workoutDurationMins = Math.floor((Date.now() - state.workoutStartTime) / 60000);
     navigate('ui-summary');
-    
     document.getElementById('summary-note').value = "";
-    
     const workoutDisplayName = state.type; 
     const dateStr = new Date().toLocaleDateString('he-IL');
-    // Added Week number to summary header
     let summaryText = `GYMPRO ELITE SUMMARY\n${workoutDisplayName} | Week ${state.week} | ${dateStr} | ${state.workoutDurationMins}m\n\n`;
     let grouped = {};
-    
     state.log.forEach(e => {
         if (!grouped[e.exName]) grouped[e.exName] = { sets: [], vol: 0, hasWarmup: false };
         if (e.isWarmup) grouped[e.exName].hasWarmup = true;
         else if (!e.skip) {
             let weightStr = `${e.w}kg`;
-            if (isUnilateral(e.exName)) {
-                weightStr += ` (יד אחת)`;
-            }
-
+            if (isUnilateral(e.exName)) weightStr += ` (יד אחת)`;
             let setStr = `${weightStr} x ${e.r} (RIR ${e.rir})`;
             if (e.note) setStr += ` | Note: ${e.note}`;
             grouped[e.exName].sets.push(setStr); grouped[e.exName].vol += (e.w * e.r);
         }
     });
-
     for (let ex in grouped) { 
         summaryText += `${ex} (Vol: ${grouped[ex].vol}kg):\n`;
         if (grouped[ex].hasWarmup) summaryText += `🔥 Warmup Completed\n`;
         summaryText += `${grouped[ex].sets.join('\n')}\n\n`; 
     }
-    
     document.getElementById('summary-area').innerText = summaryText.trim();
     state.lastWorkoutDetails = grouped;
 }
@@ -1338,46 +1737,14 @@ function finish() {
 function copyResult() {
     let text = document.getElementById('summary-area').innerText;
     const userNote = document.getElementById('summary-note').value.trim();
-    if (userNote) {
-        text += `\n\n📝 הערות כלליות: ${userNote}`;
-    }
-
+    if (userNote) text += `\n\n📝 הערות כלליות: ${userNote}`;
     const workoutDisplayName = state.type;
     const dateStr = new Date().toLocaleDateString('he-IL');
-    
-    const archiveObj = { 
-        id: Date.now(), 
-        date: dateStr, 
-        timestamp: Date.now(), 
-        type: workoutDisplayName, 
-        week: state.week, // Added week logging
-        duration: state.workoutDurationMins, 
-        summary: text, 
-        details: state.lastWorkoutDetails, 
-        generalNote: userNote
-    };
-
+    const archiveObj = { id: Date.now(), date: dateStr, timestamp: Date.now(), type: workoutDisplayName, week: state.week, duration: state.workoutDurationMins, summary: text, details: state.lastWorkoutDetails, generalNote: userNote };
     StorageManager.saveToArchive(archiveObj);
-
-    if (navigator.clipboard) { 
-        navigator.clipboard.writeText(text).then(() => { 
-            haptic('light'); 
-            alert("הסיכום (כולל הערות) הועתק ונשמר בארכיון!"); 
-            location.reload(); 
-        }); 
-    } else { 
-        const el = document.createElement("textarea"); 
-        el.value = text; 
-        document.body.appendChild(el); 
-        el.select(); 
-        document.execCommand('copy'); 
-        document.body.removeChild(el); 
-        alert("הסיכום (כולל הערות) הועתק ונשמר בארכיון!"); 
-        location.reload(); 
-    }
+    if (navigator.clipboard) { navigator.clipboard.writeText(text).then(() => { haptic('light'); alert("הסיכום נשמר בארכיון והועתק!"); location.reload(); }); } 
+    else { const el = document.createElement("textarea"); el.value = text; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el); alert("הסיכום נשמר בארכיון והועתק!"); location.reload(); }
 }
-
-// --- ARCHIVE LOGIC & CALENDAR ---
 
 function switchArchiveView(view) {
     state.archiveView = view;
@@ -1408,7 +1775,6 @@ function renderArchiveList() {
     else {
         history.forEach(item => {
             const card = document.createElement('div'); card.className = "menu-card"; card.style.cursor = "default";
-            // Display week in the list item
             const weekStr = item.week ? ` • שבוע ${item.week}` : '';
             card.innerHTML = `<div class="archive-card-row"><input type="checkbox" class="archive-checkbox" data-id="${item.timestamp}"><div class="archive-info"><div style="display:flex; justify-content:space-between; width:100%;"><h3 style="margin:0;">${item.date}</h3><span style="font-size:0.8em; color:#8E8E93">${item.duration} דק'</span></div><p style="margin:0; color:#8E8E93; font-size:0.85em;">${item.type}${weekStr}</p></div><div class="chevron"></div></div>`;
             const checkbox = card.querySelector('.archive-checkbox');
@@ -1462,20 +1828,17 @@ function renderCalendar() {
     for(let i = 0; i < firstDayIndex; i++) {
         const cell = document.createElement('div'); cell.className = "calendar-cell empty"; grid.appendChild(cell);
     }
-
     const today = new Date();
     for(let day = 1; day <= daysInMonth; day++) {
         const cell = document.createElement('div'); cell.className = "calendar-cell";
         cell.innerHTML = `<span>${day}</span>`;
         if(state.calendarOffset === 0 && day === today.getDate()) cell.classList.add('today');
-
         const dailyWorkouts = monthWorkouts.filter(item => new Date(item.timestamp).getDate() === day);
         if(dailyWorkouts.length > 0) {
             const dotsContainer = document.createElement('div'); dotsContainer.className = "dots-container";
             dailyWorkouts.forEach(wo => {
                 const dot = document.createElement('div');
                 let dotClass = 'type-free';
-                // Updated color mapping for Hebrew names + Backward compatibility for 'A'/'B'/'C'
                 if(wo.type.includes('כתפיים - גב - חזה') || wo.type.includes('A')) dotClass = 'type-a';
                 else if(wo.type.includes('רגליים - גב') || wo.type.includes('B')) dotClass = 'type-b';
                 else if(wo.type.includes('חזה - כתפיים') || wo.type.includes('C')) dotClass = 'type-c';
@@ -1499,11 +1862,9 @@ function openDayDrawer(workouts, day, monthName) {
         html += `<p>נמצאו ${workouts.length} אימונים:</p>`;
         workouts.forEach(wo => {
             let dotColor = '#BF5AF2';
-            // Color Logic for drawer
             if(wo.type.includes('כתפיים - גב - חזה') || wo.type.includes('A')) dotColor = '#0A84FF';
             else if(wo.type.includes('רגליים - גב') || wo.type.includes('B')) dotColor = '#32D74B';
             else if(wo.type.includes('חזה - כתפיים') || wo.type.includes('C')) dotColor = '#FF9F0A';
-            
             html += `
             <div class="mini-workout-item" onclick='openArchiveFromDrawer(${JSON.stringify(wo).replace(/'/g, "&#39;")})'>
                 <div class="mini-dot" style="background:${dotColor}"></div>
@@ -1559,7 +1920,6 @@ function importData(input) {
     reader.readAsText(file);
 }
 
-// --- NEW GLOBAL FUNCTIONS FOR CONFIG IMPORT ---
 function triggerConfigImport() { document.getElementById('import-config-file').click(); }
 
 function processConfigImport(input) {
@@ -1675,6 +2035,9 @@ function saveSetEdit() {
         hist.innerText = `סט אחרון: ${state.lastLoggedSet.w}kg x ${state.lastLoggedSet.r} (RIR ${state.lastLoggedSet.rir})`;
     }
 
+    // UPDATE SAVED STATE AFTER EDIT
+    StorageManager.saveSessionState();
+
     closeEditModal();
     haptic('success');
     openSessionLog(); 
@@ -1692,8 +2055,107 @@ function deleteLastSet() {
             state.setIdx--;
         }
         
+        // UPDATE SAVED STATE
+        StorageManager.saveSessionState();
+
         closeEditModal();
         haptic('warning');
         initPickers(); 
     }
+}
+
+// SWAP MENU
+function openSwapMenu() {
+    const container = document.getElementById('swap-container'); 
+    container.innerHTML = "";
+    
+    const workoutList = state.workouts[state.type]; if (!workoutList) return;
+
+    // 1. VARIATIONS
+    const variations = getSubstitutes(state.currentExName).filter(name => !state.completedExInSession.includes(name));
+    
+    if (variations.length > 0) {
+        const titleVar = document.createElement('div');
+        titleVar.className = "section-label";
+        titleVar.innerText = `וריאציות (מחליף את הנוכחי)`;
+        container.appendChild(titleVar);
+
+        variations.forEach(vName => {
+            const btn = document.createElement('button'); 
+            btn.className = "menu-card"; 
+            btn.innerHTML = `<span>${vName}</span><div class="chevron"></div>`;
+            btn.onclick = () => {
+                const newExData = state.exercises.find(e => e.name === vName);
+                if (newExData) {
+                    state.currentExName = vName;
+                    showConfirmScreen(vName);
+                }
+            };
+            container.appendChild(btn);
+        });
+    }
+
+    // 2. REORDER
+    const titleOrder = document.createElement('div');
+    titleOrder.className = "section-label";
+    titleOrder.innerText = `שאר האימון (שינוי סדר)`;
+    titleOrder.style.marginTop = "20px";
+    container.appendChild(titleOrder);
+
+    const remaining = workoutList.filter(item => {
+        if(item.type === 'cluster') return true; 
+        const isDone = isExOrVariationDone(item.name);
+        const isCurrent = item.name === state.currentExName;
+        return !isDone && !isCurrent;
+    });
+    
+    if (remaining.length === 0) {
+        const empty = document.createElement('p');
+        empty.style.textAlign = 'center';
+        empty.style.color = 'var(--text-dim)';
+        empty.innerText = 'אין תרגילים נוספים להחלפה';
+        container.appendChild(empty);
+    } else {
+        remaining.forEach(item => {
+            if (item.type !== 'cluster') {
+                const btn = document.createElement('button'); 
+                btn.className = "menu-card"; 
+                btn.innerHTML = `<span>${item.name}</span><div class="chevron"></div>`;
+                btn.onclick = () => { 
+                    state.exIdx = state.workouts[state.type].findIndex(x => x.name === item.name); 
+                    showConfirmScreen(); 
+                };
+                container.appendChild(btn);
+            }
+        });
+    }
+
+    navigate('ui-swap-list');
+}
+
+function calcWarmup() {
+    const targetW = parseFloat(document.getElementById('weight-picker').value);
+    const list = document.getElementById('warmup-list'); list.innerHTML = "";
+    const percentages = [0, 0.4, 0.6, 0.8];
+    percentages.forEach((pct, idx) => {
+        let w; let reps;
+        if(idx === 0) { w = 20; reps = 10; }
+        else {
+            w = Math.round((targetW * pct) / 2.5) * 2.5;
+            if (w < 20) w = 20;
+            reps = idx === 1 ? 5 : (idx === 2 ? 3 : 2);
+        }
+        if (w >= targetW) return;
+        const row = document.createElement('div'); row.className = "warmup-row";
+        row.innerHTML = `<span>סט ${idx + 1}</span><span>${w}kg x ${reps}</span>`;
+        list.appendChild(row);
+    });
+    document.getElementById('warmup-modal').style.display = 'flex';
+}
+
+function closeWarmup() { document.getElementById('warmup-modal').style.display = 'none'; }
+function markWarmupDone() { 
+    state.log.push({ exName: state.currentExName, isWarmup: true }); 
+    StorageManager.saveSessionState(); // SAVE STATE
+    closeWarmup(); 
 }
