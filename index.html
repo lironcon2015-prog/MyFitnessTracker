@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>GymPro Elite 12.6.0</title>
+    <title>GymPro Elite 12.8.0</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="stylesheet" href="style.css">
@@ -39,7 +39,7 @@
         </div>
     </div>
 
-    <!-- Exercise Config Modal (NEW) -->
+    <!-- Exercise Config Modal -->
     <div id="ex-config-modal" class="modal-overlay">
         <div class="modal-content" style="max-width: 350px;">
             <h3 id="ex-config-title">הגדרת תרגיל</h3>
@@ -60,6 +60,12 @@
                         <option value="ידיים">ידיים</option>
                         <option value="קליסטניקס">קליסטניקס</option>
                     </select>
+                </div>
+
+                <!-- Unilateral Checkbox -->
+                <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+                    <span class="input-label" style="margin:0;">חד-צדדי (Unilateral)</span>
+                    <input type="checkbox" id="conf-ex-uni" class="archive-checkbox">
                 </div>
 
                 <div class="input-grid" style="grid-template-columns: 1fr 1fr;">
@@ -151,7 +157,6 @@
 
                 <div class="section-label">בחר תוכנית שבועית</div>
                 
-                <!-- NEW GRID WITH DELOAD -->
                 <div class="grid-menu" style="grid-template-columns: 1fr 1fr;">
                     <button class="menu-card" onclick="selectWeek(1)"><span>שבוע 1</span><div class="chevron"></div></button>
                     <button class="menu-card" onclick="selectWeek(2)"><span>שבוע 2</span><div class="chevron"></div></button>
@@ -163,20 +168,26 @@
                     <div class="card-text center-text">ארכיון וגיבוי</div>
                 </button>
 
-                <div class="version-footer">GymPro Elite v12.6.0</div>
+                <div class="version-footer">GymPro Elite v12.8.0</div>
             </div>
 
             <!-- SETTINGS SCREEN -->
             <div id="ui-settings" class="screen">
                 <h2 class="section-title">הגדרות וניהול</h2>
-                <button class="menu-card tall" style="width:100%; margin-bottom: 20px; border-color: var(--accent);" onclick="openWorkoutManager()">
+                
+                <button class="menu-card tall" style="width:100%; margin-bottom: 10px; border-color: var(--accent);" onclick="openWorkoutManager()">
                     <h3 style="color:var(--accent);">ניהול תוכניות אימון</h3>
                     <p>ערוך, צור או מחק תוכניות</p>
                 </button>
 
+                <button class="menu-card tall" style="width:100%; margin-bottom: 20px; border-color: var(--type-b);" onclick="openExerciseDatabase()">
+                    <h3 style="color:var(--type-b);">ניהול מאגר תרגילים</h3>
+                    <p>יצירה, עריכה וניהול הגדרות לכל התרגילים</p>
+                </button>
+
                 <div class="glass-card">
                     <h3 style="margin-top:0">ניהול נתונים</h3>
-                    <p style="color:var(--text-dim); font-size:0.9em;">גרסה V12.6.0</p>
+                    <p style="color:var(--text-dim); font-size:0.9em;">גרסה V12.8.0</p>
                     <button class="btn-text" style="color: #ff453a; border: 1px solid #ff453a; border-radius: 12px; margin-bottom: 20px;" onclick="resetToFactorySettings()">איפוס להגדרות יצרן</button>
                     
                     <div style="border-top: 1px solid var(--border); padding-top: 15px;">
@@ -188,6 +199,20 @@
                     </div>
                 </div>
                 <input type="file" id="import-config-file" style="display: none;" onchange="processConfigImport(this)">
+            </div>
+
+            <!-- EXERCISE DATABASE MANAGER (NEW) -->
+            <div id="ui-exercise-db" class="screen">
+                 <div style="position: sticky; top: 0; background: var(--bg); z-index: 10; padding-bottom: 10px;">
+                    <h2 class="section-title" style="margin-bottom: 10px;">מאגר תרגילים</h2>
+                    
+                    <input type="text" id="db-search" class="search-input" placeholder="חפש תרגיל לעריכה..." oninput="renderExerciseDatabase()">
+                    
+                    <!-- Create New Button -->
+                    <button class="btn-text" onclick="openExerciseCreator()" style="color: var(--type-b); border: 1px dashed var(--type-b); margin-top: 5px; font-weight: 600;">+ יצירת תרגיל חדש</button>
+                </div>
+                <div id="db-list" class="vertical-stack" style="padding-top: 10px;"></div>
+                <button class="btn-text" onclick="handleBackClick()">חזור</button>
             </div>
 
             <!-- WORKOUT MANAGER (LIST) -->
@@ -256,7 +281,8 @@
                 <div id="workout-menu-container" class="vertical-stack"></div>
                 <button class="menu-card tall freestyle-card" style="margin-top: 15px;" onclick="startFreestyle()"><h3>Freestyle</h3><p>בחירה חופשית</p></button>
             </div>
-
+            
+            <!-- OLD MUSCLE SELECT (REMOVED FROM FREESTYLE FLOW, KEPT FOR INTERRUPTION/EXTRA) -->
             <div id="ui-muscle-select" class="screen">
                 <h2 class="section-title">בחר שריר</h2>
                 <button id="btn-resume-flow" class="action-card success-gradient" style="display:none; margin-bottom: 20px;" onclick="resumeWorkout()">
@@ -273,10 +299,15 @@
                 <button id="btn-finish-extra" class="finish-main-btn" onclick="finishExtraPhase()">סיום הוספת תרגילים</button>
             </div>
 
+            <!-- VARIATION / FREESTYLE (UPDATED) -->
             <div id="ui-variation" class="screen">
-                <h2 id="variation-title" class="section-title">בחר תרגיל</h2>
-                <div id="variation-chips" class="chip-container" style="display: none; margin-bottom: 15px;"></div>
-                <div id="variation-options" class="vertical-stack"></div>
+                <div style="position: sticky; top: 0; background: var(--bg); z-index: 10; padding-bottom: 10px;">
+                     <h2 id="variation-title" class="section-title" style="margin-bottom:10px;">בחר תרגיל</h2>
+                     <input type="text" id="freestyle-search" class="search-input" placeholder="חפש תרגיל..." oninput="renderFreestyleList()">
+                     <div id="variation-chips" class="chip-container" style="display: flex;"></div>
+                </div>
+                
+                <div id="variation-options" class="vertical-stack" style="padding-top: 10px;"></div>
                 <button class="btn-text" onclick="handleBackClick()">חזור</button>
             </div>
             
