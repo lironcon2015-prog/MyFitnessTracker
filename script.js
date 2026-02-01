@@ -1,9 +1,8 @@
 /**
- * GYMPRO ELITE V12.6.0 (Major Update)
- * - Feature: Delete Any Set (with setIdx auto-correction)
- * - Feature: Swap Exercise (Physical array swap logic)
- * - Feature: Exercise Manager (Create/Edit exercises via UI)
- * - Feature: Deload Week (Filtered view, Data isolation)
+ * GYMPRO ELITE V12.8.0 (Freestyle Upgrade & Exercise DB Manager)
+ * - Feature: Unified Freestyle UI (Search + Chips, no muscle select screen).
+ * - Feature: Dedicated Exercise Database Manager in Settings.
+ * - Improvement: Direct Edit buttons in DB Manager.
  */
 
 // --- DEFAULT DATA ---
@@ -163,6 +162,7 @@ let state = {
     freestyleFilter: 'all',
     exercises: [],
     workouts: {},
+    workoutMeta: {}, 
     
     // Cluster State
     clusterMode: false,
@@ -197,6 +197,7 @@ const StorageManager = {
     KEY_ARCHIVE: 'gympro_archive',
     KEY_DB_EXERCISES: 'gympro_db_exercises',
     KEY_DB_WORKOUTS: 'gympro_db_workouts',
+    KEY_META: 'gympro_workout_meta',
     KEY_SESSION: 'gympro_current_session', 
 
     getData(key) {
@@ -211,6 +212,7 @@ const StorageManager = {
     initDB() {
         const storedEx = this.getData(this.KEY_DB_EXERCISES);
         const storedWo = this.getData(this.KEY_DB_WORKOUTS);
+        const storedMeta = this.getData(this.KEY_META);
 
         if (storedEx && storedEx.length > 0) {
             state.exercises = storedEx;
@@ -229,6 +231,13 @@ const StorageManager = {
         } else {
             state.workouts = JSON.parse(JSON.stringify(defaultWorkouts));
             this.saveData(this.KEY_DB_WORKOUTS, state.workouts);
+        }
+
+        if (storedMeta) {
+            state.workoutMeta = storedMeta;
+        } else {
+            state.workoutMeta = {};
+            this.saveData(this.KEY_META, state.workoutMeta);
         }
     },
 
@@ -258,6 +267,7 @@ const StorageManager = {
         if(confirm("פעולה זו תאפס את כל התרגילים והאימונים לברירת המחדל. האם להמשיך?")) {
             localStorage.removeItem(this.KEY_DB_EXERCISES);
             localStorage.removeItem(this.KEY_DB_WORKOUTS);
+            localStorage.removeItem(this.KEY_META);
             localStorage.removeItem(this.KEY_SESSION);
             location.reload();
         }
@@ -269,9 +279,7 @@ const StorageManager = {
     },
 
     saveWeight(exName, weight) {
-        // Deload Protection: Do not overwrite base weights during deload
         if (state.week === 'deload') return;
-        
         const data = this.getData(this.KEY_WEIGHTS) || {};
         data[exName] = weight;
         this.saveData(this.KEY_WEIGHTS, data);
@@ -321,10 +329,11 @@ const StorageManager = {
     exportConfiguration() {
         const configData = {
             type: 'config_only',
-            version: '12.6.0',
+            version: '12.8.0',
             date: new Date().toISOString(),
             workouts: this.getData(this.KEY_DB_WORKOUTS),
-            exercises: this.getData(this.KEY_DB_EXERCISES)
+            exercises: this.getData(this.KEY_DB_EXERCISES),
+            meta: this.getData(this.KEY_META)
         };
         const a = document.createElement('a'); 
         a.href = URL.createObjectURL(new Blob([JSON.stringify(configData, null, 2)], {type: "application/json"})); 
@@ -340,6 +349,7 @@ const StorageManager = {
         if(confirm("פעולה זו תדרוס את התוכניות והתרגילים. האם להמשיך?")) {
             this.saveData(this.KEY_DB_WORKOUTS, data.workouts);
             this.saveData(this.KEY_DB_EXERCISES, data.exercises);
+            if (data.meta) this.saveData(this.KEY_META, data.meta);
             alert("התבניות נטענו בהצלחה!");
             location.reload();
         }
@@ -399,12 +409,18 @@ function restoreSession() {
             case 'ui-muscle-select':
                 if (state.isInterruption) { document.getElementById('btn-resume-flow').style.display = 'flex'; document.getElementById('btn-finish-extra').style.display = 'none'; }
                 else if (state.isExtraPhase) { document.getElementById('btn-resume-flow').style.display = 'none'; document.getElementById('btn-finish-extra').style.display = 'block'; }
-                else if (state.isFreestyle) { document.getElementById('btn-resume-flow').style.display = 'none'; document.getElementById('btn-finish-extra').style.display = 'none'; }
                 break;
-            case 'ui-variation': showExerciseList(state.currentMuscle); break;
+            case 'ui-variation': 
+                if (state.isFreestyle) {
+                    // Restore chips and search
+                    renderFreestyleChips();
+                    renderFreestyleList();
+                } else {
+                    showExerciseList(state.currentMuscle); 
+                }
+                break;
             case 'ui-arm-selection': if (state.isArmPhase) showArmSelection(); break;
-            case 'ui-ask-extra': break;
-            case 'ui-ask-arms': break;
+            case 'ui-exercise-db': renderExerciseDatabase(); break;
             case 'ui-archive': openArchive(); break;
         }
         haptic('success');
@@ -474,7 +490,6 @@ function handleBackClick() {
 
     if (currentScreen === 'ui-main') {
         if (state.setIdx > 0) {
-            // Revert set index manually if user wants to go back within exercise
             if(confirm("חזרה אחורה תמחק את הסט הנוכחי. להמשיך?")) {
                state.setIdx--;
                initPickers();
@@ -501,7 +516,7 @@ function handleBackClick() {
         return;
     }
 
-    if (currentScreen === 'ui-workout-manager') { state.historyStack.pop(); navigate('ui-settings'); return; }
+    if (currentScreen === 'ui-workout-manager' || currentScreen === 'ui-exercise-db') { state.historyStack.pop(); navigate('ui-settings'); return; }
     if (currentScreen === 'ui-workout-editor') { 
         if(confirm("לצאת ללא שמירה?")) { state.historyStack.pop(); navigate('ui-workout-manager'); }
         return; 
@@ -511,6 +526,10 @@ function handleBackClick() {
     if (currentScreen === 'ui-archive-detail') { state.historyStack.pop(); navigate('ui-archive'); return; }
     if (currentScreen === 'ui-swap-list') { state.historyStack.pop(); navigate('ui-confirm'); return; }
     if (currentScreen === 'ui-settings') { state.historyStack.pop(); navigate('ui-week'); return; }
+    if (currentScreen === 'ui-variation') {
+        if (state.isFreestyle) { state.historyStack.pop(); navigate('ui-workout-type'); return; }
+        else { state.historyStack.pop(); navigate('ui-muscle-select'); return; }
+    }
 
     state.historyStack.pop();
     const prevScreen = state.historyStack[state.historyStack.length - 1];
@@ -533,14 +552,10 @@ function renderWorkoutMenu() {
     
     if (state.week === 'deload') {
         title.innerText = "שבוע דילואוד";
-        // Show only flagged workouts
         const keys = Object.keys(state.workouts);
         const deloadWorkouts = keys.filter(k => {
-             const w = state.workouts[k];
-             // Check if it's an array (old structure) or marked object (future proof)
-             // We will check a property on the array itself if needed, or scan content
-             // For now, only Freestyle is default. Workouts need a flag.
-             return w.availableInDeload === true;
+             const meta = state.workoutMeta[k];
+             return meta && meta.availableInDeload === true;
         });
 
         if(deloadWorkouts.length === 0) {
@@ -604,7 +619,11 @@ function renderManagerList() {
 function deleteWorkout(key) {
     if(confirm(`האם למחוק את תוכנית ${key}?`)) {
         delete state.workouts[key];
+        if (state.workoutMeta[key]) delete state.workoutMeta[key];
+        
         StorageManager.saveData(StorageManager.KEY_DB_WORKOUTS, state.workouts);
+        StorageManager.saveData(StorageManager.KEY_META, state.workoutMeta);
+        
         renderManagerList(); renderWorkoutMenu(); 
     }
 }
@@ -612,11 +631,13 @@ function deleteWorkout(key) {
 function duplicateWorkout(key) {
     const newName = key + " Copy";
     if (state.workouts[newName]) { alert("שם התוכנית כבר קיים"); return; }
-    // Deep copy array
     const source = state.workouts[key];
     const copy = JSON.parse(JSON.stringify(source));
-    // Copy the deload flag if exists property on array
-    if(source.availableInDeload) copy.availableInDeload = true;
+    
+    if (state.workoutMeta[key]) {
+        state.workoutMeta[newName] = JSON.parse(JSON.stringify(state.workoutMeta[key]));
+        StorageManager.saveData(StorageManager.KEY_META, state.workoutMeta);
+    }
     
     state.workouts[newName] = copy;
     StorageManager.saveData(StorageManager.KEY_DB_WORKOUTS, state.workouts);
@@ -637,7 +658,8 @@ function editWorkout(key) {
 
 function openEditorUI() {
     document.getElementById('editor-workout-name').value = managerState.currentName;
-    document.getElementById('editor-deload-check').checked = !!managerState.exercises.availableInDeload;
+    const meta = state.workoutMeta[managerState.currentName] || {};
+    document.getElementById('editor-deload-check').checked = !!meta.availableInDeload;
     renderEditorList();
     navigate('ui-workout-editor');
 }
@@ -652,8 +674,8 @@ function openExerciseCreator() {
     document.getElementById('conf-ex-step').value = "2.5";
     document.getElementById('conf-ex-min').value = "";
     document.getElementById('conf-ex-max').value = "";
+    document.getElementById('conf-ex-uni').checked = false; 
     
-    // Flag to know we are creating
     document.getElementById('ex-config-modal').dataset.mode = "create";
     document.getElementById('ex-config-modal').style.display = 'flex';
 }
@@ -664,13 +686,13 @@ function openExerciseEditor(exName) {
 
     document.getElementById('ex-config-title').innerText = "עריכת תרגיל";
     document.getElementById('conf-ex-name').value = ex.name;
-    // Disable name editing to prevent breaking history links
     document.getElementById('conf-ex-name').disabled = true;
     
     document.getElementById('conf-ex-muscle').value = ex.muscles[0] || "חזה";
     document.getElementById('conf-ex-step').value = ex.step || "2.5";
     
-    // Handle ranges
+    document.getElementById('conf-ex-uni').checked = !!ex.isUnilateral;
+    
     if (ex.manualRange) {
         document.getElementById('conf-ex-base').value = ex.manualRange.base || "";
         document.getElementById('conf-ex-min').value = ex.manualRange.min || "";
@@ -686,6 +708,39 @@ function openExerciseEditor(exName) {
     document.getElementById('ex-config-modal').style.display = 'flex';
 }
 
+// --- EXERCISE DATABASE MANAGER (NEW) ---
+function openExerciseDatabase() {
+    navigate('ui-exercise-db');
+    document.getElementById('db-search').value = '';
+    renderExerciseDatabase();
+}
+
+function renderExerciseDatabase() {
+    const list = document.getElementById('db-list');
+    list.innerHTML = "";
+    const searchVal = document.getElementById('db-search').value.toLowerCase();
+    
+    // Sort Alphabetically
+    const sorted = [...state.exercises].sort((a,b) => a.name.localeCompare(b.name));
+    
+    const filtered = sorted.filter(ex => ex.name.toLowerCase().includes(searchVal));
+
+    filtered.forEach(ex => {
+        const row = document.createElement('div');
+        row.className = "selector-item-row";
+        
+        row.innerHTML = `
+            <div class="selector-item-info">
+                <div>${ex.name}</div>
+                <div style="font-size:0.75em; color:var(--text-dim);">${ex.muscles.join(', ')}</div>
+            </div>
+            <div class="selector-item-actions">
+                <button class="btn-text-edit" onclick="openExerciseEditor('${ex.name.replace(/'/g, "\\'")}')">ערוך</button>
+            </div>
+        `;
+        list.appendChild(row);
+    });
+}
 function saveExerciseConfig() {
     const mode = document.getElementById('ex-config-modal').dataset.mode;
     const name = document.getElementById('conf-ex-name').value.trim();
@@ -694,6 +749,7 @@ function saveExerciseConfig() {
     const base = parseFloat(document.getElementById('conf-ex-base').value);
     const min = parseFloat(document.getElementById('conf-ex-min').value);
     const max = parseFloat(document.getElementById('conf-ex-max').value);
+    const isUni = document.getElementById('conf-ex-uni').checked;
 
     if (!name) { alert("נא להזין שם תרגיל"); return; }
 
@@ -704,51 +760,54 @@ function saveExerciseConfig() {
             name: name,
             muscles: [muscle],
             step: step,
+            isUnilateral: isUni,
             manualRange: {
                 base: isNaN(base) ? undefined : base,
                 min: isNaN(min) ? undefined : min,
                 max: isNaN(max) ? undefined : max
             }
         };
-        // Add to state and save
         state.exercises.push(newEx);
         StorageManager.saveData(StorageManager.KEY_DB_EXERCISES, state.exercises);
         
-        // Auto select it
         closeExConfigModal();
         alert("התרגיל נוצר בהצלחה!");
-        prepareSelector(); // refresh list
         
     } else {
-        // Edit mode
         const targetName = document.getElementById('ex-config-modal').dataset.target;
         const exIndex = state.exercises.findIndex(e => e.name === targetName);
         if (exIndex === -1) return;
 
         state.exercises[exIndex].muscles = [muscle];
         state.exercises[exIndex].step = step;
+        state.exercises[exIndex].isUnilateral = isUni;
         
-        // Ensure manualRange object exists
         if (!state.exercises[exIndex].manualRange) state.exercises[exIndex].manualRange = {};
         
         state.exercises[exIndex].manualRange.base = isNaN(base) ? undefined : base;
         state.exercises[exIndex].manualRange.min = isNaN(min) ? undefined : min;
         state.exercises[exIndex].manualRange.max = isNaN(max) ? undefined : max;
         
-        // Handle legacy top-level props
         if (!isNaN(min)) state.exercises[exIndex].minW = min;
         if (!isNaN(max)) state.exercises[exIndex].maxW = max;
 
         StorageManager.saveData(StorageManager.KEY_DB_EXERCISES, state.exercises);
         closeExConfigModal();
-        prepareSelector(); // refresh list
+    }
+
+    // Refresh the correct screen
+    if (document.getElementById('ui-exercise-db').classList.contains('active')) {
+        renderExerciseDatabase();
+    } else if (document.getElementById('ui-exercise-selector').classList.contains('active')) {
+        prepareSelector();
     }
 }
 
 function closeExConfigModal() {
     document.getElementById('ex-config-modal').style.display = 'none';
-    document.getElementById('conf-ex-name').disabled = false; // Reset state
+    document.getElementById('conf-ex-name').disabled = false; 
 }
+
 // --- WORKOUT EDITOR & CLUSTER SUPPORT ---
 
 function renderEditorList() {
@@ -864,12 +923,16 @@ function saveWorkoutChanges() {
 
     if (newName !== managerState.originalName) {
         if (state.workouts[newName]) { alert("שם תוכנית זה כבר קיים"); return; }
-        if (managerState.originalName) delete state.workouts[managerState.originalName];
+        if (managerState.originalName) {
+            delete state.workouts[managerState.originalName];
+            delete state.workoutMeta[managerState.originalName];
+        }
     }
     
-    // Save Deload Flag
-    managerState.exercises.availableInDeload = document.getElementById('editor-deload-check').checked;
-    
+    if (!state.workoutMeta[newName]) state.workoutMeta[newName] = {};
+    state.workoutMeta[newName].availableInDeload = document.getElementById('editor-deload-check').checked;
+    StorageManager.saveData(StorageManager.KEY_META, state.workoutMeta);
+
     state.workouts[newName] = managerState.exercises;
     StorageManager.saveData(StorageManager.KEY_DB_WORKOUTS, state.workouts);
     
@@ -899,8 +962,7 @@ function saveExerciseSettings() {
 }
 function closeExerciseSettings() { document.getElementById('exercise-settings-modal').style.display = 'none'; managerState.editingTimerEx = null; }
 
-// --- SMART EXERCISE SELECTOR (With Edit Capability) ---
-
+// --- SMART EXERCISE SELECTOR ---
 function openExerciseSelector() { managerState.activeClusterRef = null; prepareSelector(); }
 function openExerciseSelectorForCluster(clusterIdx) { managerState.activeClusterRef = clusterIdx; prepareSelector(); }
 
@@ -960,7 +1022,7 @@ function selectExerciseFromList(exName) {
 
 function selectWeek(w) { 
     state.week = w; 
-    renderWorkoutMenu(); // Refresh menu (needed for deload logic)
+    renderWorkoutMenu(); 
     navigate('ui-workout-type'); 
 }
 
@@ -1118,13 +1180,10 @@ function showConfirmScreen(forceExName = null) {
     StorageManager.saveSessionState();
 }
 
-// Updated Logic to Ignore Deload Weeks
 function getLastPerformance(exName) {
     const archive = StorageManager.getArchive();
     for (const item of archive) {
-        // Skip deload weeks in history lookup
         if (item.week === 'deload') continue;
-        
         if (item.details && item.details[exName]) {
             return { date: item.date, sets: item.details[exName].sets };
         }
@@ -1209,10 +1268,9 @@ function save1RM() {
 }
 
 function startRecording() { 
-    // Check if we already did sets for this exercise (Swap logic support)
     const existingLogs = state.log.filter(l => l.exName === state.currentExName && !l.skip && !l.isWarmup);
     if (existingLogs.length > 0) {
-        state.setIdx = existingLogs.length; // Resume from where we left off
+        state.setIdx = existingLogs.length;
         state.lastLoggedSet = existingLogs[existingLogs.length - 1];
     } else {
         state.setIdx = 0; 
@@ -1227,7 +1285,13 @@ function startRecording() {
     StorageManager.saveSessionState();
 }
 
-function isUnilateral(exName) { return unilateralKeywords.some(keyword => exName.includes(keyword)); }
+function isUnilateral(exName) {
+    const exData = state.exercises.find(e => e.name === exName);
+    if (exData && exData.isUnilateral !== undefined) {
+        return exData.isUnilateral;
+    }
+    return unilateralKeywords.some(keyword => exName.includes(keyword));
+}
 
 function initPickers() {
     document.getElementById('ex-display-name').innerText = state.currentExName;
@@ -1270,6 +1334,7 @@ function initPickers() {
     } else hist.style.display = 'none';
     
     document.getElementById('unilateral-note').style.display = isUnilateral(state.currentExName) ? 'block' : 'none';
+    
     document.getElementById('btn-warmup').style.display = (state.setIdx === 0 && !state.clusterMode && ["Squat", "Deadlift", "Bench", "Overhead"].some(k => state.currentExName.includes(k))) ? 'block' : 'none';
     
     const timerArea = document.getElementById('timer-area');
@@ -1285,7 +1350,6 @@ function initPickers() {
     const skipBtn = document.getElementById('btn-skip-exercise');
     skipBtn.style.display = (state.setIdx === 0) ? 'none' : 'block';
 
-    // --- NEW PICKER LOGIC (CUSTOM RANGES) ---
     const wPick = document.getElementById('weight-picker'); wPick.innerHTML = "";
     
     const savedWeight = StorageManager.getLastWeight(state.currentExName);
@@ -1295,13 +1359,10 @@ function initPickers() {
     if (state.currentEx.isCalc) defaultW = target.w;
     else defaultW = state.lastLoggedSet ? state.lastLoggedSet.w : (state.setIdx === 0 && savedWeight ? savedWeight : (target ? target.w : 0));
     
-    // Fallback to manual base if no history
     if (!savedWeight && state.setIdx === 0 && manualRange.base) defaultW = manualRange.base;
 
-    // Determine Step
     const step = state.currentEx.step || 2.5;
     
-    // Determine Min/Max
     let minW = manualRange.min !== undefined ? manualRange.min : (state.currentEx.minW !== undefined ? state.currentEx.minW : Math.max(0, defaultW - 40));
     let maxW = manualRange.max !== undefined ? manualRange.max : (state.currentEx.maxW !== undefined ? state.currentEx.maxW : defaultW + 50);
     
@@ -1322,8 +1383,6 @@ function initPickers() {
         let o = new Option(v === 0 ? "Fail" : v, v); if(v === 2) o.selected = true; rirPick.add(o);
     });
 }
-
-// --- TIMER LOGIC ---
 
 function resetAndStartTimer(customTime = null) {
     stopRestTimer(); state.seconds = 0; state.startTime = Date.now();
@@ -1366,7 +1425,6 @@ function nextStep() {
     const noteVal = document.getElementById('set-notes').value.trim();
     const entry = { exName: state.currentExName, w: wVal, r: parseInt(document.getElementById('reps-picker').value), rir: document.getElementById('rir-picker').value, note: noteVal };
     
-    // DELOAD PROTECTION: Only save weight if NOT deload
     StorageManager.saveWeight(state.currentExName, wVal);
     
     state.log.push(entry); state.lastLoggedSet = entry;
@@ -1424,7 +1482,13 @@ function finishCurrentExercise() {
         if (state.isInterruption) { state.isInterruption = false; navigate('ui-confirm'); StorageManager.saveSessionState(); } 
         else if (state.isExtraPhase) { navigate('ui-ask-extra'); StorageManager.saveSessionState(); } 
         else if (state.isArmPhase) { showArmSelection(); } 
-        else if (state.isFreestyle) { showExerciseList(state.currentMuscle); } 
+        else if (state.isFreestyle) { 
+            // Return to unified freestyle list
+            navigate('ui-variation');
+            document.getElementById('freestyle-search').value = '';
+            renderFreestyleList();
+            StorageManager.saveSessionState();
+        } 
         else { checkFlow(); }
     }
 }
@@ -1493,6 +1557,7 @@ function interruptWorkout() {
     state.isInterruption = true;
     document.getElementById('btn-resume-flow').style.display = 'flex';
     document.getElementById('btn-finish-extra').style.display = 'none';
+    // Use old logic for interruption/extra (muscle select)
     navigate('ui-muscle-select');
     StorageManager.saveSessionState();
 }
@@ -1501,60 +1566,91 @@ function resumeWorkout() { state.isInterruption = false; navigate('ui-confirm');
 function startExtraPhase() { state.isExtraPhase = true; document.getElementById('btn-resume-flow').style.display = 'none'; document.getElementById('btn-finish-extra').style.display = 'block'; navigate('ui-muscle-select'); StorageManager.saveSessionState(); }
 function finishExtraPhase() { navigate('ui-ask-arms'); StorageManager.saveSessionState(); }
 
+// --- FREESTYLE & LISTS (NEW UNIFIED LOGIC) ---
 function startFreestyle() {
     state.type = 'Freestyle'; state.log = []; state.completedExInSession = [];
     state.isArmPhase = false; state.isFreestyle = true; state.isExtraPhase = false; state.isInterruption = false;
     state.workoutStartTime = Date.now();
-    document.getElementById('btn-resume-flow').style.display = 'none';
-    document.getElementById('btn-finish-extra').style.display = 'none';
-    navigate('ui-muscle-select');
-    StorageManager.saveSessionState(); 
-}
-
-function showExerciseList(muscle) {
-    state.currentMuscle = muscle;
+    
+    // Default filter
     state.freestyleFilter = 'all'; 
-    const chipContainer = document.getElementById('variation-chips');
-    chipContainer.style.display = 'none'; chipContainer.innerHTML = '';
-    document.getElementById('variation-title').innerText = `תרגילי ${muscle}`;
-    const options = document.getElementById('variation-options');
-    options.innerHTML = "";
-
-    if (state.isFreestyle) {
-        const backBtn = document.createElement('button');
-        backBtn.className = "btn-text"; backBtn.style.color = "var(--accent)"; backBtn.style.textAlign = "right"; backBtn.style.marginBottom = "10px";
-        backBtn.innerText = "חזור לבחירת קבוצת שריר";
-        backBtn.onclick = () => navigate('ui-muscle-select'); 
-        options.appendChild(backBtn);
-    }
-
-    if (muscle === 'רגליים') { chipContainer.style.display = 'flex'; renderFreestyleChips(['all', 'quads', 'hamstrings', 'calves'], 'רגליים'); } 
-    else if (muscle === 'ידיים') { chipContainer.style.display = 'flex'; renderFreestyleChips(['all', 'biceps', 'triceps'], 'ידיים'); }
-
-    renderFreestyleList();
+    document.getElementById('freestyle-search').value = '';
+    
+    document.getElementById('variation-title').innerText = "בחר תרגיל";
     navigate('ui-variation');
+    
+    renderFreestyleChips();
+    renderFreestyleList();
+    
     StorageManager.saveSessionState(); 
 }
 
-function renderFreestyleChips(filters, mainMuscle) {
-    const container = document.getElementById('variation-chips'); container.innerHTML = "";
-    const labels = { 'all': 'הכל', 'quads': 'ארבע ראשי', 'hamstrings': 'ירך אחורית', 'calves': 'תאומים', 'biceps': 'יד קדמית', 'triceps': 'יד אחורית' };
-    filters.forEach(f => {
+function renderFreestyleChips() {
+    const container = document.getElementById('variation-chips');
+    container.innerHTML = "";
+    
+    const muscles = ['all', 'חזה', 'גב', 'רגליים', 'כתפיים', 'ידיים', 'קליסטניקס'];
+    const labels = { 'all': 'הכל' };
+    
+    muscles.forEach(m => {
         const btn = document.createElement('button');
-        btn.className = `chip ${state.freestyleFilter === f ? 'active' : ''}`;
-        btn.innerText = labels[f] || f;
-        btn.onclick = () => { state.freestyleFilter = f; renderFreestyleChips(filters, mainMuscle); renderFreestyleList(); };
+        btn.className = `chip ${state.freestyleFilter === m ? 'active' : ''}`;
+        btn.innerText = labels[m] || m;
+        btn.onclick = () => { 
+            state.freestyleFilter = m; 
+            renderFreestyleChips(); 
+            renderFreestyleList(); 
+        };
         container.appendChild(btn);
     });
 }
 
 function renderFreestyleList() {
     const options = document.getElementById('variation-options');
-    const backBtn = options.querySelector('.btn-text');
     options.innerHTML = "";
-    if(backBtn) options.appendChild(backBtn);
-    let filtered = state.exercises.filter(ex => ex.muscles.includes(state.currentMuscle) && !state.completedExInSession.includes(ex.name));
-    if (state.freestyleFilter !== 'all') filtered = filtered.filter(ex => ex.muscles.includes(state.freestyleFilter));
+    
+    const searchVal = document.getElementById('freestyle-search').value.toLowerCase();
+    
+    let filtered = state.exercises.filter(ex => {
+        const matchesFilter = state.freestyleFilter === 'all' || ex.muscles.includes(state.freestyleFilter);
+        const matchesSearch = ex.name.toLowerCase().includes(searchVal);
+        const notDone = !state.completedExInSession.includes(ex.name);
+        return matchesFilter && matchesSearch && notDone;
+    });
+    
+    // Sort alphabetically
+    filtered.sort((a,b) => a.name.localeCompare(b.name));
+
+    if (filtered.length === 0) {
+        options.innerHTML = `<p style="text-align:center; color:var(--text-dim); margin-top:20px;">לא נמצאו תרגילים</p>`;
+        return;
+    }
+
+    filtered.forEach(ex => {
+        const btn = document.createElement('button'); 
+        btn.className = "menu-card";
+        btn.innerHTML = `<span>${ex.name}</span><div class="chevron"></div>`;
+        btn.onclick = () => {
+            state.currentEx = JSON.parse(JSON.stringify(ex));
+            state.currentExName = ex.name;
+            if(!state.currentEx.sets || state.currentEx.sets.length < 3) state.currentEx.sets = [{w:10, r:10}, {w:10, r:10}, {w:10, r:10}];
+            startRecording();
+        };
+        options.appendChild(btn);
+    });
+}
+
+// Fallback for non-freestyle (extra/interruption)
+function showExerciseList(muscle) {
+    state.currentMuscle = muscle;
+    // Just render standard list for that muscle
+    const options = document.getElementById('variation-options');
+    options.innerHTML = "";
+    document.getElementById('variation-chips').style.display = 'none'; // Hide chips in old mode
+    document.getElementById('freestyle-search').style.display = 'none'; // Hide search in old mode
+    document.getElementById('variation-title').innerText = muscle;
+
+    let filtered = state.exercises.filter(ex => ex.muscles.includes(muscle) && !state.completedExInSession.includes(ex.name));
     filtered.forEach(ex => {
         const btn = document.createElement('button'); btn.className = "menu-card";
         btn.innerHTML = `<span>${ex.name}</span><div class="chevron"></div>`;
@@ -1566,6 +1662,8 @@ function renderFreestyleList() {
         };
         options.appendChild(btn);
     });
+    
+    navigate('ui-variation');
 }
 
 function startArmWorkout() { 
@@ -1625,6 +1723,7 @@ function finish() {
         else if (!e.skip) {
             let weightStr = `${e.w}kg`;
             if (isUnilateral(e.exName)) weightStr += ` (יד אחת)`;
+            
             let setStr = `${weightStr} x ${e.r} (RIR ${e.rir})`;
             if (e.note) setStr += ` | Note: ${e.note}`;
             grouped[e.exName].sets.push(setStr); grouped[e.exName].vol += (e.w * e.r);
@@ -1873,7 +1972,6 @@ function openEditSet(index) {
     document.getElementById('edit-rir').value = entry.rir;
     document.getElementById('edit-note').value = entry.note || "";
     
-    // Always show delete button now
     document.getElementById('btn-delete-set').style.display = 'block';
     closeDayDrawer(); 
     document.getElementById('edit-set-modal').style.display = 'flex';
@@ -1903,7 +2001,6 @@ function saveSetEdit() {
     closeEditModal(); haptic('success'); openSessionLog(); 
 }
 
-// --- NEW DELETE LOGIC (Can delete any set) ---
 function deleteSetFromLog() {
     if (state.editingIndex === -1) return;
     if (!confirm("האם למחוק את הסט הזה?")) return;
@@ -1911,10 +2008,8 @@ function deleteSetFromLog() {
     const removedEntry = state.log[state.editingIndex];
     state.log.splice(state.editingIndex, 1);
     
-    // Check if we deleted a set from the current exercise context
     if (removedEntry.exName === state.currentExName) {
         if (state.setIdx > 0) state.setIdx--;
-        // Update last logged set to the previous one (if exists)
         const relevantLogs = state.log.filter(l => l.exName === state.currentExName && !l.skip && !l.isWarmup);
         if (relevantLogs.length > 0) {
             state.lastLoggedSet = relevantLogs[relevantLogs.length - 1];
@@ -1927,21 +2022,18 @@ function deleteSetFromLog() {
     closeEditModal();
     haptic('warning');
     
-    // Refresh UI if we are on the main screen
     if (document.getElementById('ui-main').classList.contains('active')) {
         initPickers();
     }
     openSessionLog();
 }
 
-// --- SWAP MENU (PHYSICAL SWAP) ---
 function openSwapMenu() {
     const container = document.getElementById('swap-container'); 
     container.innerHTML = "";
     
     const workoutList = state.workouts[state.type]; if (!workoutList) return;
 
-    // 1. VARIATIONS
     const variations = getSubstitutes(state.currentExName).filter(name => !state.completedExInSession.includes(name));
     if (variations.length > 0) {
         const titleVar = document.createElement('div');
@@ -1953,7 +2045,6 @@ function openSwapMenu() {
             btn.className = "menu-card"; 
             btn.innerHTML = `<span>${vName}</span><div class="chevron"></div>`;
             btn.onclick = () => {
-                // Variation swap just changes name, doesn't reorder list
                 state.currentExName = vName;
                 showConfirmScreen(vName);
             };
@@ -1961,14 +2052,12 @@ function openSwapMenu() {
         });
     }
 
-    // 2. REORDER
     const titleOrder = document.createElement('div');
     titleOrder.className = "section-label";
     titleOrder.innerText = `שאר האימון (החלף סדר)`;
     titleOrder.style.marginTop = "20px";
     container.appendChild(titleOrder);
 
-    // Filter exercises that are AFTER the current index
     const remaining = workoutList.map((item, idx) => ({ item, idx })).filter(({ item, idx }) => idx > state.exIdx);
 
     if (remaining.length === 0) {
@@ -1981,12 +2070,9 @@ function openSwapMenu() {
             btn.className = "menu-card"; 
             btn.innerHTML = `<span>${item.name}</span><div class="chevron"></div>`;
             btn.onclick = () => { 
-                // PHYSICAL SWAP LOGIC
                 const currentItem = state.workouts[state.type][state.exIdx];
                 state.workouts[state.type][state.exIdx] = state.workouts[state.type][idx];
                 state.workouts[state.type][idx] = currentItem;
-                
-                // Refresh
                 showConfirmScreen(); 
             };
             container.appendChild(btn);
