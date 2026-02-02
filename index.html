@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>GymPro Elite 12.8.0</title>
+    <title>GymPro Elite 12.10.0</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="stylesheet" href="style.css">
@@ -168,7 +168,7 @@
                     <div class="card-text center-text">ארכיון וגיבוי</div>
                 </button>
 
-                <div class="version-footer">GymPro Elite v12.8.0</div>
+                <div class="version-footer">GymPro Elite v12.10.0</div>
             </div>
 
             <!-- SETTINGS SCREEN -->
@@ -187,7 +187,7 @@
 
                 <div class="glass-card">
                     <h3 style="margin-top:0">ניהול נתונים</h3>
-                    <p style="color:var(--text-dim); font-size:0.9em;">גרסה V12.8.0</p>
+                    <p style="color:var(--text-dim); font-size:0.9em;">גרסה V12.10.0</p>
                     <button class="btn-text" style="color: #ff453a; border: 1px solid #ff453a; border-radius: 12px; margin-bottom: 20px;" onclick="resetToFactorySettings()">איפוס להגדרות יצרן</button>
                     
                     <div style="border-top: 1px solid var(--border); padding-top: 15px;">
@@ -201,14 +201,13 @@
                 <input type="file" id="import-config-file" style="display: none;" onchange="processConfigImport(this)">
             </div>
 
-            <!-- EXERCISE DATABASE MANAGER (NEW) -->
+            <!-- EXERCISE DATABASE MANAGER -->
             <div id="ui-exercise-db" class="screen">
                  <div style="position: sticky; top: 0; background: var(--bg); z-index: 10; padding-bottom: 10px;">
                     <h2 class="section-title" style="margin-bottom: 10px;">מאגר תרגילים</h2>
                     
                     <input type="text" id="db-search" class="search-input" placeholder="חפש תרגיל לעריכה..." oninput="renderExerciseDatabase()">
                     
-                    <!-- Create New Button -->
                     <button class="btn-text" onclick="openExerciseCreator()" style="color: var(--type-b); border: 1px dashed var(--type-b); margin-top: 5px; font-weight: 600;">+ יצירת תרגיל חדש</button>
                 </div>
                 <div id="db-list" class="vertical-stack" style="padding-top: 10px;"></div>
@@ -230,7 +229,6 @@
                     <label style="font-size:0.8em; color:var(--text-dim);">שם התוכנית</label>
                     <input type="text" id="editor-workout-name" class="minimal-input" style="text-align:right; font-size:1.2em; font-weight:bold; margin-bottom:10px;">
                     
-                    <!-- New Deload Checkbox -->
                     <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border); padding-top: 10px;">
                         <span style="font-size:0.9em;">הצג בשבוע דילואוד?</span>
                         <input type="checkbox" id="editor-deload-check" class="archive-checkbox">
@@ -268,7 +266,6 @@
                         <button class="chip" onclick="setSelectorFilter('קליסטניקס', this)">קליסטניקס</button>
                     </div>
 
-                    <!-- Create New Button -->
                     <button class="btn-text" onclick="openExerciseCreator()" style="color: var(--type-b); border: 1px dashed var(--type-b); margin-top: 10px; font-weight: 600;">+ יצירת תרגיל חדש</button>
                 </div>
 
@@ -282,32 +279,26 @@
                 <button class="menu-card tall freestyle-card" style="margin-top: 15px;" onclick="startFreestyle()"><h3>Freestyle</h3><p>בחירה חופשית</p></button>
             </div>
             
-            <!-- OLD MUSCLE SELECT (REMOVED FROM FREESTYLE FLOW, KEPT FOR INTERRUPTION/EXTRA) -->
-            <div id="ui-muscle-select" class="screen">
-                <h2 class="section-title">בחר שריר</h2>
-                <button id="btn-resume-flow" class="action-card success-gradient" style="display:none; margin-bottom: 20px;" onclick="resumeWorkout()">
-                    <div class="card-text center-text">חזור למסלול המקורי</div>
-                </button>
-                <div class="grid-menu">
-                    <button class="menu-card" onclick="showExerciseList('כתפיים')">כתפיים</button>
-                    <button class="menu-card" onclick="showExerciseList('רגליים')">רגליים</button>
-                    <button class="menu-card" onclick="showExerciseList('חזה')">חזה</button>
-                    <button class="menu-card" onclick="showExerciseList('גב')">גב</button>
-                    <button class="menu-card" onclick="showExerciseList('ידיים')">ידיים</button>
-                    <button class="menu-card" style="border-color: var(--type-c);" onclick="showExerciseList('קליסטניקס')">קליסטניקס</button>
-                </div>
-                <button id="btn-finish-extra" class="finish-main-btn" onclick="finishExtraPhase()">סיום הוספת תרגילים</button>
-            </div>
-
-            <!-- VARIATION / FREESTYLE (UPDATED) -->
+            <!-- VARIATION / FREESTYLE (UNIFIED) -->
             <div id="ui-variation" class="screen">
                 <div style="position: sticky; top: 0; background: var(--bg); z-index: 10; padding-bottom: 10px;">
+                     <!-- Context Actions (Injected via JS) -->
+                     <div id="variation-context-container" style="display:none; margin-bottom:10px;">
+                        <button id="btn-var-resume" class="action-card success-gradient" style="margin-bottom:10px;" onclick="resumeWorkout()">
+                            <div class="card-text center-text">חזור למסלול</div>
+                        </button>
+                     </div>
+
                      <h2 id="variation-title" class="section-title" style="margin-bottom:10px;">בחר תרגיל</h2>
                      <input type="text" id="freestyle-search" class="search-input" placeholder="חפש תרגיל..." oninput="renderFreestyleList()">
                      <div id="variation-chips" class="chip-container" style="display: flex;"></div>
                 </div>
                 
                 <div id="variation-options" class="vertical-stack" style="padding-top: 10px;"></div>
+                
+                <!-- Extra Phase Finish Button (Injected via JS) -->
+                <button id="btn-var-finish-extra" class="finish-main-btn" style="display:none; margin-top:20px;" onclick="finishExtraPhase()">סיום אימון</button>
+                
                 <button class="btn-text" onclick="handleBackClick()">חזור</button>
             </div>
             
@@ -410,26 +401,10 @@
                     <h2>האם להוסיף תרגילים נוספים?</h2>
                     <p class="sub-text">ניתן לבחור תרגילים מכל קבוצות השרירים</p>
                     <div class="vertical-stack">
-                        <button class="btn-main primary-gradient" onclick="startExtraPhase()">כן, הוסף תרגיל</button>
-                        <button class="btn-text" onclick="navigate('ui-ask-arms')">לא, המשך לידיים</button>
-                    </div>
-                </div>
-            </div>
-
-            <div id="ui-ask-arms" class="screen">
-                <div class="confirm-fixed-top">
-                    <h2>האם להוסיף ידיים?</h2>
-                    <div class="vertical-stack">
-                        <button class="btn-main primary-gradient" onclick="startArmWorkout()">כן</button>
                         <button class="btn-text" onclick="finish()">לא, סיים אימון</button>
+                        <button class="btn-main primary-gradient" onclick="startExtraPhase()">כן, הוסף תרגילים</button>
                     </div>
                 </div>
-            </div>
-
-            <div id="ui-arm-selection" class="screen">
-                <h2 id="arm-selection-title" class="section-title">בחר תרגיל ידיים</h2>
-                <div id="arm-options" class="vertical-stack"></div>
-                <button id="btn-skip-arm-group" class="btn-text"></button>
             </div>
 
             <div id="ui-summary" class="screen">
