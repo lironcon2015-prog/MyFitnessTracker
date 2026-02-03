@@ -1,8 +1,9 @@
 /**
- * GYMPRO ELITE V12.11.0 (Fix: Deep Back Logic / Time Travel)
- * - Logic: Added 'revertToPreviousExercise' for true undo flow.
- * - Logic: handleBackClick rewritten to support n-clicks undo.
- * - UX: Sticky filters & Extra phase retained.
+ * GYMPRO ELITE V12.12.0 (Smart Navigation & Instant Load)
+ * - Logic: Time Travel Navigation (Non-destructive Back).
+ * - Logic: DOMContentLoaded for 0ms load.
+ * - Logic: Priority Modal Closing on Back.
+ * - UX: Sticky Filters & Scroll Preservation.
  */
 
 // --- DEFAULT DATA ---
@@ -327,7 +328,7 @@ const StorageManager = {
     exportConfiguration() {
         const configData = {
             type: 'config_only',
-            version: '12.11.0',
+            version: '12.12.0',
             date: new Date().toISOString(),
             workouts: this.getData(this.KEY_DB_WORKOUTS),
             exercises: this.getData(this.KEY_DB_EXERCISES),
@@ -355,11 +356,12 @@ const StorageManager = {
 };
 
 // --- INITIALIZATION ---
-window.onload = () => {
+// OPTIMIZATION: Use DOMContentLoaded for 0ms Load
+document.addEventListener('DOMContentLoaded', () => {
     StorageManager.initDB();
     renderWorkoutMenu();
     checkRecovery();
-};
+});
 
 function checkRecovery() {
     if (StorageManager.hasActiveSession()) {
@@ -375,6 +377,7 @@ function restoreSession() {
         
         document.getElementById('recovery-modal').style.display = 'none';
         
+        // MIGRATION 12.10.0: Handle removed screens
         let lastScreen = state.historyStack[state.historyStack.length - 1];
         if (['ui-muscle-select', 'ui-ask-arms', 'ui-arm-selection'].includes(lastScreen)) {
              if (lastScreen === 'ui-muscle-select') {
@@ -392,6 +395,7 @@ function restoreSession() {
         document.getElementById(lastScreen).classList.add('active');
         document.getElementById('global-back').style.visibility = (lastScreen === 'ui-week') ? 'hidden' : 'visible';
         
+        // On Full Restore (Page Reload), we MUST re-render everything to restore DOM
         switch (lastScreen) {
             case 'ui-main':
                 initPickers();
@@ -483,6 +487,111 @@ function navigate(id) {
     if (settingsBtn) settingsBtn.style.visibility = (id === 'ui-week') ? 'visible' : 'hidden';
 }
 
+/**
+ * REFACTORED handleBackClick (V12.12.0 Smart Navigation)
+ * Implements "Time Travel" via Non-Destructive CSS Toggling
+ */
+function handleBackClick() {
+    haptic('warning');
+    
+    // --- 1. PRIORITY LAYER (Modal/Overlay Closing) ---
+    // If any modal is open, close it first and do NOT navigate back.
+    if(document.getElementById('sheet-modal').classList.contains('open')) { closeDayDrawer(); closeSessionLog(); return; }
+    if(document.getElementById('warmup-modal').style.display === 'flex') { closeWarmup(); return; }
+    if(document.getElementById('edit-set-modal').style.display === 'flex') { closeEditModal(); return; }
+    if(document.getElementById('ex-config-modal').style.display === 'flex') { closeExConfigModal(); return; }
+    if(document.getElementById('exercise-settings-modal').style.display === 'flex') { closeExerciseSettings(); return; }
+
+    if (state.historyStack.length <= 1) return;
+
+    const currentScreen = state.historyStack[state.historyStack.length - 1];
+
+    // --- 2. LOGIC GUARD LAYER ---
+    // Prevent accidental exit from active processes (Logic Undo)
+    
+    if (currentScreen === 'ui-main') {
+        if (state.isFreestyle && state.setIdx === 0 && state.log.length === 0) {
+            // Safe to exit
+        } 
+        else if (state.setIdx > 0) {
+            if(confirm("חזרה אחורה תמחק את הסט הנוכחי. להמשיך?")) {
+               state.setIdx--;
+               initPickers();
+               StorageManager.saveSessionState();
+               return; // Stay on screen, just undo logic
+            }
+            return; // Abort
+        } else {
+            // Exit active exercise -> Confirm Screen
+            stopRestTimer();
+            state.historyStack.pop(); // Pop ui-main
+            
+            // Special Case: Returning from ui-main to ui-confirm should NOT be destructive
+            // We switch manually to preserve ui-confirm state
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById('ui-confirm').classList.add('active');
+            
+            // Restore visibility (standard navigate logic but manual)
+            document.getElementById('global-back').style.visibility = 'visible';
+            return;
+        }
+    }
+
+    if (currentScreen === 'ui-confirm') {
+        if (state.log.length > 0 || state.completedExInSession.length > 0) {
+            if(confirm("האם לצאת מהאימון?")) StorageManager.clearSessionState();
+            else return; 
+        }
+    }
+
+    if (currentScreen === 'ui-cluster-rest') {
+        if(!confirm("האם לצאת ממצב Cluster?")) return;
+        state.clusterMode = false;
+    }
+
+    if (currentScreen === 'ui-workout-editor') { 
+        if(confirm("לצאת ללא שמירה?")) { 
+            state.historyStack.pop(); 
+            // We use standard navigate here to ensure clean state for manager list
+            navigate('ui-workout-manager'); 
+            return;
+        }
+        return; 
+    }
+
+    // --- 3. CLEANUP LAYER (Minimal) ---
+    // Removed aggressive filter cleaning to allow Sticky Filters & Search Preservation.
+    
+    if (currentScreen === 'ui-variation') {
+        state.isInterruption = false;
+        state.isExtraPhase = false;
+        // NOTE: state.freestyleFilter NOT reset here.
+    }
+
+    // --- 4. NAVIGATION LAYER (Time Travel) ---
+    // We pop the stack, but we DO NOT call navigate() which triggers renders.
+    // We manually toggle CSS classes to show the previous screen EXACTLY as it was.
+    
+    state.historyStack.pop();
+    const prevScreen = state.historyStack[state.historyStack.length - 1];
+    
+    // Hide all, Show Prev (No Render)
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(prevScreen).classList.add('active');
+    
+    // Header Logic
+    document.getElementById('global-back').style.visibility = (prevScreen === 'ui-week') ? 'hidden' : 'visible';
+    const settingsBtn = document.getElementById('btn-settings');
+    if (settingsBtn) settingsBtn.style.visibility = (prevScreen === 'ui-week') ? 'visible' : 'hidden';
+
+    // Special Handling: If we go back to ui-main (unlikely via back button but possible logically), ensure timer visibility
+    if (prevScreen === 'ui-main') {
+         if(state.setIdx > 0 || state.clusterMode) {
+             document.getElementById('timer-area').style.visibility = 'visible';
+         }
+    }
+}
+
 function openSettings() { navigate('ui-settings'); }
 function resetToFactorySettings() { StorageManager.resetFactory(); }
 
@@ -527,194 +636,6 @@ function renderWorkoutMenu() {
         });
     }
 }
-/**
- * REFACTORED handleBackClick (V12.11.0 Fix: Time Travel Logic)
- * Supports n-clicks undo flow:
- * 1. From Next Exercise Confirm -> Back to Previous Exercise Finished (Action Panel).
- * 2. From Finished (Action Panel) -> Back to Editing Last Set.
- * 3. From Editing Set -> Back to Delete Set -> Previous Set.
- */
-function handleBackClick() {
-    haptic('warning');
-    if (state.historyStack.length <= 1) return;
-
-    const currentScreen = state.historyStack[state.historyStack.length - 1];
-
-    // --- 1. GUARD LAYER: UI-MAIN (Active Exercise) ---
-    if (currentScreen === 'ui-main') {
-        // Case A: Action Panel is Open (Exercise Finished state)
-        // Action: "Un-finish" the exercise -> Go back to editing mode
-        const actionPanel = document.getElementById('action-panel');
-        if (actionPanel.style.display !== 'none') {
-            actionPanel.style.display = 'none';
-            document.getElementById('btn-submit-set').style.display = 'block';
-            document.getElementById('btn-skip-exercise').style.display = 'block';
-            
-            // Re-init pickers to show the last set values
-            initPickers();
-            
-            // If we are in "Finished" state, timer is hidden. We might want to show it or keep hidden.
-            // Usually editing mode shows timer area.
-            document.getElementById('timer-area').style.visibility = 'visible';
-            
-            return; // Stay on screen, just changed state
-        }
-
-        // Case B: Freestyle Undo (If 0 sets done)
-        if (state.isFreestyle && state.setIdx === 0 && state.log.length === 0) {
-            // Pass through to standard navigation (Exit to Variation)
-        } 
-        // Case C: Mid-Set or Finished Sets (Editing mode)
-        else if (state.setIdx > 0 || (state.log.length > 0 && state.setIdx === 0)) {
-            if(confirm("חזרה אחורה תמחק את הסט הנוכחי. להמשיך?")) {
-               // Logic to remove last set is handled manually here to ensure state consistency
-               const lastEntry = state.log[state.log.length - 1];
-               if (lastEntry && lastEntry.exName === state.currentExName) {
-                   state.log.pop();
-                   state.setIdx--;
-                   // Update lastLoggedSet
-                   const relevant = state.log.filter(l => l.exName === state.currentExName && !l.skip && !l.isWarmup);
-                   state.lastLoggedSet = relevant.length > 0 ? relevant[relevant.length - 1] : null;
-                   
-                   StorageManager.saveWeight(state.currentExName, state.lastLoggedSet ? state.lastLoggedSet.w : 0);
-               }
-               
-               initPickers();
-               StorageManager.saveSessionState();
-               return; // Stay on screen
-            }
-            return; // Abort back
-        } else {
-            // Case D: Start of Exercise (0 sets, no log) -> Exit
-            stopRestTimer();
-            state.historyStack.pop(); 
-            
-            // Navigation Logic based on Mode
-            if (state.isFreestyle || state.isExtraPhase || state.isInterruption) {
-                navigate('ui-variation');
-                // Ensure list is rendered correctly
-                updateVariationUI();
-                renderFreestyleChips();
-                renderFreestyleList();
-            } else {
-                navigate('ui-confirm');
-            }
-            return;
-        }
-    }
-
-    // --- 2. GUARD LAYER: UI-CONFIRM (Transition Screen) ---
-    if (currentScreen === 'ui-confirm') {
-        // Time Travel Logic: If we are deep in a workout (exIdx > 0), Back means "Go to previous exercise"
-        if (state.exIdx > 0 && !state.isFreestyle && !state.isInterruption && !state.clusterMode) {
-             // We don't ask for confirmation here, we just go back (smooth UX)
-             revertToPreviousExercise();
-             return;
-        }
-
-        // Standard Exit Logic (Start of workout)
-        if (state.log.length > 0 || state.completedExInSession.length > 0) {
-            if(confirm("האם לצאת מהאימון?")) StorageManager.clearSessionState();
-            else return; // Abort
-        }
-        // If empty workout, just go back
-    }
-
-    if (currentScreen === 'ui-cluster-rest') {
-        if(!confirm("האם לצאת ממצב Cluster?")) return;
-        state.clusterMode = false;
-        // Proceed to back
-    }
-
-    if (currentScreen === 'ui-workout-editor') { 
-        if(confirm("לצאת ללא שמירה?")) { 
-            state.historyStack.pop(); 
-            navigate('ui-workout-manager'); 
-            return;
-        }
-        return; 
-    }
-
-    // --- 3. CLEANUP LAYER (Transient Screens) ---
-    if (currentScreen === 'ui-variation') {
-        state.isInterruption = false;
-        state.isExtraPhase = false;
-        state.freestyleFilter = 'all'; 
-    }
-
-    if (currentScreen === 'ui-exercise-selector') {
-        document.getElementById('selector-search').value = "";
-    }
-
-    // --- 4. NAVIGATION LAYER ---
-    state.historyStack.pop();
-    const prevScreen = state.historyStack[state.historyStack.length - 1];
-    
-    // --- 5. REFRESH LAYER ---
-    if (prevScreen === 'ui-variation') {
-        updateVariationUI(); 
-        renderFreestyleChips();
-        renderFreestyleList();
-    }
-
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById(prevScreen).classList.add('active');
-    
-    document.getElementById('global-back').style.visibility = (prevScreen === 'ui-week') ? 'hidden' : 'visible';
-    const settingsBtn = document.getElementById('btn-settings');
-    if (settingsBtn) settingsBtn.style.visibility = (prevScreen === 'ui-week') ? 'visible' : 'hidden';
-}
-
-/**
- * Helper: Reverts state to the previous exercise in "Finished" state.
- * Used for "Time Travel" from ui-confirm back to ui-main.
- */
-function revertToPreviousExercise() {
-    // 1. Decrement Index
-    state.exIdx--;
-    
-    // 2. Load Previous Data
-    const prevItem = state.workouts[state.type][state.exIdx];
-    const exData = state.exercises.find(e => e.name === prevItem.name);
-    
-    // Deep copy to prevent reference issues
-    state.currentEx = JSON.parse(JSON.stringify(exData));
-    state.currentExName = exData.name;
-    
-    // Restore settings from plan
-    if (prevItem.restTime) state.currentEx.restTime = prevItem.restTime;
-    
-    // 3. Restore Set Index (To the end)
-    // We assume the user finished it, so setIdx should be at the end of sets array
-    // We check the log to be sure how many sets were done
-    const relevantLogs = state.log.filter(l => l.exName === state.currentExName && !l.skip && !l.isWarmup);
-    state.setIdx = relevantLogs.length > 0 ? relevantLogs.length : (state.currentEx.sets ? state.currentEx.sets.length : 3);
-    state.lastLoggedSet = relevantLogs.length > 0 ? relevantLogs[relevantLogs.length - 1] : null;
-
-    // 4. Remove from 'Completed' list so flow logic allows re-entry
-    state.completedExInSession = state.completedExInSession.filter(name => name !== state.currentExName);
-
-    // 5. Navigate to UI-MAIN
-    navigate('ui-main');
-
-    // 6. Restore UI State to "Finished" (Action Panel Open)
-    setTimeout(() => {
-        initPickers();
-        document.getElementById('btn-submit-set').style.display = 'none';
-        document.getElementById('btn-skip-exercise').style.display = 'none';
-        document.getElementById('action-panel').style.display = 'block';
-
-        // Preview logic
-        let nextName = getNextExerciseName();
-        document.getElementById('next-ex-preview').innerText = `הבא בתור: ${nextName}`;
-
-        document.getElementById('timer-area').style.visibility = 'hidden';
-        stopRestTimer();
-    }, 50);
-
-    StorageManager.saveSessionState();
-}
-
 // --- WORKOUT MANAGER ---
 
 function openWorkoutManager() { renderManagerList(); navigate('ui-workout-manager'); }
@@ -853,6 +774,7 @@ function renderExerciseDatabase() {
     list.innerHTML = "";
     const searchVal = document.getElementById('db-search').value.toLowerCase();
     
+    // Sort Alphabetically
     const sorted = [...state.exercises].sort((a,b) => a.name.localeCompare(b.name));
     
     const filtered = sorted.filter(ex => ex.name.toLowerCase().includes(searchVal));
@@ -877,7 +799,7 @@ function renderExerciseDatabase() {
 function saveExerciseConfig() {
     const mode = document.getElementById('ex-config-modal').dataset.mode;
     const name = document.getElementById('conf-ex-name').value.trim();
-    const muscleSelect = document.getElementById('conf-ex-muscle').value;
+    const muscleSelect = document.getElementById('conf-ex-muscle').value; 
     const step = parseFloat(document.getElementById('conf-ex-step').value);
     const base = parseFloat(document.getElementById('conf-ex-base').value);
     const min = parseFloat(document.getElementById('conf-ex-min').value);
@@ -932,10 +854,13 @@ function saveExerciseConfig() {
         closeExConfigModal();
     }
 
+    // Refresh the correct screen
     if (document.getElementById('ui-exercise-db').classList.contains('active')) {
         renderExerciseDatabase();
     } else if (document.getElementById('ui-exercise-selector').classList.contains('active')) {
-        prepareSelector();
+        // IMPORTANT: In V12.12.0 we might be returning from edit, so we should refresh list
+        // but try to preserve filter if possible.
+        renderSelectorList();
     }
 }
 
@@ -943,7 +868,6 @@ function closeExConfigModal() {
     document.getElementById('ex-config-modal').style.display = 'none';
     document.getElementById('conf-ex-name').disabled = false; 
 }
-
 // --- WORKOUT EDITOR & CLUSTER SUPPORT ---
 
 function renderEditorList() {
@@ -1622,6 +1546,7 @@ function finishCurrentExercise() {
             StorageManager.saveSessionState(); 
         } 
         else if (state.isFreestyle) { 
+            // V12.12.0: Sticky Filters preserved in handleBackClick.
             navigate('ui-variation');
             updateVariationUI();
             renderFreestyleChips();
@@ -1726,7 +1651,7 @@ function startFreestyle() {
     state.isFreestyle = true; state.isExtraPhase = false; state.isInterruption = false;
     state.workoutStartTime = Date.now();
     
-    // Default filter
+    // Default filter reset on FRESH start
     state.freestyleFilter = 'all'; 
     document.getElementById('freestyle-search').value = '';
     
@@ -1793,17 +1718,12 @@ function renderFreestyleList() {
     let filtered = state.exercises.filter(ex => {
         const isDone = state.completedExInSession.includes(ex.name);
         
-        // 1. Done Tab Logic
         if (state.freestyleFilter === 'בוצעו') return isDone;
-        
-        // 2. Hide done exercises from normal lists
         if (isDone) return false;
 
-        // 3. Search Logic
         const matchesSearch = ex.name.toLowerCase().includes(searchVal);
         if (!matchesSearch) return false;
 
-        // 4. Category Logic
         if (state.freestyleFilter === 'all') return true;
         if (state.freestyleFilter === 'יד קדמית') return ex.muscles.includes('biceps');
         if (state.freestyleFilter === 'יד אחורית') return ex.muscles.includes('triceps');
@@ -2091,6 +2011,8 @@ function openSessionLog() {
     drawer.classList.add('open');
     haptic('light');
 }
+
+function closeSessionLog() { closeDayDrawer(); } // Alias for consistency
 
 function openEditSet(index) {
     const entry = state.log[index];
