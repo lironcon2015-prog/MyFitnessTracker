@@ -1,14 +1,13 @@
 /**
- * GYMPRO ELITE V12.12.0 (Smart Navigation & Instant Load)
- * - Logic: Time Travel Navigation (Non-destructive Back).
- * - Logic: DOMContentLoaded for 0ms load.
- * - Logic: Priority Modal Closing on Back.
- * - UX: Sticky Filters & Scroll Preservation.
+ * GYMPRO ELITE V12.11.0 (Smart Exit & Live History)
+ * - Logic: Smart Back Navigation (State Reconstruction).
+ * - Feature: Live History Drawer in active workout.
+ * - UX: Text-based History button.
  */
 
-// --- DEFAULT DATA ---
+// --- DEFAULT DATA (No Changes) ---
 const defaultExercises = [
-    // SHOULDERS
+    // ... (אותה רשימה כמו קודם - ללא שינוי)
     { name: "Overhead Press (Main)", muscles: ["כתפיים"], isCalc: true, baseRM: 60, rmRange: [50, 100], manualRange: {base: 50, min: 40, max: 80, step: 2.5} },
     { name: "Arnold Press", muscles: ["כתפיים"], sets: [{w: 15, r: 10}, {w: 15, r: 10}, {w: 15, r: 10}], step: 2.5 },
     { name: "Dumbbell Shoulder Press", muscles: ["כתפיים"], sets: [{w: 20, r: 10}, {w: 20, r: 10}, {w: 20, r: 10}], step: 2.5 },
@@ -21,8 +20,6 @@ const defaultExercises = [
     { name: "Front Raises", muscles: ["כתפיים"], sets: [{w: 10, r: 12}, {w: 10, r: 12}, {w: 10, r: 12}], step: 1 },
     { name: "Y Raises", muscles: ["גב", "כתפיים"], sets: [{w: 4, r: 12}, {w: 4, r: 12}, {w: 4, r: 12}], step: 1 },
     { name: "L Raises", muscles: ["גב", "כתפיים"], sets: [{w: 3, r: 12}, {w: 3, r: 12}, {w: 3, r: 12}], step: 1 },
-
-    // BACK
     { name: "Weighted Pull Ups", muscles: ["גב", "קליסטניקס"], sets: [{w: 0, r: 8}, {w: 0, r: 8}, {w: 0, r: 8}], step: 5, minW: 0, maxW: 60, isBW: true },
     { name: "Pull Ups", muscles: ["גב", "קליסטניקס"], isBW: true, sets: [{w: 0, r: 8}, {w: 0, r: 8}, {w: 0, r: 8}], step: 5, minW: 0, maxW: 60 },
     { name: "Chin Ups", muscles: ["גב", "קליסטניקס"], isBW: true, sets: [{w: 0, r: 8}, {w: 0, r: 8}, {w: 0, r: 8}], step: 5, minW: 0, maxW: 60 },
@@ -37,8 +34,6 @@ const defaultExercises = [
     { name: "Rack Pulls", muscles: ["גב"], sets: [{w: 100, r: 5}, {w: 100, r: 5}, {w: 100, r: 5}], step: 5 },
     { name: "Reverse Fly (Machine)", muscles: ["גב", "כתפיים"], sets: [{w: 30, r: 12}, {w: 30, r: 12}, {w: 30, r: 12}], step: 2.5 },
     { name: "Bodyweight Rows", muscles: ["גב", "קליסטניקס"], isBW: true, sets: [{w: 0, r: 10}, {w: 0, r: 10}, {w: 0, r: 10}] },
-
-    // CHEST
     { name: "Bench Press (Main)", muscles: ["חזה"], isCalc: true, baseRM: 100, rmRange: [80, 150], manualRange: {base: 85, min: 60, max: 140, step: 2.5} },
     { name: "Incline Bench Press", muscles: ["חזה"], sets: [{w: 65, r: 9}, {w: 65, r: 9}, {w: 65, r: 9}], step: 2.5 },
     { name: "Dumbbell Peck Fly", muscles: ["חזה"], sets: [{w: 14, r: 11}, {w: 14, r: 11}, {w: 14, r: 11}], step: 2 },
@@ -48,8 +43,6 @@ const defaultExercises = [
     { name: "Decline Bench Press", muscles: ["חזה"], sets: [{w: 80, r: 8}, {w: 80, r: 8}, {w: 80, r: 8}], step: 2.5 },
     { name: "Dumbbell Bench Press", muscles: ["חזה"], sets: [{w: 30, r: 8}, {w: 30, r: 8}, {w: 30, r: 8}], step: 2.5 },
     { name: "Incline Dumbbell Bench Press", muscles: ["חזה"], sets: [{w: 25, r: 8}, {w: 25, r: 8}, {w: 25, r: 8}], step: 2.5 },
-
-    // LEGS
     { name: "Leg Press", muscles: ["רגליים", "quads"], sets: [{w: 280, r: 8}, {w: 300, r: 8}, {w: 300, r: 7}], step: 5 },
     { name: "Squat", muscles: ["רגליים", "quads", "glutes"], sets: [{w: 100, r: 8}, {w: 100, r: 8}, {w: 100, r: 8}], step: 2.5, minW: 60, maxW: 180 },
     { name: "Deadlift", muscles: ["רגליים", "hamstrings"], sets: [{w: 100, r: 5}, {w: 100, r: 5}, {w: 100, r: 5}], step: 2.5, minW: 60, maxW: 180 },
@@ -64,8 +57,6 @@ const defaultExercises = [
     { name: "Walking Lunges", muscles: ["רגליים", "quads", "glutes"], sets: [{w: 10, r: 10}, {w: 10, r: 10}, {w: 10, r: 10}], step: 1 },
     { name: "Hack Squat", muscles: ["רגליים", "quads"], sets: [{w: 50, r: 10}, {w: 50, r: 10}, {w: 50, r: 10}], step: 5 },
     { name: "Hip Thrust", muscles: ["רגליים", "glutes"], sets: [{w: 60, r: 10}, {w: 60, r: 10}, {w: 60, r: 10}], step: 5 },
-
-    // ARMS
     { name: "Dumbbell Bicep Curls", muscles: ["ידיים", "biceps"], sets: [{w: 12, r: 8}, {w: 12, r: 8}, {w: 12, r: 8}], step: 0.5 },
     { name: "Barbell Bicep Curls", muscles: ["ידיים", "biceps"], sets: [{w: 25, r: 8}, {w: 25, r: 8}, {w: 25, r: 8}], step: 1 },
     { name: "Concentration Curls", muscles: ["ידיים", "biceps"], sets: [{w: 10, r: 10}, {w: 10, r: 10}, {w: 10, r: 10}], step: 0.5 },
@@ -75,8 +66,6 @@ const defaultExercises = [
     { name: "Triceps Pushdown", muscles: ["ידיים", "triceps"], sets: [{w: 35, r: 8}, {w: 35, r: 8}, {w: 35, r: 8}], step: 2.5 },
     { name: "Skullcrushers", muscles: ["ידיים", "triceps"], sets: [{w: 25, r: 8}, {w: 25, r: 8}, {w: 25, r: 8}], step: 2.5 },
     { name: "Overhead Triceps Extension (Cable)", muscles: ["ידיים", "triceps"], sets: [{w: 15, r: 12}, {w: 15, r: 12}, {w: 15, r: 12}], step: 1.25 },
-
-    // CALISTHENICS
     { name: "Muscle Up", muscles: ["קליסטניקס"], isBW: true, sets: [{w: 0, r: 3}, {w: 0, r: 3}, {w: 0, r: 3}] },
     { name: "Pistol Squat", muscles: ["קליסטניקס", "רגליים", "quads"], isBW: true, sets: [{w: 0, r: 5}, {w: 0, r: 5}, {w: 0, r: 5}] },
     { name: "Handstand Pushups", muscles: ["קליסטניקס", "כתפיים"], isBW: true, sets: [{w: 0, r: 5}, {w: 0, r: 5}, {w: 0, r: 5}] },
@@ -111,7 +100,7 @@ const defaultWorkouts = {
     ]
 };
 
-// --- SUBSTITUTION LOGIC ---
+// --- SUBSTITUTION LOGIC (No Changes) ---
 const substituteGroups = [
     ["Incline Bench Press", "Incline Dumbbell Bench Press"],
     ["Dumbbell Bench Press", "Machine Press"], 
@@ -189,7 +178,7 @@ let wakeLock = null;
 let currentArchiveItem = null;
 let selectedArchiveIds = new Set(); 
 
-// --- LOCAL STORAGE MANAGER ---
+// --- LOCAL STORAGE MANAGER (No Changes) ---
 const StorageManager = {
     KEY_WEIGHTS: 'gympro_weights',
     KEY_RM: 'gympro_rm',
@@ -328,7 +317,7 @@ const StorageManager = {
     exportConfiguration() {
         const configData = {
             type: 'config_only',
-            version: '12.12.0',
+            version: '12.11.0',
             date: new Date().toISOString(),
             workouts: this.getData(this.KEY_DB_WORKOUTS),
             exercises: this.getData(this.KEY_DB_EXERCISES),
@@ -356,12 +345,11 @@ const StorageManager = {
 };
 
 // --- INITIALIZATION ---
-// OPTIMIZATION: Use DOMContentLoaded for 0ms Load
-document.addEventListener('DOMContentLoaded', () => {
+window.onload = () => {
     StorageManager.initDB();
     renderWorkoutMenu();
     checkRecovery();
-});
+};
 
 function checkRecovery() {
     if (StorageManager.hasActiveSession()) {
@@ -377,7 +365,7 @@ function restoreSession() {
         
         document.getElementById('recovery-modal').style.display = 'none';
         
-        // MIGRATION 12.10.0: Handle removed screens
+        // Handle migration logic (12.10)
         let lastScreen = state.historyStack[state.historyStack.length - 1];
         if (['ui-muscle-select', 'ui-ask-arms', 'ui-arm-selection'].includes(lastScreen)) {
              if (lastScreen === 'ui-muscle-select') {
@@ -395,10 +383,15 @@ function restoreSession() {
         document.getElementById(lastScreen).classList.add('active');
         document.getElementById('global-back').style.visibility = (lastScreen === 'ui-week') ? 'hidden' : 'visible';
         
-        // On Full Restore (Page Reload), we MUST re-render everything to restore DOM
         switch (lastScreen) {
             case 'ui-main':
                 initPickers();
+                // Ensure Action Panel is visible if we were done
+                if (document.getElementById('btn-submit-set').style.display === 'none') {
+                    document.getElementById('action-panel').style.display = 'block';
+                    document.getElementById('next-ex-preview').innerText = `הבא בתור: ${getNextExerciseName()}`;
+                }
+
                 if (state.startTime && state.seconds > 0) {
                     const elapsed = Math.floor((Date.now() - state.startTime) / 1000);
                     let target = state.currentEx && state.currentEx.restTime ? state.currentEx.restTime : 90;
@@ -480,6 +473,8 @@ function navigate(id) {
     document.getElementById(id).classList.add('active');
     
     if (id !== 'ui-main') stopRestTimer();
+    
+    // Only push to stack if we are not manually manipulating history (handled in handleBackClick)
     if (state.historyStack[state.historyStack.length - 1] !== id) state.historyStack.push(id);
     
     document.getElementById('global-back').style.visibility = (id === 'ui-week') ? 'hidden' : 'visible';
@@ -488,62 +483,100 @@ function navigate(id) {
 }
 
 /**
- * REFACTORED handleBackClick (V12.12.0 Smart Navigation)
- * Implements "Time Travel" via Non-Destructive CSS Toggling
+ * REWRITTEN handleBackClick (V12.11.0 SMART EXIT)
+ * Implements State Reconstruction for workout flow.
  */
 function handleBackClick() {
     haptic('warning');
-    
-    // --- 1. PRIORITY LAYER (Modal/Overlay Closing) ---
-    // If any modal is open, close it first and do NOT navigate back.
-    if(document.getElementById('sheet-modal').classList.contains('open')) { closeDayDrawer(); closeSessionLog(); return; }
-    if(document.getElementById('warmup-modal').style.display === 'flex') { closeWarmup(); return; }
-    if(document.getElementById('edit-set-modal').style.display === 'flex') { closeEditModal(); return; }
-    if(document.getElementById('ex-config-modal').style.display === 'flex') { closeExConfigModal(); return; }
-    if(document.getElementById('exercise-settings-modal').style.display === 'flex') { closeExerciseSettings(); return; }
-
     if (state.historyStack.length <= 1) return;
 
     const currentScreen = state.historyStack[state.historyStack.length - 1];
 
-    // --- 2. LOGIC GUARD LAYER ---
-    // Prevent accidental exit from active processes (Logic Undo)
+    // --- SMART LOGIC FOR WORKOUT FLOW ---
     
+    // 1. ACTIVE EXERCISE SCREEN (ui-main)
     if (currentScreen === 'ui-main') {
-        if (state.isFreestyle && state.setIdx === 0 && state.log.length === 0) {
-            // Safe to exit
-        } 
-        else if (state.setIdx > 0) {
-            if(confirm("חזרה אחורה תמחק את הסט הנוכחי. להמשיך?")) {
-               state.setIdx--;
-               initPickers();
-               StorageManager.saveSessionState();
-               return; // Stay on screen, just undo logic
+        const actionPanel = document.getElementById('action-panel');
+        
+        // Scenario A: Action Panel is visible (Exercise finished view)
+        // Action: Un-finish. Return to editing the last set.
+        if (actionPanel.style.display !== 'none') {
+            actionPanel.style.display = 'none';
+            document.getElementById('btn-submit-set').style.display = 'block';
+            document.getElementById('btn-skip-exercise').style.display = (state.setIdx === 0) ? 'none' : 'block';
+            initPickers(); // Reloads current set values
+            return; // Stay on ui-main
+        }
+
+        // Scenario B: Mid-set (Set > 0)
+        // Action: Confirm delete last set
+        if (state.setIdx > 0) {
+            if(confirm("למחוק את הסט האחרון ולחזור אליו?")) {
+                // Remove last log entry
+                state.log.pop();
+                
+                // Update lastLoggedSet pointer
+                const relevantLogs = state.log.filter(l => l.exName === state.currentExName && !l.skip && !l.isWarmup);
+                if (relevantLogs.length > 0) state.lastLoggedSet = relevantLogs[relevantLogs.length - 1];
+                else state.lastLoggedSet = null;
+
+                state.setIdx--;
+                initPickers(); // UI refresh
+                StorageManager.saveSessionState();
+                return; // Stay on ui-main
             }
-            return; // Abort
-        } else {
-            // Exit active exercise -> Confirm Screen
-            stopRestTimer();
-            state.historyStack.pop(); // Pop ui-main
-            
-            // Special Case: Returning from ui-main to ui-confirm should NOT be destructive
-            // We switch manually to preserve ui-confirm state
-            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            document.getElementById('ui-confirm').classList.add('active');
-            
-            // Restore visibility (standard navigate logic but manual)
-            document.getElementById('global-back').style.visibility = 'visible';
+            return; // Abort back
+        }
+
+        // Scenario C: First set (Set 0)
+        // Action: Return to ui-confirm (Cancel exercise entry)
+        stopRestTimer();
+        state.historyStack.pop(); 
+        navigate('ui-confirm');
+        return;
+    }
+
+    // 2. CONFIRM NEXT EXERCISE SCREEN (ui-confirm)
+    if (currentScreen === 'ui-confirm') {
+        // If it's the very first exercise and no logs, just exit
+        if (state.exIdx === 0 && state.log.length === 0) {
+            if(confirm("האם לצאת מהאימון?")) StorageManager.clearSessionState();
+            else return;
+        } 
+        else {
+            // We are mid-workout. "Back" means "Go to previous exercise finished state"
+            stepBackToPreviousExercise();
             return;
         }
     }
 
-    if (currentScreen === 'ui-confirm') {
-        if (state.log.length > 0 || state.completedExInSession.length > 0) {
-            if(confirm("האם לצאת מהאימון?")) StorageManager.clearSessionState();
-            else return; 
+    // 3. FREESTYLE/VARIATION SCREEN (ui-variation)
+    if (currentScreen === 'ui-variation') {
+        // Cleanup flags
+        state.isInterruption = false;
+        state.isExtraPhase = false;
+        state.freestyleFilter = 'all';
+
+        // If we came here from "Add Exercise" (Interruption), go back to where we were
+        // If we are in extra phase, go back to finished state of previous extra
+        state.historyStack.pop();
+        const prev = state.historyStack[state.historyStack.length - 1];
+        
+        // Manual navigate to avoid double stack push
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(prev).classList.add('active');
+        
+        // Refresh UI if needed
+        if (prev === 'ui-main') {
+            // Should be in action panel state
+            document.getElementById('action-panel').style.display = 'block';
+            document.getElementById('btn-submit-set').style.display = 'none';
         }
+        return;
     }
 
+    // --- STANDARD NAVIGATION (Setup/Menu Screens) ---
+    
     if (currentScreen === 'ui-cluster-rest') {
         if(!confirm("האם לצאת ממצב Cluster?")) return;
         state.clusterMode = false;
@@ -552,44 +585,150 @@ function handleBackClick() {
     if (currentScreen === 'ui-workout-editor') { 
         if(confirm("לצאת ללא שמירה?")) { 
             state.historyStack.pop(); 
-            // We use standard navigate here to ensure clean state for manager list
             navigate('ui-workout-manager'); 
             return;
         }
         return; 
     }
 
-    // --- 3. CLEANUP LAYER (Minimal) ---
-    // Removed aggressive filter cleaning to allow Sticky Filters & Search Preservation.
-    
-    if (currentScreen === 'ui-variation') {
-        state.isInterruption = false;
-        state.isExtraPhase = false;
-        // NOTE: state.freestyleFilter NOT reset here.
+    if (currentScreen === 'ui-exercise-selector') {
+        document.getElementById('selector-search').value = "";
     }
 
-    // --- 4. NAVIGATION LAYER (Time Travel) ---
-    // We pop the stack, but we DO NOT call navigate() which triggers renders.
-    // We manually toggle CSS classes to show the previous screen EXACTLY as it was.
-    
     state.historyStack.pop();
     const prevScreen = state.historyStack[state.historyStack.length - 1];
     
-    // Hide all, Show Prev (No Render)
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById(prevScreen).classList.add('active');
     
-    // Header Logic
     document.getElementById('global-back').style.visibility = (prevScreen === 'ui-week') ? 'hidden' : 'visible';
     const settingsBtn = document.getElementById('btn-settings');
     if (settingsBtn) settingsBtn.style.visibility = (prevScreen === 'ui-week') ? 'visible' : 'hidden';
+}
 
-    // Special Handling: If we go back to ui-main (unlikely via back button but possible logically), ensure timer visibility
-    if (prevScreen === 'ui-main') {
-         if(state.setIdx > 0 || state.clusterMode) {
-             document.getElementById('timer-area').style.visibility = 'visible';
-         }
+/**
+ * NEW FUNCTION: Time Travel Logic
+ * Reconstructs the state of the previous exercise to allow editing.
+ */
+function stepBackToPreviousExercise() {
+    // 1. Find the last executed exercise from the log
+    // We ignore warmups for "exercise type" determination, but we need the name
+    const validLogs = state.log.filter(l => !l.isWarmup);
+    if (validLogs.length === 0) {
+        // Fallback: Just exit if no history
+        if(confirm("האם לצאת מהאימון?")) StorageManager.clearSessionState();
+        return;
     }
+
+    const lastEntry = validLogs[validLogs.length - 1];
+    const prevExName = lastEntry.exName;
+
+    // 2. Load Exercise Data
+    const exData = state.exercises.find(e => e.name === prevExName);
+    if (!exData) { alert("Error: Exercise data not found"); return; }
+    
+    state.currentEx = JSON.parse(JSON.stringify(exData));
+    state.currentExName = prevExName;
+
+    // 3. Determine if it was part of the plan or freestyle
+    // If the name matches the *previous* plan item, decrement index.
+    // If we are currently at index X, we check index X-1.
+    const plan = state.workouts[state.type];
+    if (plan && state.exIdx > 0) {
+        const prevPlanItem = plan[state.exIdx - 1];
+        if (prevPlanItem && prevPlanItem.name === prevExName) {
+            state.exIdx--; // Revert plan pointer
+        }
+        // If it doesn't match, it was a Freestyle interruption. 
+        // We do NOT change exIdx, so we stay "before" the current plan item.
+    }
+
+    // 4. Reconstruct Set Index
+    // Count how many sets of this exercise are in the log (excluding warmups)
+    const setLogCount = state.log.filter(l => l.exName === prevExName && !l.isWarmup).length;
+    state.setIdx = setLogCount; // Position at "Done" (index = count)
+    
+    // Set last logged set for display
+    const relevantLogs = state.log.filter(l => l.exName === prevExName && !l.skip && !l.isWarmup);
+    state.lastLoggedSet = relevantLogs.length > 0 ? relevantLogs[relevantLogs.length - 1] : null;
+
+    // 5. Navigate to UI Main in "Finished" state
+    state.historyStack.push('ui-main'); // Manually push since we bypass navigate() logic sometimes
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('ui-main').classList.add('active');
+    
+    initPickers(); // Load values
+    
+    // Force Action Panel View
+    document.getElementById('btn-submit-set').style.display = 'none';
+    document.getElementById('btn-skip-exercise').style.display = 'none';
+    document.getElementById('action-panel').style.display = 'block';
+    
+    // Update "Next Exercise" preview in the panel
+    document.getElementById('next-ex-preview').innerText = `הבא בתור: ${getNextExerciseName()}`;
+    
+    StorageManager.saveSessionState();
+}
+
+/**
+ * NEW FUNCTION: Live History Drawer
+ * Shows history for the *current* exercise without leaving the screen.
+ */
+function openLiveHistory() {
+    const history = getLastPerformance(state.currentExName);
+    
+    const drawer = document.getElementById('sheet-modal');
+    const overlay = document.getElementById('sheet-overlay');
+    const content = document.getElementById('sheet-content');
+
+    let html = `<h3>היסטוריית ביצוע</h3><p class="sub-text">${state.currentExName}</p>`;
+
+    if (history) {
+        let rowsHtml = "";
+        history.sets.forEach((setStr, idx) => {
+            let weight = "-", reps = "-", rir = "-";
+            try {
+                const parts = setStr.split('x');
+                if(parts.length > 1) {
+                    weight = parts[0].replace('kg', '').trim();
+                    const rest = parts[1];
+                    const rirMatch = rest.match(/\(RIR (.*?)\)/);
+                    reps = rest.split('(')[0].trim();
+                    if(rirMatch) rir = rirMatch[1];
+                }
+            } catch(e) {}
+
+            rowsHtml += `
+            <div class="history-row" style="grid-template-columns: 0.5fr 1fr 1fr 1fr;">
+                <div class="history-col set-idx">#${idx + 1}</div>
+                <div class="history-col">${weight}</div>
+                <div class="history-col">${reps}</div>
+                <div class="history-col rir-note">${rir}</div>
+            </div>`;
+        });
+
+        html += `
+        <div class="history-card-container" style="border:none; padding:0; background:transparent;">
+            <div style="font-size:0.85em; color:var(--text-dim); text-align:right; margin-bottom:10px;">📅 ביצוע אחרון: ${history.date}</div>
+            <div class="history-header" style="grid-template-columns: 0.5fr 1fr 1fr 1fr;">
+                <div>סט</div>
+                <div>משקל</div>
+                <div>חזרות</div>
+                <div>RIR</div>
+            </div>
+            <div class="history-list">${rowsHtml}</div>
+        </div>
+        `;
+    } else {
+        html += `<p style="text-align:center; padding: 20px;">אין נתונים קודמים לתרגיל זה.</p>`;
+    }
+
+    html += `<button class="btn-text" onclick="closeDayDrawer()" style="margin-top:20px;">סגור</button>`;
+
+    content.innerHTML = html;
+    overlay.style.display = 'block';
+    drawer.classList.add('open');
+    haptic('light');
 }
 
 function openSettings() { navigate('ui-settings'); }
@@ -639,6 +778,7 @@ function renderWorkoutMenu() {
 // --- WORKOUT MANAGER ---
 
 function openWorkoutManager() { renderManagerList(); navigate('ui-workout-manager'); }
+// --- WORKOUT MANAGER CONT. ---
 
 function renderManagerList() {
     const list = document.getElementById('manager-list'); list.innerHTML = "";
@@ -738,6 +878,7 @@ function openExerciseEditor(exName) {
     document.getElementById('conf-ex-name').value = ex.name;
     document.getElementById('conf-ex-name').disabled = true;
     
+    // Handle Biceps/Triceps mapping back to dropdown
     let muscleVal = ex.muscles[0] || "חזה";
     if (ex.muscles.includes('biceps')) muscleVal = "יד קדמית";
     else if (ex.muscles.includes('triceps')) muscleVal = "יד אחורית";
@@ -799,7 +940,7 @@ function renderExerciseDatabase() {
 function saveExerciseConfig() {
     const mode = document.getElementById('ex-config-modal').dataset.mode;
     const name = document.getElementById('conf-ex-name').value.trim();
-    const muscleSelect = document.getElementById('conf-ex-muscle').value; 
+    const muscleSelect = document.getElementById('conf-ex-muscle').value; // 'יד קדמית' or 'יד אחורית'
     const step = parseFloat(document.getElementById('conf-ex-step').value);
     const base = parseFloat(document.getElementById('conf-ex-base').value);
     const min = parseFloat(document.getElementById('conf-ex-min').value);
@@ -808,6 +949,7 @@ function saveExerciseConfig() {
 
     if (!name) { alert("נא להזין שם תרגיל"); return; }
 
+    // Map dropdown to muscle array
     let musclesArr = [muscleSelect];
     if (muscleSelect === 'יד קדמית') musclesArr = ['ידיים', 'biceps'];
     if (muscleSelect === 'יד אחורית') musclesArr = ['ידיים', 'triceps'];
@@ -858,9 +1000,7 @@ function saveExerciseConfig() {
     if (document.getElementById('ui-exercise-db').classList.contains('active')) {
         renderExerciseDatabase();
     } else if (document.getElementById('ui-exercise-selector').classList.contains('active')) {
-        // IMPORTANT: In V12.12.0 we might be returning from edit, so we should refresh list
-        // but try to preserve filter if possible.
-        renderSelectorList();
+        prepareSelector();
     }
 }
 
@@ -1546,7 +1686,7 @@ function finishCurrentExercise() {
             StorageManager.saveSessionState(); 
         } 
         else if (state.isFreestyle) { 
-            // V12.12.0: Sticky Filters preserved in handleBackClick.
+            // STICKY FILTERS ACTIVE: We do not reset freestyleFilter here.
             navigate('ui-variation');
             updateVariationUI();
             renderFreestyleChips();
@@ -1651,7 +1791,7 @@ function startFreestyle() {
     state.isFreestyle = true; state.isExtraPhase = false; state.isInterruption = false;
     state.workoutStartTime = Date.now();
     
-    // Default filter reset on FRESH start
+    // Default filter
     state.freestyleFilter = 'all'; 
     document.getElementById('freestyle-search').value = '';
     
@@ -1693,6 +1833,7 @@ function renderFreestyleChips() {
     const container = document.getElementById('variation-chips');
     container.innerHTML = "";
     
+    // Updated V12.10.0: Biceps/Triceps split + Done tab
     const muscles = ['all', 'חזה', 'גב', 'רגליים', 'כתפיים', 'יד קדמית', 'יד אחורית', 'קליסטניקס', 'בוצעו'];
     const labels = { 'all': 'הכל' };
     
@@ -1718,12 +1859,17 @@ function renderFreestyleList() {
     let filtered = state.exercises.filter(ex => {
         const isDone = state.completedExInSession.includes(ex.name);
         
+        // 1. Done Tab Logic
         if (state.freestyleFilter === 'בוצעו') return isDone;
+        
+        // 2. Hide done exercises from normal lists
         if (isDone) return false;
 
+        // 3. Search Logic
         const matchesSearch = ex.name.toLowerCase().includes(searchVal);
         if (!matchesSearch) return false;
 
+        // 4. Category Logic
         if (state.freestyleFilter === 'all') return true;
         if (state.freestyleFilter === 'יד קדמית') return ex.muscles.includes('biceps');
         if (state.freestyleFilter === 'יד אחורית') return ex.muscles.includes('triceps');
@@ -1731,6 +1877,7 @@ function renderFreestyleList() {
         return ex.muscles.includes(state.freestyleFilter);
     });
     
+    // Sort alphabetically
     filtered.sort((a,b) => a.name.localeCompare(b.name));
 
     if (filtered.length === 0) {
@@ -2011,8 +2158,6 @@ function openSessionLog() {
     drawer.classList.add('open');
     haptic('light');
 }
-
-function closeSessionLog() { closeDayDrawer(); } // Alias for consistency
 
 function openEditSet(index) {
     const entry = state.log[index];
