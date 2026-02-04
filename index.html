@@ -359,10 +359,11 @@
 
             <div id="ui-main" class="screen">
                 <div class="exercise-header">
-                    <button onclick="openSessionLog()" class="clean-log-btn">יומן</button>
-                    <!-- NEW HISTORY BUTTON -->
-                    <button onclick="openHistoryDrawer()" class="clean-history-btn">היסטוריה</button>
-                    
+                    <div class="header-tools">
+                        <button onclick="openHistoryDrawer()" class="tool-btn">היסטוריה</button>
+                        <button onclick="openSessionLog()" class="tool-btn">יומן</button>
+                    </div>
+
                     <div class="badge-row" style="margin-top: 5px;">
                         <span id="set-counter" class="ios-badge">SET 1/3</span>
                         <button id="btn-warmup" class="warmup-badge" onclick="calcWarmup()">חימום</button>
