@@ -1,6 +1,7 @@
 /**
- * GYMPRO ELITE V12.12 (History Drawer)
- * - Feature: Added 'History' button in active workout screen to view last session data in a drawer.
+ * GYMPRO ELITE V12.12.1 (Abs Category & Deload Only)
+ * - Feature: Added 'Abs' (בטן) category to filters and config.
+ * - Feature: Added 'Deload Only' workout logic.
  */
 
 // --- DEFAULT DATA ---
@@ -146,7 +147,7 @@ let state = {
     log: [], currentEx: null, currentExName: '',
     historyStack: ['ui-week'],
     timerInterval: null, seconds: 0, startTime: null,
-    isFreestyle: false, isExtraPhase: false, isInterruption: false, // Updated flags
+    isFreestyle: false, isExtraPhase: false, isInterruption: false, 
     currentMuscle: '',
     completedExInSession: [],
     workoutStartTime: null, workoutDurationMins: 0,
@@ -326,7 +327,7 @@ const StorageManager = {
     exportConfiguration() {
         const configData = {
             type: 'config_only',
-            version: '12.12',
+            version: '12.12.1',
             date: new Date().toISOString(),
             workouts: this.getData(this.KEY_DB_WORKOUTS),
             exercises: this.getData(this.KEY_DB_EXERCISES),
@@ -374,7 +375,7 @@ function restoreSession() {
         
         document.getElementById('recovery-modal').style.display = 'none';
         
-        // MIGRATION 12.10.0: Handle removed screens
+        // Handle migration of removed screens if needed
         let lastScreen = state.historyStack[state.historyStack.length - 1];
         if (['ui-muscle-select', 'ui-ask-arms', 'ui-arm-selection'].includes(lastScreen)) {
              if (lastScreen === 'ui-muscle-select') {
@@ -413,7 +414,7 @@ function restoreSession() {
             case 'ui-confirm': showConfirmScreen(state.currentExName); break;
             case 'ui-swap-list': openSwapMenu(); break;
             case 'ui-workout-manager': renderManagerList(); break;
-            case 'ui-workout-editor': renderEditorList(); document.getElementById('editor-workout-name').value = managerState.currentName; break;
+            case 'ui-workout-editor': openEditorUI(); break; // REFACTORED call
             case 'ui-exercise-selector': document.getElementById('selector-search').value = ""; updateSelectorChips(); renderSelectorList(); break;
             case 'ui-1rm': setupCalculatedEx(); break;
             case 'ui-variation': 
@@ -483,34 +484,26 @@ function navigate(id) {
     if (settingsBtn) settingsBtn.style.visibility = (id === 'ui-week') ? 'visible' : 'hidden';
 }
 
-/**
- * REFACTORED handleBackClick (V12.10.0 Guard Layers)
- * Structured: Guard -> Cleanup -> Navigate -> Refresh
- */
 function handleBackClick() {
     haptic('warning');
     if (state.historyStack.length <= 1) return;
 
     const currentScreen = state.historyStack[state.historyStack.length - 1];
 
-    // --- 1. GUARD LAYER (Process Screens) ---
-    // Prevent accidental exit from active processes
-    
+    // Guard Layer
     if (currentScreen === 'ui-main') {
-        // Special Case: Freestyle Undo (If 0 sets done, allow exit without confirmation)
         if (state.isFreestyle && state.setIdx === 0 && state.log.length === 0) {
-            // Pass through to standard navigation
+            // pass
         } 
         else if (state.setIdx > 0) {
             if(confirm("חזרה אחורה תמחק את הסט הנוכחי. להמשיך?")) {
                state.setIdx--;
                initPickers();
                StorageManager.saveSessionState();
-               return; // Stay on screen
+               return; 
             }
-            return; // Abort back
+            return; 
         } else {
-            // Exit active exercise flow -> Go to Confirm
             stopRestTimer();
             state.historyStack.pop(); 
             navigate('ui-confirm');
@@ -521,15 +514,13 @@ function handleBackClick() {
     if (currentScreen === 'ui-confirm') {
         if (state.log.length > 0 || state.completedExInSession.length > 0) {
             if(confirm("האם לצאת מהאימון?")) StorageManager.clearSessionState();
-            else return; // Abort
+            else return; 
         }
-        // If empty workout, just go back
     }
 
     if (currentScreen === 'ui-cluster-rest') {
         if(!confirm("האם לצאת ממצב Cluster?")) return;
         state.clusterMode = false;
-        // Proceed to back
     }
 
     if (currentScreen === 'ui-workout-editor') { 
@@ -541,41 +532,31 @@ function handleBackClick() {
         return; 
     }
 
-    // --- 2. CLEANUP LAYER (Transient Screens) ---
-    // Reset flags and temporary states when leaving specific screens
-    
+    // Cleanup Layer
     if (currentScreen === 'ui-variation') {
         state.isInterruption = false;
         state.isExtraPhase = false;
-        state.freestyleFilter = 'all'; // Reset filter on BACK (but keep on flow)
+        state.freestyleFilter = 'all'; 
     }
 
     if (currentScreen === 'ui-exercise-selector') {
         document.getElementById('selector-search').value = "";
     }
 
-    // --- 3. NAVIGATION LAYER ---
-    // Standard Stack Pop
+    // Navigation Layer
     state.historyStack.pop();
     const prevScreen = state.historyStack[state.historyStack.length - 1];
     
-    // --- 4. REFRESH LAYER ---
-    // Ensure the destination screen is in correct state
-    
+    // Refresh Layer
     if (prevScreen === 'ui-variation') {
         updateVariationUI(); 
-        // Note: renderFreestyleList will be called by navigate->restore or we might need explicit call
-        // navigate() calls nothing, just switches class. restoreSession handles reload.
-        // We might need to ensure chips are rendered.
         renderFreestyleChips();
         renderFreestyleList();
     }
 
-    // Perform the UI switch manually to avoid pushing to stack again (since we just popped)
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById(prevScreen).classList.add('active');
     
-    // Update Header Buttons
     document.getElementById('global-back').style.visibility = (prevScreen === 'ui-week') ? 'hidden' : 'visible';
     const settingsBtn = document.getElementById('btn-settings');
     if (settingsBtn) settingsBtn.style.visibility = (prevScreen === 'ui-week') ? 'visible' : 'hidden';
@@ -584,7 +565,7 @@ function handleBackClick() {
 function openSettings() { navigate('ui-settings'); }
 function resetToFactorySettings() { StorageManager.resetFactory(); }
 
-// --- DYNAMIC MAIN MENU & DELOAD LOGIC ---
+// --- DYNAMIC MAIN MENU & DELOAD LOGIC (UPDATED V12.12.1) ---
 function renderWorkoutMenu() {
     const container = document.getElementById('workout-menu-container');
     container.innerHTML = "";
@@ -604,7 +585,17 @@ function renderWorkoutMenu() {
              deloadWorkouts.forEach(key => {
                 const btn = document.createElement('button');
                 btn.className = "menu-card tall";
-                btn.innerHTML = `<h3>${key}</h3>`;
+                // Add visual indicator for Deload Only workouts
+                const meta = state.workoutMeta[key];
+                const badge = (meta && meta.isDeloadOnly) ? `<span style="font-size:0.7em; color:var(--type-free); border:1px solid var(--type-free); padding:2px 6px; border-radius:4px;">Deload Only</span>` : '';
+                
+                let count = 0;
+                const w = state.workouts[key];
+                if(Array.isArray(w)) {
+                    w.forEach(item => { if(item.type === 'cluster') count += item.exercises.length; else count++; });
+                }
+
+                btn.innerHTML = `<div style="display:flex; justify-content:space-between; width:100%; align-items:center;"><h3>${key}</h3>${badge}</div><p>${count} תרגילים</p>`;
                 btn.onclick = () => selectWorkout(key);
                 container.appendChild(btn);
              });
@@ -612,6 +603,9 @@ function renderWorkoutMenu() {
     } else {
         title.innerText = `שבוע ${state.week} - בחר אימון`;
         Object.keys(state.workouts).forEach(key => {
+            const meta = state.workoutMeta[key];
+            if (meta && meta.isDeloadOnly) return; // Skip Deload Only workouts in normal weeks
+
             const btn = document.createElement('button');
             btn.className = "menu-card tall";
             let count = 0;
@@ -625,6 +619,7 @@ function renderWorkoutMenu() {
         });
     }
 }
+
 // --- WORKOUT MANAGER ---
 
 function openWorkoutManager() { renderManagerList(); navigate('ui-workout-manager'); }
@@ -699,6 +694,7 @@ function openEditorUI() {
     document.getElementById('editor-workout-name').value = managerState.currentName;
     const meta = state.workoutMeta[managerState.currentName] || {};
     document.getElementById('editor-deload-check').checked = !!meta.availableInDeload;
+    document.getElementById('editor-deload-only-check').checked = !!meta.isDeloadOnly; 
     renderEditorList();
     navigate('ui-workout-editor');
 }
@@ -732,6 +728,7 @@ function openExerciseEditor(exName) {
     let muscleVal = ex.muscles[0] || "חזה";
     if (ex.muscles.includes('biceps')) muscleVal = "יד קדמית";
     else if (ex.muscles.includes('triceps')) muscleVal = "יד אחורית";
+    else if (ex.muscles.includes('בטן')) muscleVal = "בטן"; 
     
     document.getElementById('conf-ex-muscle').value = muscleVal;
     document.getElementById('conf-ex-step').value = ex.step || "2.5";
@@ -754,7 +751,7 @@ function openExerciseEditor(exName) {
     document.getElementById('ex-config-modal').style.display = 'flex';
 }
 
-// --- EXERCISE DATABASE MANAGER ---
+// --- EXERCISE DATABASE MANAGER (UPDATED V12.12.1) ---
 function openExerciseDatabase() {
     managerState.dbFilter = 'all';
     document.querySelectorAll('#ui-exercise-db .chip').forEach(c => c.classList.remove('active'));
@@ -1067,7 +1064,18 @@ function saveWorkoutChanges() {
     }
     
     if (!state.workoutMeta[newName]) state.workoutMeta[newName] = {};
-    state.workoutMeta[newName].availableInDeload = document.getElementById('editor-deload-check').checked;
+    
+    // UPDATED V12.12.1: Deload Only Logic
+    const isDeloadOnly = document.getElementById('editor-deload-only-check').checked;
+    state.workoutMeta[newName].isDeloadOnly = isDeloadOnly;
+    
+    // Force availableInDeload if it is deload only
+    if (isDeloadOnly) {
+        state.workoutMeta[newName].availableInDeload = true;
+    } else {
+        state.workoutMeta[newName].availableInDeload = document.getElementById('editor-deload-check').checked;
+    }
+
     StorageManager.saveData(StorageManager.KEY_META, state.workoutMeta);
 
     state.workouts[newName] = managerState.exercises;
@@ -1154,7 +1162,6 @@ function selectExerciseFromList(exName) {
     navigate('ui-workout-editor');
     renderEditorList();
 }
-
 // --- WORKOUT FLOW ENGINE ---
 
 function selectWeek(w) { 
@@ -1624,10 +1631,6 @@ function finishCurrentExercise() {
             StorageManager.saveSessionState(); 
         } 
         else if (state.isFreestyle) { 
-            // UPDATED V12.10.0: STICKY FILTERS
-            // Removed: document.getElementById('freestyle-search').value = '';
-            // Removed: state.freestyleFilter = 'all';
-            
             navigate('ui-variation');
             updateVariationUI();
             renderFreestyleChips();
@@ -1770,12 +1773,12 @@ function updateVariationUI() {
     }
 }
 
+// UPDATED V12.12.1: Added 'בטן' to filters
 function renderFreestyleChips() {
     const container = document.getElementById('variation-chips');
     container.innerHTML = "";
     
-    // UPDATED V12.10.0: Biceps/Triceps split + Done tab
-    const muscles = ['all', 'חזה', 'גב', 'רגליים', 'כתפיים', 'יד קדמית', 'יד אחורית', 'קליסטניקס', 'בוצעו'];
+    const muscles = ['all', 'חזה', 'גב', 'רגליים', 'כתפיים', 'יד קדמית', 'יד אחורית', 'בטן', 'קליסטניקס', 'בוצעו'];
     const labels = { 'all': 'הכל' };
     
     muscles.forEach(m => {
@@ -1814,7 +1817,7 @@ function renderFreestyleList() {
         if (state.freestyleFilter === 'all') return true;
         if (state.freestyleFilter === 'יד קדמית') return ex.muscles.includes('biceps');
         if (state.freestyleFilter === 'יד אחורית') return ex.muscles.includes('triceps');
-        
+        // 'בטן' and others work directly via includes
         return ex.muscles.includes(state.freestyleFilter);
     });
     
@@ -2100,13 +2103,11 @@ function openSessionLog() {
     haptic('light');
 }
 
-// NEW FUNCTION FOR HISTORY DRAWER
 function openHistoryDrawer() {
     const drawer = document.getElementById('sheet-modal');
     const overlay = document.getElementById('sheet-overlay');
     const content = document.getElementById('sheet-content');
     
-    // Fetch History
     const history = getLastPerformance(state.currentExName);
     
     let html = `<h3>היסטוריה: ${state.currentExName}</h3>`;
@@ -2116,7 +2117,6 @@ function openHistoryDrawer() {
     } else {
         html += `<div style="font-size:0.85em; color:var(--text-dim); margin-bottom:15px;">📅 ביצוע אחרון: ${history.date}</div>`;
         
-        // Header
         html += `
         <div style="display: grid; grid-template-columns: 0.5fr 1fr 1fr 1fr; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; margin-bottom: 10px; font-size: 0.8em; color: var(--text-dim); font-weight: 600; text-align: center;">
             <div>סט</div>
@@ -2126,7 +2126,6 @@ function openHistoryDrawer() {
         </div>
         <div class="vertical-stack">`;
         
-        // Rows
         history.sets.forEach((setStr, idx) => {
             let weight = "-", reps = "-", rir = "-";
             try {
