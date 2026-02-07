@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>GymPro Elite 12.11.1</title> <!-- Bump Version -->
+    <title>GymPro Elite 12.12</title> <!-- Bump Version -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="stylesheet" href="style.css">
@@ -101,10 +101,10 @@
             </div>
 
             <button class="btn-main primary-gradient" onclick="saveExerciseConfig()">שמור הגדרות</button>
+            <button id="btn-delete-ex" class="btn-text" style="color: #ff453a; display: none;" onclick="deleteExercise()">מחק תרגיל מהמאגר</button>
             <button class="btn-text" onclick="closeExConfigModal()">ביטול</button>
         </div>
     </div>
-
     <!-- Rest Timer Settings Modal -->
     <div id="exercise-settings-modal" class="modal-overlay">
         <div class="modal-content">
@@ -170,7 +170,7 @@
                     <div class="card-text center-text">ארכיון וגיבוי</div>
                 </button>
 
-                <div class="version-footer">GymPro Elite v12.11.1</div>
+                <div class="version-footer">GymPro Elite v12.12</div>
             </div>
 
             <!-- SETTINGS SCREEN -->
@@ -189,7 +189,7 @@
 
                 <div class="glass-card">
                     <h3 style="margin-top:0">ניהול נתונים</h3>
-                    <p style="color:var(--text-dim); font-size:0.9em;">גרסה V12.11.1</p>
+                    <p style="color:var(--text-dim); font-size:0.9em;">גרסה V12.12</p>
                     <button class="btn-text" style="color: #ff453a; border: 1px solid #ff453a; border-radius: 12px; margin-bottom: 20px;" onclick="resetToFactorySettings()">איפוס להגדרות יצרן</button>
                     
                     <div style="border-top: 1px solid var(--border); padding-top: 15px;">
@@ -203,19 +203,28 @@
                 <input type="file" id="import-config-file" style="display: none;" onchange="processConfigImport(this)">
             </div>
 
-            <!-- EXERCISE DATABASE MANAGER -->
+       <!-- EXERCISE DATABASE MANAGER -->
             <div id="ui-exercise-db" class="screen">
                  <div style="position: sticky; top: 0; background: var(--bg); z-index: 10; padding-bottom: 10px;">
                     <h2 class="section-title" style="margin-bottom: 10px;">מאגר תרגילים</h2>
                     
                     <input type="text" id="db-search" class="search-input" placeholder="חפש תרגיל לעריכה..." oninput="renderExerciseDatabase()">
                     
+                    <div class="chip-container">
+                        <button class="chip active" onclick="setDbFilter('all', this)">הכל</button>
+                        <button class="chip" onclick="setDbFilter('חזה', this)">חזה</button>
+                        <button class="chip" onclick="setDbFilter('גב', this)">גב</button>
+                        <button class="chip" onclick="setDbFilter('רגליים', this)">רגליים</button>
+                        <button class="chip" onclick="setDbFilter('כתפיים', this)">כתפיים</button>
+                        <button class="chip" onclick="setDbFilter('ידיים', this)">ידיים</button>
+                        <button class="chip" onclick="setDbFilter('קליסטניקס', this)">קליסטניקס</button>
+                    </div>
+
                     <button class="btn-text" onclick="openExerciseCreator()" style="color: var(--type-b); border: 1px dashed var(--type-b); margin-top: 5px; font-weight: 600;">+ יצירת תרגיל חדש</button>
                 </div>
                 <div id="db-list" class="vertical-stack" style="padding-top: 10px;"></div>
                 <button class="btn-text" onclick="handleBackClick()">חזור</button>
             </div>
-
             <!-- WORKOUT MANAGER (LIST) -->
             <div id="ui-workout-manager" class="screen">
                 <div class="hero-section"><h2>ניהול תוכניות</h2></div>
