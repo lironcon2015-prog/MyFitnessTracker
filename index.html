@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>GymPro Elite 12.12</title> <!-- Bump Version -->
+    <title>GymPro Elite 12.12.1</title> <!-- Bump Version -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="stylesheet" href="style.css">
@@ -60,6 +60,7 @@
                         <option value="כתפיים">כתפיים</option>
                         <option value="יד קדמית">יד קדמית</option>
                         <option value="יד אחורית">יד אחורית</option>
+                        <option value="בטן">בטן</option>
                         <option value="קליסטניקס">קליסטניקס</option>
                     </select>
                 </div>
@@ -170,7 +171,7 @@
                     <div class="card-text center-text">ארכיון וגיבוי</div>
                 </button>
 
-                <div class="version-footer">GymPro Elite v12.12</div>
+                <div class="version-footer">GymPro Elite v12.12.1</div>
             </div>
 
             <!-- SETTINGS SCREEN -->
@@ -189,7 +190,7 @@
 
                 <div class="glass-card">
                     <h3 style="margin-top:0">ניהול נתונים</h3>
-                    <p style="color:var(--text-dim); font-size:0.9em;">גרסה V12.12</p>
+                    <p style="color:var(--text-dim); font-size:0.9em;">גרסה V12.12.1</p>
                     <button class="btn-text" style="color: #ff453a; border: 1px solid #ff453a; border-radius: 12px; margin-bottom: 20px;" onclick="resetToFactorySettings()">איפוס להגדרות יצרן</button>
                     
                     <div style="border-top: 1px solid var(--border); padding-top: 15px;">
@@ -217,6 +218,7 @@
                         <button class="chip" onclick="setDbFilter('רגליים', this)">רגליים</button>
                         <button class="chip" onclick="setDbFilter('כתפיים', this)">כתפיים</button>
                         <button class="chip" onclick="setDbFilter('ידיים', this)">ידיים</button>
+                        <button class="chip" onclick="setDbFilter('בטן', this)">בטן</button>
                         <button class="chip" onclick="setDbFilter('קליסטניקס', this)">קליסטניקס</button>
                     </div>
 
@@ -243,6 +245,11 @@
                     <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border); padding-top: 10px;">
                         <span style="font-size:0.9em;">הצג בשבוע דילואוד?</span>
                         <input type="checkbox" id="editor-deload-check" class="archive-checkbox">
+                    </div>
+
+                    <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border); padding-top: 10px; margin-top: 5px;">
+                        <span style="font-size:0.9em; color: var(--type-free);">מופיע בדילואוד בלבד?</span>
+                        <input type="checkbox" id="editor-deload-only-check" class="archive-checkbox">
                     </div>
                 </div>
 
@@ -274,6 +281,7 @@
                         <button class="chip" onclick="setSelectorFilter('רגליים', this)">רגליים</button>
                         <button class="chip" onclick="setSelectorFilter('כתפיים', this)">כתפיים</button>
                         <button class="chip" onclick="setSelectorFilter('ידיים', this)">ידיים</button>
+                        <button class="chip" onclick="setSelectorFilter('בטן', this)">בטן</button>
                         <button class="chip" onclick="setSelectorFilter('קליסטניקס', this)">קליסטניקס</button>
                     </div>
 
