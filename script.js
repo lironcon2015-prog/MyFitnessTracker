@@ -1,7 +1,7 @@
 /**
- * GYMPRO ELITE V12.12.1 (Abs Category & Deload Only)
- * - Feature: Added 'Abs' (בטן) category to filters and config.
- * - Feature: Added 'Deload Only' workout logic.
+ * GYMPRO ELITE V12.12.2 (Refactor & Loops Fix)
+ * - Feature: 'Back to Dashboard' button in manager.
+ * - Fix: History loops in editor, exercise selection, archive deletion, and swap menu.
  */
 
 // --- DEFAULT DATA ---
@@ -327,7 +327,7 @@ const StorageManager = {
     exportConfiguration() {
         const configData = {
             type: 'config_only',
-            version: '12.12.1',
+            version: '12.12.2',
             date: new Date().toISOString(),
             workouts: this.getData(this.KEY_DB_WORKOUTS),
             exercises: this.getData(this.KEY_DB_EXERCISES),
@@ -414,7 +414,7 @@ function restoreSession() {
             case 'ui-confirm': showConfirmScreen(state.currentExName); break;
             case 'ui-swap-list': openSwapMenu(); break;
             case 'ui-workout-manager': renderManagerList(); break;
-            case 'ui-workout-editor': openEditorUI(); break; // REFACTORED call
+            case 'ui-workout-editor': openEditorUI(); break; 
             case 'ui-exercise-selector': document.getElementById('selector-search').value = ""; updateSelectorChips(); renderSelectorList(); break;
             case 'ui-1rm': setupCalculatedEx(); break;
             case 'ui-variation': 
@@ -471,13 +471,18 @@ async function initAudio() {
     try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
 }
 
-function navigate(id) {
+function navigate(id, clearStack = false) {
     haptic('light');
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById(id).classList.add('active');
     
     if (id !== 'ui-main') stopRestTimer();
-    if (state.historyStack[state.historyStack.length - 1] !== id) state.historyStack.push(id);
+
+    if (clearStack) {
+        state.historyStack = [id];
+    } else {
+        if (state.historyStack[state.historyStack.length - 1] !== id) state.historyStack.push(id);
+    }
     
     document.getElementById('global-back').style.visibility = (id === 'ui-week') ? 'hidden' : 'visible';
     const settingsBtn = document.getElementById('btn-settings');
@@ -565,7 +570,7 @@ function handleBackClick() {
 function openSettings() { navigate('ui-settings'); }
 function resetToFactorySettings() { StorageManager.resetFactory(); }
 
-// --- DYNAMIC MAIN MENU & DELOAD LOGIC (UPDATED V12.12.1) ---
+// --- DYNAMIC MAIN MENU & DELOAD LOGIC ---
 function renderWorkoutMenu() {
     const container = document.getElementById('workout-menu-container');
     container.innerHTML = "";
@@ -585,7 +590,6 @@ function renderWorkoutMenu() {
              deloadWorkouts.forEach(key => {
                 const btn = document.createElement('button');
                 btn.className = "menu-card tall";
-                // Add visual indicator for Deload Only workouts
                 const meta = state.workoutMeta[key];
                 const badge = (meta && meta.isDeloadOnly) ? `<span style="font-size:0.7em; color:var(--type-free); border:1px solid var(--type-free); padding:2px 6px; border-radius:4px;">Deload Only</span>` : '';
                 
@@ -604,7 +608,7 @@ function renderWorkoutMenu() {
         title.innerText = `שבוע ${state.week} - בחר אימון`;
         Object.keys(state.workouts).forEach(key => {
             const meta = state.workoutMeta[key];
-            if (meta && meta.isDeloadOnly) return; // Skip Deload Only workouts in normal weeks
+            if (meta && meta.isDeloadOnly) return; 
 
             const btn = document.createElement('button');
             btn.className = "menu-card tall";
@@ -751,7 +755,7 @@ function openExerciseEditor(exName) {
     document.getElementById('ex-config-modal').style.display = 'flex';
 }
 
-// --- EXERCISE DATABASE MANAGER (UPDATED V12.12.1) ---
+// --- EXERCISE DATABASE MANAGER ---
 function openExerciseDatabase() {
     managerState.dbFilter = 'all';
     document.querySelectorAll('#ui-exercise-db .chip').forEach(c => c.classList.remove('active'));
@@ -1065,11 +1069,9 @@ function saveWorkoutChanges() {
     
     if (!state.workoutMeta[newName]) state.workoutMeta[newName] = {};
     
-    // UPDATED V12.12.1: Deload Only Logic
     const isDeloadOnly = document.getElementById('editor-deload-only-check').checked;
     state.workoutMeta[newName].isDeloadOnly = isDeloadOnly;
     
-    // Force availableInDeload if it is deload only
     if (isDeloadOnly) {
         state.workoutMeta[newName].availableInDeload = true;
     } else {
@@ -1083,6 +1085,10 @@ function saveWorkoutChanges() {
     
     haptic('success');
     renderWorkoutMenu(); 
+    
+    // FIX: Pop the editor from history to prevent loop
+    state.historyStack.pop();
+    
     navigate('ui-workout-manager');
     renderManagerList();
 }
@@ -1159,11 +1165,14 @@ function selectExerciseFromList(exName) {
     } else {
         managerState.exercises.push(newExObj);
     }
+    
+    // FIX: Pop selector from history stack
+    state.historyStack.pop();
+    
     navigate('ui-workout-editor');
     renderEditorList();
 }
 // --- WORKOUT FLOW ENGINE ---
-
 function selectWeek(w) { 
     state.week = w; 
     renderWorkoutMenu(); 
@@ -2034,7 +2043,16 @@ function openArchiveFromDrawer(itemData) {
 function showArchiveDetail(item) {
     currentArchiveItem = item; document.getElementById('archive-detail-content').innerText = item.summary;
     document.getElementById('btn-archive-copy').onclick = () => navigator.clipboard.writeText(item.summary).then(() => alert("הועתק!"));
-    document.getElementById('btn-archive-delete').onclick = () => { if(confirm("למחוק אימון זה מהארכיון?")) { StorageManager.deleteFromArchive(item.timestamp); openArchive(); } };
+    
+    // FIX: Pop the detail screen from history after deletion to prevent loop
+    document.getElementById('btn-archive-delete').onclick = () => { 
+        if(confirm("למחוק אימון זה מהארכיון?")) { 
+            StorageManager.deleteFromArchive(item.timestamp); 
+            state.historyStack.pop(); 
+            openArchive(); 
+        } 
+    };
+    
     navigate('ui-archive-detail');
 }
 
@@ -2237,8 +2255,10 @@ function openSwapMenu() {
             const btn = document.createElement('button'); 
             btn.className = "menu-card"; 
             btn.innerHTML = `<span>${vName}</span><div class="chevron"></div>`;
+            // FIX: Pop from stack before navigating to avoid loop
             btn.onclick = () => {
                 state.currentExName = vName;
+                state.historyStack.pop(); 
                 showConfirmScreen(vName);
             };
             container.appendChild(btn);
@@ -2262,10 +2282,12 @@ function openSwapMenu() {
             const btn = document.createElement('button'); 
             btn.className = "menu-card"; 
             btn.innerHTML = `<span>${item.name}</span><div class="chevron"></div>`;
+            // FIX: Pop from stack before navigating to avoid loop
             btn.onclick = () => { 
                 const currentItem = state.workouts[state.type][state.exIdx];
                 state.workouts[state.type][state.exIdx] = state.workouts[state.type][idx];
                 state.workouts[state.type][idx] = currentItem;
+                state.historyStack.pop();
                 showConfirmScreen(); 
             };
             container.appendChild(btn);
