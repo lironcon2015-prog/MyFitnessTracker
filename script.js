@@ -1,5 +1,5 @@
 /**
- * GYMPRO ELITE V12.11.1 (History Drawer)
+ * GYMPRO ELITE V12.12 (History Drawer)
  * - Feature: Added 'History' button in active workout screen to view last session data in a drawer.
  */
 
@@ -173,6 +173,7 @@ let managerState = {
     currentName: '',
     exercises: [],
     selectorFilter: 'all',
+    dbFilter: 'all',
     activeClusterRef: null,
     editingTimerEx: null 
 };
@@ -325,7 +326,7 @@ const StorageManager = {
     exportConfiguration() {
         const configData = {
             type: 'config_only',
-            version: '12.11.1',
+            version: '12.12',
             date: new Date().toISOString(),
             workouts: this.getData(this.KEY_DB_WORKOUTS),
             exercises: this.getData(this.KEY_DB_EXERCISES),
@@ -714,6 +715,8 @@ function openExerciseCreator() {
     document.getElementById('conf-ex-max').value = "";
     document.getElementById('conf-ex-uni').checked = false; 
     
+    document.getElementById('btn-delete-ex').style.display = 'none';
+    
     document.getElementById('ex-config-modal').dataset.mode = "create";
     document.getElementById('ex-config-modal').style.display = 'flex';
 }
@@ -724,9 +727,8 @@ function openExerciseEditor(exName) {
 
     document.getElementById('ex-config-title').innerText = "עריכת תרגיל";
     document.getElementById('conf-ex-name').value = ex.name;
-    document.getElementById('conf-ex-name').disabled = true;
+    document.getElementById('conf-ex-name').disabled = false;
     
-    // UPDATED V12.10.0: Handle Biceps/Triceps mapping back to dropdown
     let muscleVal = ex.muscles[0] || "חזה";
     if (ex.muscles.includes('biceps')) muscleVal = "יד קדמית";
     else if (ex.muscles.includes('triceps')) muscleVal = "יד אחורית";
@@ -746,6 +748,7 @@ function openExerciseEditor(exName) {
         document.getElementById('conf-ex-max').value = ex.maxW || "";
     }
 
+    document.getElementById('btn-delete-ex').style.display = 'block';
     document.getElementById('ex-config-modal').dataset.mode = "edit";
     document.getElementById('ex-config-modal').dataset.target = exName;
     document.getElementById('ex-config-modal').style.display = 'flex';
@@ -753,8 +756,19 @@ function openExerciseEditor(exName) {
 
 // --- EXERCISE DATABASE MANAGER ---
 function openExerciseDatabase() {
+    managerState.dbFilter = 'all';
+    document.querySelectorAll('#ui-exercise-db .chip').forEach(c => c.classList.remove('active'));
+    document.querySelector('#ui-exercise-db .chip').classList.add('active');
+    
     navigate('ui-exercise-db');
     document.getElementById('db-search').value = '';
+    renderExerciseDatabase();
+}
+
+function setDbFilter(filter, btn) {
+    managerState.dbFilter = filter;
+    document.querySelectorAll('#ui-exercise-db .chip').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
     renderExerciseDatabase();
 }
 
@@ -763,31 +777,47 @@ function renderExerciseDatabase() {
     list.innerHTML = "";
     const searchVal = document.getElementById('db-search').value.toLowerCase();
     
-    // Sort Alphabetically
     const sorted = [...state.exercises].sort((a,b) => a.name.localeCompare(b.name));
     
-    const filtered = sorted.filter(ex => ex.name.toLowerCase().includes(searchVal));
+    const filtered = sorted.filter(ex => {
+        if (managerState.dbFilter !== 'all') {
+            const muscleMap = { 'יד קדמית': 'biceps', 'יד אחורית': 'triceps', 'ידיים': 'ידיים' }; 
+            if (managerState.dbFilter === 'ידיים') {
+                if (!ex.muscles.includes('ידיים') && !ex.muscles.includes('biceps') && !ex.muscles.includes('triceps')) return false;
+            } else {
+                 if (!ex.muscles.includes(managerState.dbFilter) && !ex.muscles.includes(muscleMap[managerState.dbFilter])) return false;
+            }
+        }
+        return ex.name.toLowerCase().includes(searchVal);
+    });
+
+    if (filtered.length === 0) {
+        list.innerHTML = `<p style="text-align:center; color:var(--text-dim); margin-top:20px;">לא נמצאו תרגילים</p>`;
+        return;
+    }
 
     filtered.forEach(ex => {
         const row = document.createElement('div');
         row.className = "selector-item-row";
+        row.onclick = () => openExerciseEditor(ex.name);
         
         row.innerHTML = `
             <div class="selector-item-info">
-                <div>${ex.name}</div>
-                <div style="font-size:0.75em; color:var(--text-dim);">${ex.muscles.join(', ')}</div>
+                <div style="font-weight:600; font-size:1em;">${ex.name}</div>
+                <div style="font-size:0.8em; color:var(--text-dim); margin-top:2px;">${ex.muscles.join(', ')}</div>
             </div>
             <div class="selector-item-actions">
-                <button class="btn-text-edit" onclick="openExerciseEditor('${ex.name.replace(/'/g, "\\'")}')">ערוך</button>
+                <div class="chevron"></div>
             </div>
         `;
         list.appendChild(row);
     });
 }
+
 function saveExerciseConfig() {
     const mode = document.getElementById('ex-config-modal').dataset.mode;
     const name = document.getElementById('conf-ex-name').value.trim();
-    const muscleSelect = document.getElementById('conf-ex-muscle').value; // 'יד קדמית' or 'יד אחורית'
+    const muscleSelect = document.getElementById('conf-ex-muscle').value; 
     const step = parseFloat(document.getElementById('conf-ex-step').value);
     const base = parseFloat(document.getElementById('conf-ex-base').value);
     const min = parseFloat(document.getElementById('conf-ex-min').value);
@@ -796,7 +826,6 @@ function saveExerciseConfig() {
 
     if (!name) { alert("נא להזין שם תרגיל"); return; }
 
-    // UPDATED V12.10.0: Logic to map dropdown to muscle array
     let musclesArr = [muscleSelect];
     if (muscleSelect === 'יד קדמית') musclesArr = ['ידיים', 'biceps'];
     if (muscleSelect === 'יד אחורית') musclesArr = ['ידיים', 'triceps'];
@@ -826,28 +855,90 @@ function saveExerciseConfig() {
         const exIndex = state.exercises.findIndex(e => e.name === targetName);
         if (exIndex === -1) return;
 
+        if (targetName !== name) {
+            if (state.exercises.find(e => e.name === name)) { alert("שם זה כבר קיים במערכת"); return; }
+            
+            if (confirm(`שינית את שם התרגיל מ-"${targetName}" ל-"${name}".\nהשינוי יעדכן את כל התוכניות הקיימות.\nהאם להמשיך?`)) {
+                for (let key in state.workouts) {
+                    const wo = state.workouts[key];
+                    if (Array.isArray(wo)) {
+                        wo.forEach(item => {
+                            if (item.type === 'cluster') {
+                                item.exercises.forEach(sub => { if(sub.name === targetName) sub.name = name; });
+                            } else {
+                                if(item.name === targetName) item.name = name;
+                            }
+                        });
+                    }
+                }
+                StorageManager.saveData(StorageManager.KEY_DB_WORKOUTS, state.workouts);
+
+                const lastW = StorageManager.getLastWeight(targetName);
+                if(lastW) StorageManager.saveWeight(name, lastW);
+
+                state.exercises[exIndex].name = name;
+            } else {
+                return; 
+            }
+        }
+
         state.exercises[exIndex].muscles = musclesArr;
         state.exercises[exIndex].step = step;
         state.exercises[exIndex].isUnilateral = isUni;
         
         if (!state.exercises[exIndex].manualRange) state.exercises[exIndex].manualRange = {};
-        
         state.exercises[exIndex].manualRange.base = isNaN(base) ? undefined : base;
         state.exercises[exIndex].manualRange.min = isNaN(min) ? undefined : min;
         state.exercises[exIndex].manualRange.max = isNaN(max) ? undefined : max;
         
-        if (!isNaN(min)) state.exercises[exIndex].minW = min;
-        if (!isNaN(max)) state.exercises[exIndex].maxW = max;
+        if (!isNaN(min)) delete state.exercises[exIndex].minW;
+        if (!isNaN(max)) delete state.exercises[exIndex].maxW;
 
         StorageManager.saveData(StorageManager.KEY_DB_EXERCISES, state.exercises);
         closeExConfigModal();
     }
 
-    // Refresh the correct screen
     if (document.getElementById('ui-exercise-db').classList.contains('active')) {
         renderExerciseDatabase();
     } else if (document.getElementById('ui-exercise-selector').classList.contains('active')) {
         prepareSelector();
+    }
+}
+
+function deleteExercise() {
+    const targetName = document.getElementById('ex-config-modal').dataset.target;
+    if (!targetName) return;
+
+    let usedIn = [];
+    for (let key in state.workouts) {
+        const wo = state.workouts[key];
+        if (Array.isArray(wo)) {
+            let found = false;
+            wo.forEach(item => {
+                if (item.type === 'cluster') {
+                    if (item.exercises.some(sub => sub.name === targetName)) found = true;
+                } else {
+                    if (item.name === targetName) found = true;
+                }
+            });
+            if (found) usedIn.push(key);
+        }
+    }
+
+    if (usedIn.length > 0) {
+        alert(`לא ניתן למחוק את התרגיל!\nהוא נמצא בשימוש בתוכניות הבאות:\n- ${usedIn.join('\n- ')}\n\nיש להסיר אותו מהתוכניות קודם.`);
+        return;
+    }
+
+    if (confirm(`האם למחוק את התרגיל "${targetName}" לצמיתות?`)) {
+        const exIndex = state.exercises.findIndex(e => e.name === targetName);
+        if (exIndex > -1) {
+            state.exercises.splice(exIndex, 1);
+            StorageManager.saveData(StorageManager.KEY_DB_EXERCISES, state.exercises);
+            alert("התרגיל נמחק.");
+            closeExConfigModal();
+            renderExerciseDatabase();
+        }
     }
 }
 
