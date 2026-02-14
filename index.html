@@ -3,11 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>GymPro Elite 12.12.2</title> <!-- Version Updated -->
+    <title>GymPro Elite 12.12.3 AI</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <!-- Chart.js for AI Visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="glass-overlay"></div>
@@ -157,6 +159,15 @@
                     <div class="card-text center-text">לחץ להפעלת סאונד</div>
                 </button>
 
+                <!-- AI COACH BUTTON (NEW) -->
+                <button onclick="AICoach.init()" class="action-card" style="background: linear-gradient(135deg, #BF5AF2, #5E5CE6); margin-bottom: 25px; box-shadow: 0 4px 20px rgba(191, 90, 242, 0.3);">
+                    <div style="display:flex; justify-content:space-between; width:100%; align-items:center; padding: 0 10px;">
+                        <span style="font-size:1.2em;">🤖</span>
+                        <div class="card-text center-text" style="font-weight:700;">AI Coach - מאמן אישי</div>
+                        <span style="font-size:1.2em;">✨</span>
+                    </div>
+                </button>
+
                 <div class="section-label">בחר תוכנית שבועית</div>
                 
                 <div class="grid-menu" style="grid-template-columns: 1fr 1fr;">
@@ -170,7 +181,51 @@
                     <div class="card-text center-text">ארכיון וגיבוי</div>
                 </button>
 
-                <div class="version-footer">GymPro Elite v12.12.2</div>
+                <div class="version-footer">GymPro Elite v12.12.3 AI</div>
+            </div>
+
+            <!-- AI SETTINGS (KEY ENTRY) -->
+            <div id="ui-ai-settings" class="screen">
+                <div class="hero-section"><h2>הגדרות AI Coach</h2></div>
+                <div class="glass-card">
+                    <p style="font-size: 0.9em; color: var(--text-dim); margin-bottom: 15px; line-height: 1.5;">
+                        כדי להפעיל את המאמן האישי, עליך לספק מפתח API של Google Gemini.
+                        <br><br>
+                        המפתח נשמר במכשיר שלך בלבד (LocalStorage) ולא נשלח לשום שרת חיצוני מלבד גוגל.
+                    </p>
+                    <div style="margin-bottom: 20px;">
+                        <label class="input-label">Gemini API Key</label>
+                        <input type="password" id="ai-api-key" class="minimal-input" placeholder="הדבק את המפתח כאן..." style="text-align: left; direction: ltr;">
+                    </div>
+                    <button class="btn-main primary-gradient" onclick="AICoach.saveKey()">שמור מפתח</button>
+                    <button class="btn-text" onclick="window.open('https://aistudio.google.com/app/apikey', '_blank')">השג מפתח (Google AI Studio)</button>
+                </div>
+                <button class="btn-text" onclick="handleBackClick()">חזור</button>
+            </div>
+
+            <!-- AI CHAT INTERFACE -->
+            <div id="ui-ai-chat" class="screen" style="padding-bottom: 90px;">
+                <div class="chat-header" style="position: sticky; top: 0; background: var(--bg); z-index: 10; padding: 10px 0; border-bottom: 1px solid var(--border);">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <h2 class="section-title" style="margin: 0;">AI Coach</h2>
+                        <button class="btn-text" style="width: auto; margin: 0; font-size: 0.8em; color: var(--type-free);" onclick="AICoach.clearChat()">נקה שיחה</button>
+                    </div>
+                    <p style="font-size: 0.8em; color: var(--text-dim);">מופעל ע"י Gemini 1.5 Flash</p>
+                </div>
+                
+                <div id="chat-container" class="vertical-stack" style="padding-top: 20px; gap: 15px;">
+                    <!-- Messages will be injected here -->
+                    <div class="chat-bubble ai">
+                        שלום! אני המאמן האישי שלך. אני מחובר לנתוני האימון שלך. איך אפשר לעזור היום?
+                        <br><span style="font-size:0.75em; opacity:0.7; margin-top:5px; display:block;">נסה לשאול: "תראה לי את ההתקדמות בבנץ' פרס"</span>
+                    </div>
+                </div>
+
+                <!-- Floating Input Area -->
+                <div class="chat-input-area">
+                    <input type="text" id="chat-input" placeholder="כתוב הודעה..." onkeypress="if(event.key === 'Enter') AICoach.sendMessage()">
+                    <button onclick="AICoach.sendMessage()" class="send-btn">➤</button>
+                </div>
             </div>
 
             <!-- SETTINGS SCREEN -->
@@ -189,7 +244,7 @@
 
                 <div class="glass-card">
                     <h3 style="margin-top:0">ניהול נתונים</h3>
-                    <p style="color:var(--text-dim); font-size:0.9em;">גרסה V12.12.2</p>
+                    <p style="color:var(--text-dim); font-size:0.9em;">גרסה V12.12.3 AI</p>
                     <button class="btn-text" style="color: #ff453a; border: 1px solid #ff453a; border-radius: 12px; margin-bottom: 20px;" onclick="resetToFactorySettings()">איפוס להגדרות יצרן</button>
                     
                     <div style="border-top: 1px solid var(--border); padding-top: 15px;">
@@ -485,5 +540,6 @@
         </main>
     </div>
     <script src="script.js"></script>
+    <script src="ai-coach.js"></script>
 </body>
 </html>
