@@ -1,22 +1,18 @@
 /**
  * AI Coach Module for GymPro Elite
  * Handles Gemini API communication, Context Injection, and Chart.js rendering.
- * Features: Exhaustive Model List to prevent 404s.
+ * Version: 12.12.6 (Stable 2026 Edition)
  */
 
 const AICoach = {
     KEY_STORAGE: 'gympro_ai_key',
     
-    // רשימת מודלים מורחבת (Shotgun Approach)
-    // המערכת תנסה אותם לפי הסדר עד שאחד יתפוס
+    // Updated Model List for 2026 Stability
     AVAILABLE_MODELS: [
-        'gemini-1.5-pro-latest', // ניסיון לגרסה האחרונה ביותר
-        'gemini-1.5-pro',        // השם הגנרי
-        'gemini-1.5-pro-002',    // גרסה יציבה ספציפית
-        'gemini-1.5-flash',      // מודל מהיר (גיבוי חזק)
-        'gemini-1.5-flash-latest',
-        'gemini-pro',            // מודל ישן (Legacy Backup)
-        'gemini-1.0-pro'         // מודל ישן מאוד (Last Resort)
+        'gemini-2.0-flash',       // New Standard (Fastest)
+        'gemini-1.5-flash',       // Previous Standard (Backup)
+        'gemini-1.5-pro',         // High Intelligence (Backup)
+        'gemini-pro'              // Universal Fallback
     ],
 
     // --- State Management ---
@@ -33,17 +29,17 @@ const AICoach = {
         
         localStorage.setItem(this.KEY_STORAGE, key);
         alert("המפתח נשמר בהצלחה!");
-        handleBackClick(); 
+        if (typeof handleBackClick === 'function') handleBackClick(); 
     },
 
     init() {
         if (!this.getKey()) {
             if(confirm("AI Coach דורש הגדרת מפתח API. לעבור להגדרות?")) {
-                navigate('ui-ai-settings');
+                if (typeof navigate === 'function') navigate('ui-ai-settings');
             }
             return false;
         }
-        navigate('ui-ai-chat');
+        if (typeof navigate === 'function') navigate('ui-ai-chat');
         setTimeout(() => this.scrollToBottom(), 100);
         return true;
     },
@@ -58,9 +54,9 @@ const AICoach = {
         }
     },
 
-    // --- Prompt Engineering (Pro Logic) ---
+    // --- Prompt Engineering ---
     async generateSystemPrompt() {
-        const allData = StorageManager.getAllData();
+        const allData = (typeof StorageManager !== 'undefined') ? StorageManager.getAllData() : { archive: [], weights: {}, rms: {} };
         const archive = allData.archive || [];
         const weights = allData.weights || {};
         const rms = allData.rms || {};
@@ -82,18 +78,15 @@ const AICoach = {
         You are an elite Gym Coach for "GYMPRO ELITE".
         Language: Hebrew (Ivrit) ONLY.
         Tone: Professional, motivating, concise.
-
+        
+        INSTRUCTION:
+        If user asks for a chart/graph, return ONLY JSON: {"type": "chart", ...}.
+        
         User Data:
         ${JSON.stringify(stats)}
 
         Recent History:
         ${JSON.stringify(recentHistory)}
-
-        INSTRUCTIONS:
-        1. Answer based on workout history.
-        2. Identify plateaus/progress.
-        3. If user asks connection status, confirm which model is being used.
-        4. VISUALIZATION: If user asks for a chart/graph, return ONLY JSON with "type": "chart".
         `;
     },
 
@@ -103,10 +96,12 @@ const AICoach = {
         const userText = inputEl.value.trim();
         if (!userText) return;
 
+        // 1. UI: User Bubble
         this.addBubble(userText, 'user');
         inputEl.value = '';
         this.scrollToBottom();
 
+        // 2. UI: Loading Indicator
         const loadingId = this.addLoadingBubble();
         this.scrollToBottom();
 
@@ -115,90 +110,105 @@ const AICoach = {
             if (!key) throw new Error("Missing API Key");
 
             const systemPrompt = await this.generateSystemPrompt();
-            
+            const fullPrompt = `${systemPrompt}\n\nUSER QUESTION:\n${userText}`;
+
             const payload = {
-                contents: [{
-                    parts: [
-                        { text: systemPrompt },
-                        { text: `User Question: ${userText}` }
-                    ]
-                }]
+                contents: [{ parts: [{ text: fullPrompt }] }],
+                safetySettings: [
+                    { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+                    { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+                    { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+                    { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+                ]
             };
 
             let success = false;
-            let firstError = null;
             let finalData = null;
-            let workingModel = '';
+            let usedModel = '';
+            let firstError = null;
 
+            // 3. Logic: Model Rotation with Timeout
             for (const model of this.AVAILABLE_MODELS) {
-                // בדיקה ב-Console כדי לראות איזה מודל מנסים
-                console.log(`Trying model: ${model}...`);
+                console.log(`[AI] Trying: ${model}`);
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
                 
+                // Timeout Controller (15 Seconds limit per request)
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 15000);
+
                 try {
                     const response = await fetch(url, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
+                        body: JSON.stringify(payload),
+                        signal: controller.signal // Link abort signal
                     });
+                    
+                    clearTimeout(timeoutId); // Clear timeout on response
 
                     if (response.ok) {
                         finalData = await response.json();
                         success = true;
-                        workingModel = model;
-                        console.log(`Success with model: ${model}`);
+                        usedModel = model;
                         break; 
                     } else {
-                        const errorData = await response.json().catch(() => ({ error: { message: response.statusText } }));
-                        const errorMessage = errorData.error?.message || response.statusText;
-                        console.warn(`Failed model ${model}:`, errorMessage);
-                        
-                        if (!firstError) firstError = `Model: ${model}\nError: ${errorMessage}`;
+                        const errData = await response.json().catch(() => ({}));
+                        const msg = errData.error?.message || response.statusText;
+                        console.warn(`[AI] Fail ${model}: ${msg}`);
+                        if (!firstError) firstError = `${model}: ${msg}`;
                     }
                 } catch (e) {
-                    console.warn(`Network error with ${model}:`, e);
-                    if (!firstError) firstError = `Network Error (${model}): ${e.message}`;
+                    clearTimeout(timeoutId);
+                    const isTimeout = e.name === 'AbortError';
+                    const msg = isTimeout ? "Timeout (15s)" : e.message;
+                    console.warn(`[AI] Error ${model}: ${msg}`);
+                    if (!firstError) firstError = `Network: ${msg}`;
                 }
             }
 
-            document.getElementById(loadingId).remove();
+            // 4. Cleanup UI
+            const loader = document.getElementById(loadingId);
+            if (loader) loader.remove();
 
+            // 5. Handle Final Result
             if (!success || !finalData) {
-                this.addBubble(`⚠️ **שגיאת התחברות ל-AI**\n\nכל המודלים נכשלו. השגיאה הראשונה הייתה:\n${firstError}`, 'ai');
+                this.addBubble(`⚠️ **שגיאה**\nלא הצלחתי להתחבר. סיבה:\n${firstError || 'Unknown Error'}`, 'ai');
                 return;
             }
 
             if (finalData.error) {
-                this.addBubble("שגיאה בתשובת ה-AI: " + finalData.error.message, 'ai');
+                this.addBubble(`שגיאת שרת: ${finalData.error.message}`, 'ai');
                 return;
             }
 
-            if (!finalData.candidates || finalData.candidates.length === 0) {
-                 this.addBubble("התקבל מענה ריק מהשרת.", 'ai');
+            if (!finalData.candidates || !finalData.candidates[0]) {
+                 if(finalData.promptFeedback?.blockReason) {
+                     this.addBubble(`⚠️ התוכן נחסם ע"י גוגל (${finalData.promptFeedback.blockReason}).`, 'ai');
+                 } else {
+                     this.addBubble("התקבלה תשובה ריקה.", 'ai');
+                 }
                  return;
             }
 
             const aiText = finalData.candidates[0].content.parts[0].text;
             this.handleAIResponse(aiText);
-            
-            // דיבאג: הדפסה ללוג באיזה מודל השתמשנו בסוף
-            console.log(`Replied using: ${workingModel}`);
+            console.log(`[AI] Success with: ${usedModel}`);
 
         } catch (err) {
-            document.getElementById(loadingId)?.remove();
+            const loader = document.getElementById(loadingId);
+            if (loader) loader.remove();
             this.addBubble(`שגיאה קריטית: ${err.message}`, 'ai');
-            console.error(err);
         }
     },
 
     // --- Response Handling ---
     handleAIResponse(text) {
-        const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+        if (!text) return;
+        let cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
 
         if (cleanText.startsWith('{') && cleanText.includes('"type": "chart"')) {
             try {
-                const chartData = JSON.parse(cleanText);
-                this.renderChartBubble(chartData);
+                this.renderChartBubble(JSON.parse(cleanText));
             } catch (e) {
                 this.addBubble(text, 'ai'); 
             }
@@ -211,11 +221,7 @@ const AICoach = {
         const container = document.getElementById('chat-container');
         const bubble = document.createElement('div');
         bubble.className = `chat-bubble ${type}`;
-        
-        let formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>'); 
-        formattedText = formattedText.replace(/\n/g, '<br>');
-        
-        bubble.innerHTML = formattedText;
+        bubble.innerHTML = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
         container.appendChild(bubble);
         this.scrollToBottom();
     },
@@ -267,9 +273,7 @@ const AICoach = {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: {
-                        legend: { labels: { color: '#fff' } }
-                    },
+                    plugins: { legend: { labels: { color: '#fff' } } },
                     scales: {
                         y: {
                             beginAtZero: false,
@@ -277,18 +281,13 @@ const AICoach = {
                             ticks: { color: '#8E8E93' },
                             title: { display: true, text: chartJson.yLabel || 'Value', color: '#8E8E93' }
                         },
-                        x: {
-                            grid: { display: false },
-                            ticks: { color: '#8E8E93' }
-                        }
+                        x: { grid: { display: false }, ticks: { color: '#8E8E93' } }
                     }
                 }
             });
         } catch (e) {
-            console.error("Chart Error:", e);
             bubble.innerHTML += `<br><span style="color:red; font-size:0.8em;">שגיאה בטעינת הגרף</span>`;
         }
-
         this.scrollToBottom();
     },
 
