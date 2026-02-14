@@ -1,17 +1,20 @@
 /**
  * AI Coach Module for GymPro Elite
  * Handles Gemini API communication, Context Injection, and Chart.js rendering.
- * Fixed: Model naming convention and URL structure.
+ * Features: Multi-model fallback system to prevent 404 errors.
  */
 
 const AICoach = {
     KEY_STORAGE: 'gympro_ai_key',
-    // שימוש בגרסת v1beta שהיא הנפוצה ביותר למודלים החדשים
-    // שים לב: השם חייב להיות עם מקפים וללא רווחים
-    MODEL_ENDPOINT: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
     
-    // מודל גיבוי למקרה שה-Flash לא זמין באזור/מפתח הספציפי
-    BACKUP_ENDPOINT: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent',
+    // רשימת מודלים לניסיון - מהחדש לישן
+    // המערכת תנסה אותם לפי הסדר עד שאחד יצליח
+    AVAILABLE_MODELS: [
+        'gemini-1.5-flash',
+        'gemini-1.5-pro',
+        'gemini-pro',
+        'gemini-1.0-pro'
+    ],
 
     // --- State Management ---
     getKey() {
@@ -29,7 +32,6 @@ const AICoach = {
     },
 
     init() {
-        // Check if key exists when trying to open chat
         if (!this.getKey()) {
             if(confirm("AI Coach דורש הגדרת מפתח API. לעבור להגדרות?")) {
                 navigate('ui-ai-settings');
@@ -51,14 +53,13 @@ const AICoach = {
         }
     },
 
-    // --- Prompt Engineering (The Brain) ---
+    // --- Prompt Engineering ---
     async generateSystemPrompt() {
         const allData = StorageManager.getAllData();
         const archive = allData.archive || [];
         const weights = allData.weights || {};
         const rms = allData.rms || {};
 
-        // Summarize last 15 workouts to save tokens
         const recentHistory = archive.slice(0, 15).map(w => ({
             date: w.date,
             type: w.type,
@@ -73,51 +74,42 @@ const AICoach = {
         };
 
         return `
-        You are an elite Gym Coach for the app "GYMPRO ELITE".
+        You are an elite Gym Coach for "GYMPRO ELITE".
         Language: Hebrew (Ivrit) ONLY.
-        Tone: Professional, motivating, concise, analytical.
+        Tone: Professional, motivating, concise.
 
         User Data:
         ${JSON.stringify(stats)}
 
-        Recent History (Last 15):
+        Recent History:
         ${JSON.stringify(recentHistory)}
 
         INSTRUCTIONS:
-        1. Answer user questions based on their workout history.
-        2. Identify plateaus or progress.
-        3. CRITICAL: If the user asks for a visual progress report (graph, chart, "תראה לי התקדמות", "גרף"), 
-           you MUST return a JSON object ONLY, wrapped in a special block.
-           Do NOT write normal text if you are outputting a chart.
-           
-           Required JSON Format for Charts:
+        1. Answer based on workout history.
+        2. Identify plateaus/progress.
+        3. VISUALIZATION: If user asks for a chart/graph ("תראה לי גרף", "התקדמות"), return ONLY JSON:
            {
              "type": "chart",
              "chartType": "line",
-             "title": "Bench Press Progress",
-             "labels": ["01/01", "08/01", "15/01"],
-             "data": [60, 62.5, 65],
+             "title": "Exercise Name Progress",
+             "labels": ["Date1", "Date2"],
+             "data": [Number1, Number2],
              "yLabel": "Weight (kg)",
-             "description": "Here is your progress on Bench Press."
+             "description": "Short analysis text."
            }
-           
-           Logic for data extraction: Look through the "Recent History" summaries or "currentWeights" to estimate progress. 
-           If precise data is missing, estimate based on available logs or tell the user data is insufficient.
         `;
     },
 
-    // --- Communication ---
+    // --- Communication Core (Robust Loop) ---
     async sendMessage() {
         const inputEl = document.getElementById('chat-input');
         const userText = inputEl.value.trim();
         if (!userText) return;
 
-        // 1. UI: Add User Message
         this.addBubble(userText, 'user');
         inputEl.value = '';
         this.scrollToBottom();
 
-        // 2. UI: Add Loading Indicator
         const loadingId = this.addLoadingBubble();
         this.scrollToBottom();
 
@@ -126,75 +118,87 @@ const AICoach = {
             if (!key) throw new Error("Missing API Key");
 
             const systemPrompt = await this.generateSystemPrompt();
-
+            
             const payload = {
                 contents: [{
                     parts: [
-                        { text: systemPrompt }, // System Context
-                        { text: `User Question: ${userText}` } // Current Prompt
+                        { text: systemPrompt },
+                        { text: `User Question: ${userText}` }
                     ]
                 }]
             };
 
-            // 3. API Call (Try Primary Endpoint)
-            let response = await fetch(`${this.MODEL_ENDPOINT}?key=${key}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
+            let success = false;
+            let lastError = null;
+            let finalData = null;
 
-            // Fallback Logic
-            if (!response.ok) {
-                console.warn("Primary model failed, trying backup...");
-                response = await fetch(`${this.BACKUP_ENDPOINT}?key=${key}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
+            // Loop through models until one works
+            for (const model of this.AVAILABLE_MODELS) {
+                console.log(`Trying model: ${model}...`);
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+                
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.ok) {
+                        finalData = await response.json();
+                        success = true;
+                        console.log(`Success with model: ${model}`);
+                        break; // Stop looping
+                    } else {
+                        const errText = await response.text();
+                        console.warn(`Failed model ${model}:`, response.status, errText);
+                        lastError = `HTTP ${response.status}`;
+                    }
+                } catch (e) {
+                    console.warn(`Network error with ${model}:`, e);
+                    lastError = e.message;
+                }
             }
 
-            const data = await response.json();
-            
-            // Remove loading indicator
             document.getElementById(loadingId).remove();
 
-            if (data.error) {
-                console.error("Gemini Error:", data.error);
-                this.addBubble(`שגיאה בתקשורת (Code ${data.error.code}): ${data.error.message}`, 'ai');
+            if (!success || !finalData) {
+                this.addBubble(`לא הצלחתי להתחבר לאף מודל AI. וודא שהמפתח תקין.\nשגיאה אחרונה: ${lastError}`, 'ai');
                 return;
             }
 
-            if (!data.candidates || data.candidates.length === 0) {
-                 this.addBubble("התקבל מענה ריק מהשרת. נסה לשאול שוב.", 'ai');
+            if (finalData.error) {
+                this.addBubble("שגיאה בתשובת ה-AI: " + finalData.error.message, 'ai');
+                return;
+            }
+
+            if (!finalData.candidates || finalData.candidates.length === 0) {
+                 this.addBubble("התקבל מענה ריק מהשרת.", 'ai');
                  return;
             }
 
-            const aiText = data.candidates[0].content.parts[0].text;
+            const aiText = finalData.candidates[0].content.parts[0].text;
             this.handleAIResponse(aiText);
 
         } catch (err) {
             document.getElementById(loadingId)?.remove();
-            this.addBubble("אירעה שגיאה פנימית. אנא בדוק את החיבור לאינטרנט ואת המפתח.", 'ai');
+            this.addBubble("שגיאה קריטית במערכת הצ'אט.", 'ai');
             console.error(err);
         }
     },
 
-    // --- Response Handling & Rendering ---
+    // --- Response Handling ---
     handleAIResponse(text) {
-        // Clean markdown code blocks if present (common with Gemini)
         const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
 
-        // Detect JSON (Chart)
         if (cleanText.startsWith('{') && cleanText.includes('"type": "chart"')) {
             try {
                 const chartData = JSON.parse(cleanText);
                 this.renderChartBubble(chartData);
             } catch (e) {
-                // Fallback if JSON parse fails
                 this.addBubble(text, 'ai'); 
             }
         } else {
-            // Normal Text
             this.addBubble(text, 'ai');
         }
     },
@@ -203,7 +207,6 @@ const AICoach = {
         const container = document.getElementById('chat-container');
         const bubble = document.createElement('div');
         bubble.className = `chat-bubble ${type}`;
-        // Convert newlines to breaks for text
         bubble.innerHTML = text.replace(/\n/g, '<br>');
         container.appendChild(bubble);
         this.scrollToBottom();
@@ -225,7 +228,6 @@ const AICoach = {
         const bubble = document.createElement('div');
         bubble.className = 'chat-bubble ai';
         
-        // Add description text
         if (chartJson.description) {
             const desc = document.createElement('div');
             desc.style.marginBottom = "10px";
@@ -233,7 +235,6 @@ const AICoach = {
             bubble.appendChild(desc);
         }
 
-        // Add Canvas
         const chartWrapper = document.createElement('div');
         chartWrapper.className = 'chart-wrapper';
         const canvas = document.createElement('canvas');
@@ -241,7 +242,6 @@ const AICoach = {
         bubble.appendChild(chartWrapper);
         container.appendChild(bubble);
 
-        // Render Chart.js
         try {
             new Chart(canvas, {
                 type: chartJson.chartType || 'line',
@@ -290,5 +290,4 @@ const AICoach = {
     }
 };
 
-// Export for global usage
 window.AICoach = AICoach;
