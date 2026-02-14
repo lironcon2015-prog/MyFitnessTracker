@@ -1,17 +1,22 @@
 /**
  * AI Coach Module for GymPro Elite
  * Handles Gemini API communication, Context Injection, and Chart.js rendering.
- * Features: Smart Error Reporting & Clean Model List.
+ * Features: Exhaustive Model List to prevent 404s.
  */
 
 const AICoach = {
     KEY_STORAGE: 'gympro_ai_key',
     
-    // רשימת מודלים מעודכנת ל-2024/2025
-    // הסרנו מודלים ישנים שגורמים לשגיאות 404
+    // רשימת מודלים מורחבת (Shotgun Approach)
+    // המערכת תנסה אותם לפי הסדר עד שאחד יתפוס
     AVAILABLE_MODELS: [
-        'gemini-1.5-pro',      // העדיפות העליונה - מודל חכם
-        'gemini-1.5-flash'     // גיבוי - מודל מהיר
+        'gemini-1.5-pro-latest', // ניסיון לגרסה האחרונה ביותר
+        'gemini-1.5-pro',        // השם הגנרי
+        'gemini-1.5-pro-002',    // גרסה יציבה ספציפית
+        'gemini-1.5-flash',      // מודל מהיר (גיבוי חזק)
+        'gemini-1.5-flash-latest',
+        'gemini-pro',            // מודל ישן (Legacy Backup)
+        'gemini-1.0-pro'         // מודל ישן מאוד (Last Resort)
     ],
 
     // --- State Management ---
@@ -87,7 +92,7 @@ const AICoach = {
         INSTRUCTIONS:
         1. Answer based on workout history.
         2. Identify plateaus/progress.
-        3. If the user asks "Does it work?" or "Are you connected?", reply with: "כן, אני מחובר ותקין! הגישה למודל Gemini 1.5 הצליחה."
+        3. If user asks connection status, confirm which model is being used.
         4. VISUALIZATION: If user asks for a chart/graph, return ONLY JSON with "type": "chart".
         `;
     },
@@ -121,10 +126,12 @@ const AICoach = {
             };
 
             let success = false;
-            let firstError = null; // נשמור את השגיאה הראשונה - היא החשובה
+            let firstError = null;
             let finalData = null;
+            let workingModel = '';
 
             for (const model of this.AVAILABLE_MODELS) {
+                // בדיקה ב-Console כדי לראות איזה מודל מנסים
                 console.log(`Trying model: ${model}...`);
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
                 
@@ -138,6 +145,7 @@ const AICoach = {
                     if (response.ok) {
                         finalData = await response.json();
                         success = true;
+                        workingModel = model;
                         console.log(`Success with model: ${model}`);
                         break; 
                     } else {
@@ -145,7 +153,6 @@ const AICoach = {
                         const errorMessage = errorData.error?.message || response.statusText;
                         console.warn(`Failed model ${model}:`, errorMessage);
                         
-                        // שמירת השגיאה הראשונה בלבד לצורך תצוגה למשתמש
                         if (!firstError) firstError = `Model: ${model}\nError: ${errorMessage}`;
                     }
                 } catch (e) {
@@ -157,8 +164,7 @@ const AICoach = {
             document.getElementById(loadingId).remove();
 
             if (!success || !finalData) {
-                // הצגת השגיאה של המודל הראשון (שהוא כנראה המועדף)
-                this.addBubble(`⚠️ **שגיאת התחברות ל-AI**\n\nלא הצלחתי להתחבר. הנה השגיאה מהניסיון הראשון:\n${firstError}\n\nהמלצה: בדוק את המפתח או נסה ליצור מפתח חדש ב-Google AI Studio.`, 'ai');
+                this.addBubble(`⚠️ **שגיאת התחברות ל-AI**\n\nכל המודלים נכשלו. השגיאה הראשונה הייתה:\n${firstError}`, 'ai');
                 return;
             }
 
@@ -174,6 +180,9 @@ const AICoach = {
 
             const aiText = finalData.candidates[0].content.parts[0].text;
             this.handleAIResponse(aiText);
+            
+            // דיבאג: הדפסה ללוג באיזה מודל השתמשנו בסוף
+            console.log(`Replied using: ${workingModel}`);
 
         } catch (err) {
             document.getElementById(loadingId)?.remove();
@@ -203,7 +212,6 @@ const AICoach = {
         const bubble = document.createElement('div');
         bubble.className = `chat-bubble ${type}`;
         
-        // המרת Markdown בסיסי (כוכביות להדגשה) ל-HTML
         let formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>'); 
         formattedText = formattedText.replace(/\n/g, '<br>');
         
