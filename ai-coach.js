@@ -1,19 +1,20 @@
 /**
  * AI Coach Module for GymPro Elite
  * Handles Gemini API communication, Context Injection, and Chart.js rendering.
- * Fixed: Robust Model List & Payload Structure (v12.12.3 Hotfix)
+ * Fixed: Updated Model List for Gen 2 (v12.12.5 Hotfix)
  */
 
 const AICoach = {
     KEY_STORAGE: 'gympro_ai_key',
     
-    // LIST: Prioritize 'flash' (stable/fast) -> 'pro' (smart) -> 'gemini-pro' (legacy)
-    // Removed 'latest' alias which causes 404 errors.
+    // LIST: Prioritize Gen 2 Models (Standard for 2026)
+    // 1.5 Flash is likely deprecated/removed in v1beta.
     AVAILABLE_MODELS: [
-        'gemini-1.5-flash',
-        'gemini-1.5-pro',
-        'gemini-1.0-pro',
-        'gemini-pro'
+        'gemini-2.0-flash',       // New Standard
+        'gemini-2.0-flash-exp',   // Experimental/Fallback
+        'gemini-2.0-pro-exp',     // High Intelligence
+        'gemini-1.5-flash',       // Legacy Backup (might fail)
+        'gemini-1.5-pro'          // Legacy Backup
     ],
 
     // --- State Management ---
@@ -124,7 +125,6 @@ const AICoach = {
             const systemPrompt = await this.generateSystemPrompt();
             
             // CONCATENATED PROMPT (Safest method for REST API)
-            // Merging system prompt and user question into one text block prevents errors on some models.
             const fullPrompt = `${systemPrompt}\n\nUSER QUESTION:\n${userText}`;
 
             const payload = {
@@ -187,7 +187,6 @@ const AICoach = {
                 return;
             }
 
-            // Check if blocked by safety settings despite our best efforts
             if (finalData.promptFeedback && finalData.promptFeedback.blockReason) {
                 this.addBubble(`⚠️ התוכן נחסם ע"י הגדרות הבטיחות של גוגל (${finalData.promptFeedback.blockReason}). נסה לנסח אחרת.`, 'ai');
                 return;
@@ -216,16 +215,13 @@ const AICoach = {
     handleAIResponse(text) {
         if (!text) return;
         
-        // Clean markdown code blocks if present
         let cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
 
-        // Check if it looks like a Chart JSON
         if (cleanText.startsWith('{') && cleanText.includes('"type": "chart"')) {
             try {
                 const chartData = JSON.parse(cleanText);
                 this.renderChartBubble(chartData);
             } catch (e) {
-                // If parsing fails, just show the text
                 console.warn("JSON Parse failed, showing text:", e);
                 this.addBubble(text, 'ai'); 
             }
@@ -239,7 +235,6 @@ const AICoach = {
         const bubble = document.createElement('div');
         bubble.className = `chat-bubble ${type}`;
         
-        // Bold formatting
         let formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>'); 
         formattedText = formattedText.replace(/\n/g, '<br>');
         
@@ -328,5 +323,4 @@ const AICoach = {
     }
 };
 
-// Expose globally
 window.AICoach = AICoach;
