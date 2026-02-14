@@ -1,20 +1,22 @@
 /**
  * AI Coach Module for GymPro Elite
  * Handles Gemini API communication, Context Injection, and Chart.js rendering.
- * Fixed: Updated Model List for Gen 2 (v12.12.5 Hotfix)
+ * Features: Exhaustive Model List to prevent 404s.
  */
 
 const AICoach = {
     KEY_STORAGE: 'gympro_ai_key',
     
-    // LIST: Prioritize Gen 2 Models (Standard for 2026)
-    // 1.5 Flash is likely deprecated/removed in v1beta.
+    // רשימת מודלים מורחבת (Shotgun Approach)
+    // המערכת תנסה אותם לפי הסדר עד שאחד יתפוס
     AVAILABLE_MODELS: [
-        'gemini-2.0-flash',       // New Standard
-        'gemini-2.0-flash-exp',   // Experimental/Fallback
-        'gemini-2.0-pro-exp',     // High Intelligence
-        'gemini-1.5-flash',       // Legacy Backup (might fail)
-        'gemini-1.5-pro'          // Legacy Backup
+        'gemini-1.5-pro-latest', // ניסיון לגרסה האחרונה ביותר
+        'gemini-1.5-pro',        // השם הגנרי
+        'gemini-1.5-pro-002',    // גרסה יציבה ספציפית
+        'gemini-1.5-flash',      // מודל מהיר (גיבוי חזק)
+        'gemini-1.5-flash-latest',
+        'gemini-pro',            // מודל ישן (Legacy Backup)
+        'gemini-1.0-pro'         // מודל ישן מאוד (Last Resort)
     ],
 
     // --- State Management ---
@@ -31,17 +33,17 @@ const AICoach = {
         
         localStorage.setItem(this.KEY_STORAGE, key);
         alert("המפתח נשמר בהצלחה!");
-        if (typeof handleBackClick === 'function') handleBackClick(); 
+        handleBackClick(); 
     },
 
     init() {
         if (!this.getKey()) {
             if(confirm("AI Coach דורש הגדרת מפתח API. לעבור להגדרות?")) {
-                if (typeof navigate === 'function') navigate('ui-ai-settings');
+                navigate('ui-ai-settings');
             }
             return false;
         }
-        if (typeof navigate === 'function') navigate('ui-ai-chat');
+        navigate('ui-ai-chat');
         setTimeout(() => this.scrollToBottom(), 100);
         return true;
     },
@@ -56,10 +58,9 @@ const AICoach = {
         }
     },
 
-    // --- Prompt Engineering ---
+    // --- Prompt Engineering (Pro Logic) ---
     async generateSystemPrompt() {
-        // Safe access to StorageManager
-        const allData = (typeof StorageManager !== 'undefined') ? StorageManager.getAllData() : { archive: [], weights: {}, rms: {} };
+        const allData = StorageManager.getAllData();
         const archive = allData.archive || [];
         const weights = allData.weights || {};
         const rms = allData.rms || {};
@@ -81,27 +82,18 @@ const AICoach = {
         You are an elite Gym Coach for "GYMPRO ELITE".
         Language: Hebrew (Ivrit) ONLY.
         Tone: Professional, motivating, concise.
-        
-        CRITICAL INSTRUCTION:
-        If the user asks for a visual representation, graph, or chart, return ONLY a valid JSON object with "type": "chart".
-        Do not wrap the JSON in markdown code blocks. Just raw JSON.
-        
-        JSON Format for Charts:
-        {
-          "type": "chart",
-          "chartType": "line",
-          "title": "Progress Title",
-          "labels": ["Date1", "Date2", "Date3"],
-          "data": [10, 20, 30],
-          "yLabel": "Weight (kg)",
-          "description": "Short text description of the chart."
-        }
 
         User Data:
         ${JSON.stringify(stats)}
 
         Recent History:
         ${JSON.stringify(recentHistory)}
+
+        INSTRUCTIONS:
+        1. Answer based on workout history.
+        2. Identify plateaus/progress.
+        3. If user asks connection status, confirm which model is being used.
+        4. VISUALIZATION: If user asks for a chart/graph, return ONLY JSON with "type": "chart".
         `;
     },
 
@@ -124,30 +116,23 @@ const AICoach = {
 
             const systemPrompt = await this.generateSystemPrompt();
             
-            // CONCATENATED PROMPT (Safest method for REST API)
-            const fullPrompt = `${systemPrompt}\n\nUSER QUESTION:\n${userText}`;
-
             const payload = {
                 contents: [{
-                    parts: [{ text: fullPrompt }]
-                }],
-                // SAFETY SETTINGS (Prevent gym slang from being flagged as violence)
-                safetySettings: [
-                    { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-                    { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-                    { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-                    { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
-                ]
+                    parts: [
+                        { text: systemPrompt },
+                        { text: `User Question: ${userText}` }
+                    ]
+                }]
             };
 
             let success = false;
             let firstError = null;
             let finalData = null;
-            let usedModel = '';
+            let workingModel = '';
 
-            // Retry Loop
             for (const model of this.AVAILABLE_MODELS) {
-                console.log(`[AI] Attempting model: ${model}`);
+                // בדיקה ב-Console כדי לראות איזה מודל מנסים
+                console.log(`Trying model: ${model}...`);
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
                 
                 try {
@@ -160,17 +145,19 @@ const AICoach = {
                     if (response.ok) {
                         finalData = await response.json();
                         success = true;
-                        usedModel = model;
-                        break; // Exit loop on success
+                        workingModel = model;
+                        console.log(`Success with model: ${model}`);
+                        break; 
                     } else {
-                        const errData = await response.json().catch(() => ({}));
-                        const errMsg = errData.error?.message || response.statusText;
-                        console.warn(`[AI] Failed ${model}: ${errMsg}`);
-                        if (!firstError) firstError = `Model: ${model}\nError: ${errMsg}`;
+                        const errorData = await response.json().catch(() => ({ error: { message: response.statusText } }));
+                        const errorMessage = errorData.error?.message || response.statusText;
+                        console.warn(`Failed model ${model}:`, errorMessage);
+                        
+                        if (!firstError) firstError = `Model: ${model}\nError: ${errorMessage}`;
                     }
                 } catch (e) {
-                    console.warn(`[AI] Network fail ${model}: ${e.message}`);
-                    if (!firstError) firstError = `Network: ${e.message}`;
+                    console.warn(`Network error with ${model}:`, e);
+                    if (!firstError) firstError = `Network Error (${model}): ${e.message}`;
                 }
             }
 
@@ -181,31 +168,24 @@ const AICoach = {
                 return;
             }
 
-            // Validations
             if (finalData.error) {
-                this.addBubble(`שגיאה מהשרת: ${finalData.error.message}`, 'ai');
-                return;
-            }
-
-            if (finalData.promptFeedback && finalData.promptFeedback.blockReason) {
-                this.addBubble(`⚠️ התוכן נחסם ע"י הגדרות הבטיחות של גוגל (${finalData.promptFeedback.blockReason}). נסה לנסח אחרת.`, 'ai');
+                this.addBubble("שגיאה בתשובת ה-AI: " + finalData.error.message, 'ai');
                 return;
             }
 
             if (!finalData.candidates || finalData.candidates.length === 0) {
-                 this.addBubble("התקבל מענה ריק מהשרת (מוזר, נסה שוב).", 'ai');
+                 this.addBubble("התקבל מענה ריק מהשרת.", 'ai');
                  return;
             }
 
             const aiText = finalData.candidates[0].content.parts[0].text;
             this.handleAIResponse(aiText);
             
-            console.log(`[AI] Success using: ${usedModel}`);
+            // דיבאג: הדפסה ללוג באיזה מודל השתמשנו בסוף
+            console.log(`Replied using: ${workingModel}`);
 
         } catch (err) {
-            const loader = document.getElementById(loadingId);
-            if(loader) loader.remove();
-            
+            document.getElementById(loadingId)?.remove();
             this.addBubble(`שגיאה קריטית: ${err.message}`, 'ai');
             console.error(err);
         }
@@ -213,16 +193,13 @@ const AICoach = {
 
     // --- Response Handling ---
     handleAIResponse(text) {
-        if (!text) return;
-        
-        let cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+        const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
 
         if (cleanText.startsWith('{') && cleanText.includes('"type": "chart"')) {
             try {
                 const chartData = JSON.parse(cleanText);
                 this.renderChartBubble(chartData);
             } catch (e) {
-                console.warn("JSON Parse failed, showing text:", e);
                 this.addBubble(text, 'ai'); 
             }
         } else {
