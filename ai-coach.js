@@ -1,23 +1,21 @@
 /**
  * AI Coach Module for GymPro Elite
  * Handles Gemini API communication, Context Injection, and Chart.js rendering.
- * Features: Multi-model fallback system (Pro -> Flash -> Legacy) & Input Sanitization.
+ * Features: Smart Error Reporting & Clean Model List.
  */
 
 const AICoach = {
     KEY_STORAGE: 'gympro_ai_key',
     
-    // רשימת מודלים לניסיון - מהחכם והחזק ביותר (Pro) למהיר/גיבוי
-    // המערכת תנסה אותם לפי הסדר עד שאחד יצליח
+    // רשימת מודלים מעודכנת ל-2024/2025
+    // הסרנו מודלים ישנים שגורמים לשגיאות 404
     AVAILABLE_MODELS: [
-        'gemini-1.5-pro',      // Pro Model - החכם ביותר (ברירת מחדל חדשה)
-        'gemini-1.5-flash',    // Flash Model - מהיר וחסכוני (גיבוי ראשון)
-        'gemini-1.0-pro'       // Legacy Model - תאימות לאחור (גיבוי אחרון)
+        'gemini-1.5-pro',      // העדיפות העליונה - מודל חכם
+        'gemini-1.5-flash'     // גיבוי - מודל מהיר
     ],
 
     // --- State Management ---
     
-    // שליפת מפתח עם ניקוי רווחים למניעת שגיאות 404
     getKey() {
         const key = localStorage.getItem(this.KEY_STORAGE);
         return key ? key.trim() : null;
@@ -30,7 +28,7 @@ const AICoach = {
         
         localStorage.setItem(this.KEY_STORAGE, key);
         alert("המפתח נשמר בהצלחה!");
-        handleBackClick(); // Return to previous screen
+        handleBackClick(); 
     },
 
     init() {
@@ -55,14 +53,13 @@ const AICoach = {
         }
     },
 
-    // --- Prompt Engineering ---
+    // --- Prompt Engineering (Pro Logic) ---
     async generateSystemPrompt() {
         const allData = StorageManager.getAllData();
         const archive = allData.archive || [];
         const weights = allData.weights || {};
         const rms = allData.rms || {};
 
-        // הכנת היסטוריה מקוצרת כדי לא לחרוג ממגבלת ה-Tokens
         const recentHistory = archive.slice(0, 15).map(w => ({
             date: w.date,
             type: w.type,
@@ -90,20 +87,12 @@ const AICoach = {
         INSTRUCTIONS:
         1. Answer based on workout history.
         2. Identify plateaus/progress.
-        3. VISUALIZATION: If user asks for a chart/graph ("תראה לי גרף", "התקדמות"), return ONLY JSON:
-           {
-             "type": "chart",
-             "chartType": "line",
-             "title": "Exercise Name Progress",
-             "labels": ["Date1", "Date2"],
-             "data": [Number1, Number2],
-             "yLabel": "Weight (kg)",
-             "description": "Short analysis text."
-           }
+        3. If the user asks "Does it work?" or "Are you connected?", reply with: "כן, אני מחובר ותקין! הגישה למודל Gemini 1.5 הצליחה."
+        4. VISUALIZATION: If user asks for a chart/graph, return ONLY JSON with "type": "chart".
         `;
     },
 
-    // --- Communication Core (Robust Loop) ---
+    // --- Communication Core ---
     async sendMessage() {
         const inputEl = document.getElementById('chat-input');
         const userText = inputEl.value.trim();
@@ -132,13 +121,11 @@ const AICoach = {
             };
 
             let success = false;
-            let lastError = null;
+            let firstError = null; // נשמור את השגיאה הראשונה - היא החשובה
             let finalData = null;
 
-            // Loop through models until one works
             for (const model of this.AVAILABLE_MODELS) {
                 console.log(`Trying model: ${model}...`);
-                // שימוש בגרסת v1beta כדי לתמוך במודלים החדשים
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
                 
                 try {
@@ -152,25 +139,26 @@ const AICoach = {
                         finalData = await response.json();
                         success = true;
                         console.log(`Success with model: ${model}`);
-                        break; // Stop looping on success
+                        break; 
                     } else {
-                        // חילוץ הודעת השגיאה המפורטת מהשרת לדיבאג
                         const errorData = await response.json().catch(() => ({ error: { message: response.statusText } }));
                         const errorMessage = errorData.error?.message || response.statusText;
+                        console.warn(`Failed model ${model}:`, errorMessage);
                         
-                        console.warn(`Failed model ${model}:`, response.status, errorMessage);
-                        lastError = `HTTP ${response.status} (${model}): ${errorMessage}`;
+                        // שמירת השגיאה הראשונה בלבד לצורך תצוגה למשתמש
+                        if (!firstError) firstError = `Model: ${model}\nError: ${errorMessage}`;
                     }
                 } catch (e) {
                     console.warn(`Network error with ${model}:`, e);
-                    lastError = `Network Error (${model}): ${e.message}`;
+                    if (!firstError) firstError = `Network Error (${model}): ${e.message}`;
                 }
             }
 
             document.getElementById(loadingId).remove();
 
             if (!success || !finalData) {
-                this.addBubble(`לא הצלחתי להתחבר לאף מודל AI.\nסיבות אפשריות:\n1. מפתח API שגוי (וודא שאין רווחים).\n2. בעיית חיבור רשת.\n\nפרטים טכניים: ${lastError}`, 'ai');
+                // הצגת השגיאה של המודל הראשון (שהוא כנראה המועדף)
+                this.addBubble(`⚠️ **שגיאת התחברות ל-AI**\n\nלא הצלחתי להתחבר. הנה השגיאה מהניסיון הראשון:\n${firstError}\n\nהמלצה: בדוק את המפתח או נסה ליצור מפתח חדש ב-Google AI Studio.`, 'ai');
                 return;
             }
 
@@ -180,7 +168,7 @@ const AICoach = {
             }
 
             if (!finalData.candidates || finalData.candidates.length === 0) {
-                 this.addBubble("התקבל מענה ריק מהשרת (Candidates Empty). נסה לנסח מחדש.", 'ai');
+                 this.addBubble("התקבל מענה ריק מהשרת.", 'ai');
                  return;
             }
 
@@ -189,7 +177,7 @@ const AICoach = {
 
         } catch (err) {
             document.getElementById(loadingId)?.remove();
-            this.addBubble(`שגיאה קריטית במערכת הצ'אט: ${err.message}`, 'ai');
+            this.addBubble(`שגיאה קריטית: ${err.message}`, 'ai');
             console.error(err);
         }
     },
@@ -203,7 +191,6 @@ const AICoach = {
                 const chartData = JSON.parse(cleanText);
                 this.renderChartBubble(chartData);
             } catch (e) {
-                // במקרה של כישלון בפענוח JSON, הצג כטקסט רגיל
                 this.addBubble(text, 'ai'); 
             }
         } else {
@@ -215,7 +202,12 @@ const AICoach = {
         const container = document.getElementById('chat-container');
         const bubble = document.createElement('div');
         bubble.className = `chat-bubble ${type}`;
-        bubble.innerHTML = text.replace(/\n/g, '<br>');
+        
+        // המרת Markdown בסיסי (כוכביות להדגשה) ל-HTML
+        let formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>'); 
+        formattedText = formattedText.replace(/\n/g, '<br>');
+        
+        bubble.innerHTML = formattedText;
         container.appendChild(bubble);
         this.scrollToBottom();
     },
