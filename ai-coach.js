@@ -1,11 +1,17 @@
 /**
  * AI Coach Module for GymPro Elite
  * Handles Gemini API communication, Context Injection, and Chart.js rendering.
+ * Fixed: Model naming convention and URL structure.
  */
 
 const AICoach = {
     KEY_STORAGE: 'gympro_ai_key',
+    // שימוש בגרסת v1beta שהיא הנפוצה ביותר למודלים החדשים
+    // שים לב: השם חייב להיות עם מקפים וללא רווחים
     MODEL_ENDPOINT: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
+    
+    // מודל גיבוי למקרה שה-Flash לא זמין באזור/מפתח הספציפי
+    BACKUP_ENDPOINT: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent',
 
     // --- State Management ---
     getKey() {
@@ -130,12 +136,22 @@ const AICoach = {
                 }]
             };
 
-            // 3. API Call
-            const response = await fetch(`${this.MODEL_ENDPOINT}?key=${key}`, {
+            // 3. API Call (Try Primary Endpoint)
+            let response = await fetch(`${this.MODEL_ENDPOINT}?key=${key}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
+
+            // Fallback Logic
+            if (!response.ok) {
+                console.warn("Primary model failed, trying backup...");
+                response = await fetch(`${this.BACKUP_ENDPOINT}?key=${key}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+            }
 
             const data = await response.json();
             
@@ -143,8 +159,14 @@ const AICoach = {
             document.getElementById(loadingId).remove();
 
             if (data.error) {
-                this.addBubble("שגיאה בתקשורת עם ה-AI: " + data.error.message, 'ai');
+                console.error("Gemini Error:", data.error);
+                this.addBubble(`שגיאה בתקשורת (Code ${data.error.code}): ${data.error.message}`, 'ai');
                 return;
+            }
+
+            if (!data.candidates || data.candidates.length === 0) {
+                 this.addBubble("התקבל מענה ריק מהשרת. נסה לשאול שוב.", 'ai');
+                 return;
             }
 
             const aiText = data.candidates[0].content.parts[0].text;
@@ -152,7 +174,7 @@ const AICoach = {
 
         } catch (err) {
             document.getElementById(loadingId)?.remove();
-            this.addBubble("אירעה שגיאה פנימית. אנא בדוק את המפתח שלך בהגדרות.", 'ai');
+            this.addBubble("אירעה שגיאה פנימית. אנא בדוק את החיבור לאינטרנט ואת המפתח.", 'ai');
             console.error(err);
         }
     },
@@ -220,39 +242,44 @@ const AICoach = {
         container.appendChild(bubble);
 
         // Render Chart.js
-        new Chart(canvas, {
-            type: chartJson.chartType || 'line',
-            data: {
-                labels: chartJson.labels,
-                datasets: [{
-                    label: chartJson.title,
-                    data: chartJson.data,
-                    borderColor: '#0A84FF',
-                    backgroundColor: 'rgba(10, 132, 255, 0.2)',
-                    tension: 0.4,
-                    fill: true
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { labels: { color: '#fff' } }
+        try {
+            new Chart(canvas, {
+                type: chartJson.chartType || 'line',
+                data: {
+                    labels: chartJson.labels,
+                    datasets: [{
+                        label: chartJson.title,
+                        data: chartJson.data,
+                        borderColor: '#0A84FF',
+                        backgroundColor: 'rgba(10, 132, 255, 0.2)',
+                        tension: 0.4,
+                        fill: true
+                    }]
                 },
-                scales: {
-                    y: {
-                        beginAtZero: false,
-                        grid: { color: 'rgba(255,255,255,0.1)' },
-                        ticks: { color: '#8E8E93' },
-                        title: { display: true, text: chartJson.yLabel || 'Value', color: '#8E8E93' }
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: '#fff' } }
                     },
-                    x: {
-                        grid: { display: false },
-                        ticks: { color: '#8E8E93' }
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            grid: { color: 'rgba(255,255,255,0.1)' },
+                            ticks: { color: '#8E8E93' },
+                            title: { display: true, text: chartJson.yLabel || 'Value', color: '#8E8E93' }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#8E8E93' }
+                        }
                     }
                 }
-            }
-        });
+            });
+        } catch (e) {
+            console.error("Chart Error:", e);
+            bubble.innerHTML += `<br><span style="color:red; font-size:0.8em;">שגיאה בטעינת הגרף</span>`;
+        }
 
         this.scrollToBottom();
     },
