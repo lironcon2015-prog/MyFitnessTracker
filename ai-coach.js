@@ -1,24 +1,26 @@
 /**
  * AI Coach Module for GymPro Elite
  * Handles Gemini API communication, Context Injection, and Chart.js rendering.
- * Features: Multi-model fallback system to prevent 404 errors.
+ * Features: Multi-model fallback system (Pro -> Flash -> Legacy) & Input Sanitization.
  */
 
 const AICoach = {
     KEY_STORAGE: 'gympro_ai_key',
     
-    // רשימת מודלים לניסיון - מהחדש לישן
+    // רשימת מודלים לניסיון - מהחכם והחזק ביותר (Pro) למהיר/גיבוי
     // המערכת תנסה אותם לפי הסדר עד שאחד יצליח
     AVAILABLE_MODELS: [
-        'gemini-1.5-flash',
-        'gemini-1.5-pro',
-        'gemini-pro',
-        'gemini-1.0-pro'
+        'gemini-1.5-pro',      // Pro Model - החכם ביותר (ברירת מחדל חדשה)
+        'gemini-1.5-flash',    // Flash Model - מהיר וחסכוני (גיבוי ראשון)
+        'gemini-1.0-pro'       // Legacy Model - תאימות לאחור (גיבוי אחרון)
     ],
 
     // --- State Management ---
+    
+    // שליפת מפתח עם ניקוי רווחים למניעת שגיאות 404
     getKey() {
-        return localStorage.getItem(this.KEY_STORAGE);
+        const key = localStorage.getItem(this.KEY_STORAGE);
+        return key ? key.trim() : null;
     },
 
     saveKey() {
@@ -60,6 +62,7 @@ const AICoach = {
         const weights = allData.weights || {};
         const rms = allData.rms || {};
 
+        // הכנת היסטוריה מקוצרת כדי לא לחרוג ממגבלת ה-Tokens
         const recentHistory = archive.slice(0, 15).map(w => ({
             date: w.date,
             type: w.type,
@@ -135,6 +138,7 @@ const AICoach = {
             // Loop through models until one works
             for (const model of this.AVAILABLE_MODELS) {
                 console.log(`Trying model: ${model}...`);
+                // שימוש בגרסת v1beta כדי לתמוך במודלים החדשים
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
                 
                 try {
@@ -148,22 +152,25 @@ const AICoach = {
                         finalData = await response.json();
                         success = true;
                         console.log(`Success with model: ${model}`);
-                        break; // Stop looping
+                        break; // Stop looping on success
                     } else {
-                        const errText = await response.text();
-                        console.warn(`Failed model ${model}:`, response.status, errText);
-                        lastError = `HTTP ${response.status}`;
+                        // חילוץ הודעת השגיאה המפורטת מהשרת לדיבאג
+                        const errorData = await response.json().catch(() => ({ error: { message: response.statusText } }));
+                        const errorMessage = errorData.error?.message || response.statusText;
+                        
+                        console.warn(`Failed model ${model}:`, response.status, errorMessage);
+                        lastError = `HTTP ${response.status} (${model}): ${errorMessage}`;
                     }
                 } catch (e) {
                     console.warn(`Network error with ${model}:`, e);
-                    lastError = e.message;
+                    lastError = `Network Error (${model}): ${e.message}`;
                 }
             }
 
             document.getElementById(loadingId).remove();
 
             if (!success || !finalData) {
-                this.addBubble(`לא הצלחתי להתחבר לאף מודל AI. וודא שהמפתח תקין.\nשגיאה אחרונה: ${lastError}`, 'ai');
+                this.addBubble(`לא הצלחתי להתחבר לאף מודל AI.\nסיבות אפשריות:\n1. מפתח API שגוי (וודא שאין רווחים).\n2. בעיית חיבור רשת.\n\nפרטים טכניים: ${lastError}`, 'ai');
                 return;
             }
 
@@ -173,7 +180,7 @@ const AICoach = {
             }
 
             if (!finalData.candidates || finalData.candidates.length === 0) {
-                 this.addBubble("התקבל מענה ריק מהשרת.", 'ai');
+                 this.addBubble("התקבל מענה ריק מהשרת (Candidates Empty). נסה לנסח מחדש.", 'ai');
                  return;
             }
 
@@ -182,7 +189,7 @@ const AICoach = {
 
         } catch (err) {
             document.getElementById(loadingId)?.remove();
-            this.addBubble("שגיאה קריטית במערכת הצ'אט.", 'ai');
+            this.addBubble(`שגיאה קריטית במערכת הצ'אט: ${err.message}`, 'ai');
             console.error(err);
         }
     },
@@ -196,6 +203,7 @@ const AICoach = {
                 const chartData = JSON.parse(cleanText);
                 this.renderChartBubble(chartData);
             } catch (e) {
+                // במקרה של כישלון בפענוח JSON, הצג כטקסט רגיל
                 this.addBubble(text, 'ai'); 
             }
         } else {
@@ -286,7 +294,9 @@ const AICoach = {
 
     scrollToBottom() {
         const screen = document.getElementById('ui-ai-chat');
-        screen.scrollTo({ top: screen.scrollHeight, behavior: 'smooth' });
+        if (screen) {
+            screen.scrollTo({ top: screen.scrollHeight, behavior: 'smooth' });
+        }
     }
 };
 
