@@ -1,7 +1,5 @@
 /**
- * GYMPRO ELITE V12.12.2 (Refactor & Loops Fix)
- * - Feature: 'Back to Dashboard' button in manager.
- * - Fix: History loops in editor, exercise selection, archive deletion, and swap menu.
+ * GYMPRO ELITE V12.12.3 AI (AI Coach Integration)
  */
 
 // --- DEFAULT DATA ---
@@ -327,7 +325,7 @@ const StorageManager = {
     exportConfiguration() {
         const configData = {
             type: 'config_only',
-            version: '12.12.2',
+            version: '12.12.3',
             date: new Date().toISOString(),
             workouts: this.getData(this.KEY_DB_WORKOUTS),
             exercises: this.getData(this.KEY_DB_EXERCISES),
@@ -375,7 +373,6 @@ function restoreSession() {
         
         document.getElementById('recovery-modal').style.display = 'none';
         
-        // Handle migration of removed screens if needed
         let lastScreen = state.historyStack[state.historyStack.length - 1];
         if (['ui-muscle-select', 'ui-ask-arms', 'ui-arm-selection'].includes(lastScreen)) {
              if (lastScreen === 'ui-muscle-select') {
@@ -516,6 +513,19 @@ function handleBackClick() {
         }
     }
 
+    // --- FIX: Safety Guard for Freestyle Mode ---
+    if (currentScreen === 'ui-variation') {
+        // If we are in Freestyle/Interruption/Extra and have logged data, warn before exit
+        if ((state.isFreestyle || state.isInterruption || state.isExtraPhase) && state.log.length > 0) {
+            if(!confirm("האם לצאת מהאימון? (הנתונים שלא נשמרו בארכיון יאבדו)")) return;
+            StorageManager.clearSessionState();
+        }
+        
+        state.isInterruption = false;
+        state.isExtraPhase = false;
+        // NOTE: We do NOT reset state.freestyleFilter here anymore to preserve user choice
+    }
+
     if (currentScreen === 'ui-confirm') {
         if (state.log.length > 0 || state.completedExInSession.length > 0) {
             if(confirm("האם לצאת מהאימון?")) StorageManager.clearSessionState();
@@ -535,13 +545,6 @@ function handleBackClick() {
             return;
         }
         return; 
-    }
-
-    // Cleanup Layer
-    if (currentScreen === 'ui-variation') {
-        state.isInterruption = false;
-        state.isExtraPhase = false;
-        state.freestyleFilter = 'all'; 
     }
 
     if (currentScreen === 'ui-exercise-selector') {
@@ -623,7 +626,6 @@ function renderWorkoutMenu() {
         });
     }
 }
-
 // --- WORKOUT MANAGER ---
 
 function openWorkoutManager() { renderManagerList(); navigate('ui-workout-manager'); }
@@ -1084,13 +1086,13 @@ function saveWorkoutChanges() {
     StorageManager.saveData(StorageManager.KEY_DB_WORKOUTS, state.workouts);
     
     haptic('success');
-    renderWorkoutMenu(); 
     
     // FIX: Pop the editor from history to prevent loop
     state.historyStack.pop();
     
     navigate('ui-workout-manager');
     renderManagerList();
+    renderWorkoutMenu(); // Ensure update propagates
 }
 
 // --- REST TIMER EDITING ---
@@ -1631,7 +1633,11 @@ function finishCurrentExercise() {
     } else {
         if (!state.completedExInSession.includes(state.currentExName)) state.completedExInSession.push(state.currentExName);
         
-        if (state.isInterruption) { state.isInterruption = false; navigate('ui-confirm'); StorageManager.saveSessionState(); } 
+        if (state.isInterruption) { 
+            state.isInterruption = false; 
+            navigate('ui-confirm'); 
+            StorageManager.saveSessionState(); 
+        } 
         else if (state.isExtraPhase) {
             updateVariationUI();
             renderFreestyleChips();
@@ -1640,6 +1646,7 @@ function finishCurrentExercise() {
             StorageManager.saveSessionState(); 
         } 
         else if (state.isFreestyle) { 
+            // FIX: Ensure filters are preserved
             navigate('ui-variation');
             updateVariationUI();
             renderFreestyleChips();
@@ -1744,7 +1751,7 @@ function startFreestyle() {
     state.isFreestyle = true; state.isExtraPhase = false; state.isInterruption = false;
     state.workoutStartTime = Date.now();
     
-    // Default filter
+    // Default filter starts at 'all', but persists through the session
     state.freestyleFilter = 'all'; 
     document.getElementById('freestyle-search').value = '';
     
@@ -1782,7 +1789,6 @@ function updateVariationUI() {
     }
 }
 
-// UPDATED V12.12.1: Added 'בטן' to filters
 function renderFreestyleChips() {
     const container = document.getElementById('variation-chips');
     container.innerHTML = "";
@@ -1815,7 +1821,7 @@ function renderFreestyleList() {
         // 1. Done Tab Logic
         if (state.freestyleFilter === 'בוצעו') return isDone;
         
-        // 2. Hide done exercises from normal lists
+        // 2. Hide done exercises from normal lists, but keep the filter active
         if (isDone) return false;
 
         // 3. Search Logic
