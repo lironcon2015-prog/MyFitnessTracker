@@ -3,12 +3,13 @@
    תוכן (content/*.json) — stale-while-revalidate: מוצג מיד מהמטמון ומתעדכן ברקע,
    כך שהוספת תרחיש לא מחייבת להעלות את מספר הגרסה כאן. */
 
-const SHELL = 'kesher8-shell-v2';
+const SHELL = 'kesher8-shell-v3';
 const CONTENT = 'kesher8-content-v1';
 
 const ASSETS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/pitch.js', './js/store.js',
+  './js/booklet.js', './js/library.js',
   './fonts.css', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png',
   './icons/icon-maskable-512.png', './icons/apple-touch-icon.png', './icons/favicon-32.png',

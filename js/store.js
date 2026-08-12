@@ -59,6 +59,20 @@ export function resetBooklet(bookletId) {
   writeJSON(KEY, progress);
 }
 
+/* --- התרחיש האחרון שנצפה בכל חוברת, כדי להמשיך מאיפה שהפסיק --- */
+const LAST_KEY = 'k8:last';
+let last = readJSON(LAST_KEY, {});
+
+export function setLast(bookletId, scenarioId) {
+  if (last[bookletId] === scenarioId) return;
+  last[bookletId] = scenarioId;
+  writeJSON(LAST_KEY, last);
+}
+
+export function getLast(bookletId) {
+  return last[bookletId] || null;
+}
+
 /** מספר החולצה של הילד. משמש לסימון "החוברות שלי", לא לצביעת הדיאגרמות —
     את השחקן המודגש קובעת החוברת, כי התרחישים מתארים תפקיד מסוים. */
 export function getMyNumber() {

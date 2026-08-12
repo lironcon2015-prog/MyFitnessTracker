@@ -1,11 +1,15 @@
 {
+ "home": {
+  "eyebrow": "כדורגל תשיעיות · גילאי 9–12",
+  "title": "מה לומדים היום",
+  "lede": "כל חוברת היא נושא אחד, ובתוכה כמה תרחישים. סמן מה שכבר למדת, וחזור למה שנשאר.",
+  "foot": "עדיף תרחיש אחד באימון — לא חוברת שלמה."
+ },
+ "legacyBooklet": "kesher-8",
  "booklets": [
   {
    "id": "kesher-8",
-   "file": "content/kesher-8.json",
-   "title": "הקשר המקשר",
-   "role": 8,
-   "count": 8
+   "file": "content/kesher-8.json"
   }
  ]
 }

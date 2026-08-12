@@ -58,7 +58,7 @@ h1{font-family:'Suez One',serif;font-weight:400;font-size:34px;line-height:1.08;
 
 .board{margin-top:16px;border:1px solid var(--hair);background:rgba(255,255,255,.28);padding:8px;
   touch-action:pan-y;user-select:none;-webkit-user-select:none}
-svg#pitch{display:block;width:100%;height:auto}
+svg.pitch{display:block;width:100%;height:auto}
 .tok{transition:transform .68s cubic-bezier(.6,.02,.2,1)}
 .tok circle{stroke-width:0}
 .tok text{font-family:'Heebo',sans-serif;font-weight:900;font-size:13px;text-anchor:middle;
@@ -145,3 +145,31 @@ ul li::before{content:'';position:absolute;right:0;top:.62em;width:9px;height:1.
 .state{margin-top:28px;padding:16px;border:1px dashed var(--hair);text-align:center;
   font-family:'Heebo',sans-serif;font-weight:700;font-size:13px;color:var(--ink-soft)}
 .loading .wrap>*:not(.state){display:none}
+
+/* ===== מסך החוברות ===== */
+#library h1{margin-top:14px}
+#library .lede{margin-bottom:4px}
+
+.cards{margin-top:26px;display:grid;gap:12px}
+.card{display:flex;gap:14px;align-items:stretch;width:100%;text-align:right;font:inherit;color:inherit;
+  border:1px solid var(--hair);background:rgba(255,255,255,.32);padding:12px;cursor:pointer;
+  transition:background .18s,border-color .18s}
+.card:active{background:rgba(255,255,255,.62);border-color:var(--ink)}
+.card:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
+.card .thumb{flex:0 0 78px;width:78px;border:1px solid var(--hair);background:rgba(255,255,255,.4);padding:3px}
+.card .body{flex:1;min-width:0;display:flex;flex-direction:column}
+.card .role{font-family:'Heebo',sans-serif;font-weight:700;font-size:10.5px;letter-spacing:.16em;
+  color:var(--pink);margin-bottom:5px}
+.card h3{font-family:'Suez One',serif;font-weight:400;font-size:20px;line-height:1.15;margin:0 0 5px}
+.card .desc{margin:0;font-size:13.5px;line-height:1.5;color:var(--ink-soft)}
+.card .resume{margin:9px 0 0;font-size:12.5px;color:var(--ink);
+  border-right:2px solid var(--pink);padding-right:8px}
+.card .track{margin-top:auto;padding-top:12px}
+.card .count{margin-top:6px}
+
+/* ===== חזרה ===== */
+.back{display:inline-block;margin-bottom:16px;font-family:'Heebo',sans-serif;font-weight:700;
+  font-size:12px;letter-spacing:.14em;color:var(--ink-soft);text-decoration:none;
+  border-bottom:1px solid var(--hair);padding-bottom:3px}
+.back:active{color:var(--ink);border-color:var(--ink)}
+.back:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
