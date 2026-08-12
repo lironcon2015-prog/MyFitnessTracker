@@ -1,10 +1,23 @@
 /* Service Worker.
-   מעטפת האפליקציה (HTML/CSS/JS/פונטים/אייקונים) — cache-first עם מספר גרסה.
-   תוכן (content/*.json) — stale-while-revalidate: מוצג מיד מהמטמון ומתעדכן ברקע,
-   כך שהוספת תרחיש לא מחייבת להעלות את מספר הגרסה כאן. */
 
-const SHELL = 'kesher8-shell-v3';
-const CONTENT = 'kesher8-content-v1';
+   הקוד מוגש cache-first מתוך מטמון שנושא מספר גרסה. זה מכוון: אם כל קובץ
+   היה נשלף מהרשת בנפרד, אפשר היה לקבל index.html חדש עם app.js ישן — סט
+   קבצים שלא מתאים לעצמו ונופל. מטמון אחד לכל גרסה מבטיח שכל הקוד שנטען
+   הוא מאותה גרסה בדיוק.
+
+   הטריות מגיעה מכיוון אחר: הדפדפן בודק את sw.js בכל ניווט, ומשגרסה חדשה
+   מותקנת היא משתלטת מיד (skipWaiting + claim), והדף מרענן את עצמו פעם אחת
+   (ראה controllerchange ב-app.js). כך עדכון שפורסם מגיע למכשיר בפתיחה
+   הבאה, בלי רענון ידני.
+
+   תוכן (content/*.json) — stale-while-revalidate: מוצג מיד ומתעדכן ברקע. */
+
+/* שם המטמון נגזר מגרסה אחת, כדי שכל שינוי קוד ינקה גם את מטמון התוכן.
+   בלי זה, תוכן שנשמר בגרסה קודמת יכול להגיע לקוד חדש שמצפה למבנה אחר.
+   הוספת תרחיש לא נוגעת בקובץ הזה, ולכן היא עדיין לא דורשת העלאת גרסה. */
+const VERSION = 'v5';
+const SHELL = 'kesher8-shell-' + VERSION;
+const CONTENT = 'kesher8-content-' + VERSION;
 
 const ASSETS = [
   './', './index.html', './css/app.css',
@@ -21,15 +34,21 @@ const ASSETS = [
   './fonts/heebo-hebrew-900-normal.woff2', './fonts/heebo-latin-900-normal.woff2'
 ];
 
-/* התוכן נטען בהתקנה כדי שהאפליקציה תעבוד אופליין כבר אחרי הביקור הראשון */
 const CONTENT_ASSETS = [
   './content/booklets.json', './content/formations.json', './content/kesher-8.json'
 ];
 
+/* cache:'reload' מכריח שליפה מהשרת. בלי זה אפשר למלא מטמון חדש
+   מעותקים ישנים שיושבים במטמון ה-HTTP של הדפדפן */
+const fresh = url => new Request(url, { cache: 'reload' });
+
 self.addEventListener('install', e => {
   e.waitUntil((async () => {
-    await caches.open(SHELL).then(c => c.addAll(ASSETS));
-    await caches.open(CONTENT).then(c => c.addAll(CONTENT_ASSETS)).catch(() => {});
+    const shell = await caches.open(SHELL);
+    await shell.addAll(ASSETS.map(fresh));
+    await caches.open(CONTENT)
+      .then(c => c.addAll(CONTENT_ASSETS.map(fresh)))
+      .catch(() => {});
     self.skipWaiting();
   })());
 });
@@ -51,38 +70,43 @@ self.addEventListener('fetch', e => {
   const url = new URL(req.url);
   if (url.origin !== location.origin) return;
 
-  if (url.pathname.includes('/content/')) {
-    e.respondWith(staleWhileRevalidate(req));
-    return;
-  }
-  e.respondWith(cacheFirst(req));
+  if (url.pathname.includes('/content/')) e.respondWith(contentFirst(req));
+  else e.respondWith(cacheFirst(req));
 });
 
-async function staleWhileRevalidate(req) {
+const timeout = ms => new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms));
+
+/* תוכן מהרשת כשאפשר, כדי שתרחיש שהוספת יופיע כבר בפתיחה הראשונה.
+   אחרי CONTENT_TIMEOUT נופלים למטמון, כך שרשת גרועה במגרש לא תתקע —
+   וכשאין רשת בכלל, האפליקציה עובדת מהמטמון כרגיל. */
+const CONTENT_TIMEOUT = 2500;
+
+async function contentFirst(req) {
   const cache = await caches.open(CONTENT);
-  const hit = await cache.match(req);
-  const fresh = fetch(req).then(res => {
-    if (res && res.ok) cache.put(req, res.clone());
+  const net = fetch(req).then(res => {
+    if (res && res.ok) cache.put(req, res.clone()).catch(() => {});
     return res;
-  }).catch(() => null);
-  return hit || (await fresh) || new Response('{}', { headers: { 'Content-Type': 'application/json' } });
+  });
+  try {
+    return await Promise.race([net, timeout(CONTENT_TIMEOUT)]);
+  } catch (e) {
+    return (await cache.match(req)) || net;
+  }
 }
 
 async function cacheFirst(req) {
-  const hit = await caches.match(req);
+  const cache = await caches.open(SHELL);
+  const hit = await cache.match(req);
   if (hit) return hit;
   try {
     const res = await fetch(req);
-    if (res && res.ok) {
-      const copy = res.clone();
-      caches.open(SHELL).then(c => c.put(req, copy)).catch(() => {});
-    }
+    if (res && res.ok) cache.put(req, res.clone()).catch(() => {});
     return res;
-  } catch (e) {
+  } catch (err) {
     if (req.mode === 'navigate') {
-      const shell = await caches.match('./index.html');
+      const shell = await cache.match('./index.html');
       if (shell) return shell;
     }
-    throw e;
+    throw err;
   }
 }

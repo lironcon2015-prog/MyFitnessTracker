@@ -167,6 +167,9 @@ ul li::before{content:'';position:absolute;right:0;top:.62em;width:9px;height:1.
 .card .track{margin-top:auto;padding-top:12px}
 .card .count{margin-top:6px}
 
+.ver{display:block;margin-top:8px;font-family:'Heebo',sans-serif;font-weight:700;font-size:10.5px;
+  letter-spacing:.16em;color:var(--ink-soft);opacity:.75}
+
 /* ===== חזרה ===== */
 .back{display:inline-block;margin-bottom:16px;font-family:'Heebo',sans-serif;font-weight:700;
   font-size:12px;letter-spacing:.14em;color:var(--ink-soft);text-decoration:none;

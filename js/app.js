@@ -32,7 +32,9 @@ async function boot() {
   const legacyTarget = booklets.find(b => b.id === index.legacyBooklet) || booklets[0];
   migrateLegacy(legacyTarget.id, legacyTarget.scenarios.map(s => s.id));
 
-  const home = index.home;
+  /* אם מסיבה כלשהי הגיע קובץ אינדקס מגרסה ישנה, עדיף ספרייה עם טקסט חסר
+     מאשר מסך ריק — הכרטיסים עצמם נקראים מקבצי החוברות */
+  const home = index.home || { eyebrow: '', title: 'החוברות', lede: '', foot: '' };
   let current = null;   // מסך החוברת הפעיל
 
   function openBooklet(id, scenarioId) {
@@ -62,7 +64,7 @@ async function boot() {
         if (location.hash !== want) history.replaceState(null, '', want);
       });
     } else {
-      renderLibrary(home, booklets, formations, openBooklet);
+      renderLibrary(home, booklets, formations, openBooklet, index.version);
     }
     window.scrollTo(0, 0);
   }
@@ -105,5 +107,19 @@ ib.onclick = async () => {
   deferred.prompt();
   deferred = null;
 };
-if ('serviceWorker' in navigator)
-  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+if ('serviceWorker' in navigator) {
+  /* אם כבר היה service worker פעיל בפתיחה, וגרסה חדשה השתלטה תוך כדי —
+     טוענים מחדש פעם אחת, כדי שעדכון שפורסם יופיע בלי שצריך לרענן ידנית */
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloading) return;
+    reloading = true;
+    location.reload();
+  });
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js')
+      .then(reg => reg.update())
+      .catch(() => {});
+  });
+}

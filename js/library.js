@@ -5,12 +5,16 @@ import { isLearned, learnedCount, getLast } from './store.js';
 
 const $ = id => document.getElementById(id);
 
-export function renderLibrary(home, booklets, formations, onOpen) {
+export function renderLibrary(home, booklets, formations, onOpen, version) {
   $('lib-eyebrow').textContent = home.eyebrow;
   $('lib-title').textContent = home.title;
   $('lib-lede').textContent = home.lede;
   $('lib-foot').textContent = home.foot;
   document.title = home.title + ' — תשיעיות';
+
+  /* חיווי גרסה — כדי לדעת במבט אם העדכון האחרון הגיע למכשיר */
+  const ver = $('lib-ver');
+  ver.textContent = version ? 'גרסה ' + version : '';
 
   const cards = $('cards');
   cards.textContent = '';
