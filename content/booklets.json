@@ -1,0 +1,11 @@
+{
+ "booklets": [
+  {
+   "id": "kesher-8",
+   "file": "content/kesher-8.json",
+   "title": "הקשר המקשר",
+   "role": 8,
+   "count": 8
+  }
+ ]
+}
