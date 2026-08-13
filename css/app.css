@@ -53,6 +53,7 @@ h1{font-family:'Suez One',serif;font-weight:400;font-size:34px;line-height:1.08;
 .chip[data-phase="החזקה"] .dot{background:var(--blue)}
 .chip[data-phase="הגנה"] .dot{background:var(--opp)}
 .chip[data-phase="מעברים"] .dot{background:var(--pink)}
+.chip[data-phase="עם הכדור"] .dot{background:var(--ink)}
 .chip[aria-selected="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
 .chip[aria-selected="true"] .dot{background:var(--paper)}
 .chip:focus-visible{outline:2px solid var(--pink);outline-offset:2px}

@@ -1,9 +1,13 @@
 /* מבדק: מציג את המגרש ברגע שלפני הפעולה, והילד ממקם את עצמו.
 
-   השאלות נגזרות מהתרחישים הקיימים ולא נכתבות בנפרד: חץ הריצה של השחקן
-   הוא בדיוק "מאיפה לאן" — תחילתו היא המצב שלפני, וסופו התשובה. תרחיש בלי
-   ריצה כזאת (מפת תפקיד) נופל מהמבדק מעצמו. תרחיש שהוא החלטה ולא תנועה
-   יכול לשאת שדה quiz משלו בקובץ החוברת. */
+   השאלות נגזרות מהתרחישים הקיימים ולא נכתבות בנפרד:
+
+   · תרחיש בלי כדור — חץ הריצה הוא בדיוק "מאיפה לאן": תחילתו היא המצב
+     שלפני, וסופו התשובה. "לאן אתה זז עכשיו?"
+   · תרחיש שבו השחקן מחזיק בכדור — החץ שיוצא ממנו הוא ההחלטה שלו,
+     והשאלה היא "לאן אתה מוסר?". שם הציון הוא לפי מי קיבל, לא לפי מטרים.
+   · תרחיש בלי אף אחד מהשניים (מפת תפקיד) נופל מהמבדק מעצמו.
+   · תרחיש שהוא החלטה בין אפשרויות יכול לשאת שדה quiz משלו בקובץ. */
 
 import { buildPitch, createPitch, el, svgPoint, PER_METER } from './pitch.js';
 import { saveQuizResult } from './store.js';
@@ -24,20 +28,79 @@ export function buildQuestions(booklet, formation) {
 
   return booklet.scenarios.map(s => {
     if (s.quiz && s.quiz.type === 'choice') return choiceQuestion(s, booklet, formation, role);
-    return moveQuestion(s, booklet, formation, role, cues);
+    return passQuestion(s, formation, role, cues) || moveQuestion(s, formation, role, cues);
   }).filter(Boolean);
 }
 
-function moveQuestion(s, booklet, formation, role, cues) {
+/** החץ שיוצא מהשחקן עצמו — המסירה שהוא נותן, להבדיל מהמסירה שהוא מקבל */
+function ownPass(s, formation, role) {
+  const end = (s.pos && s.pos[role]) || formation.base[role];
+  const start = (s.ghosts && s.ghosts[0]) || null;
+  const fromHim = p => dist(p, end) <= 15 || (start && dist(p, start) <= 15);
+  return (s.arrows || []).find(a => (a.k === 'pass' || a.k === 'opt') && fromHim(a.a));
+}
+
+function ownRun(s, formation, role) {
+  const end = (s.pos && s.pos[role]) || formation.base[role];
+  return (s.arrows || []).find(a => a.k === 'run' && dist(a.b, end) <= 25 && dist(a.a, a.b) >= MIN_RUN);
+}
+
+/** השחקן שלנו שקרוב לנקודה, אם יש כזה */
+function receiver(s, formation, role, pt) {
+  let best = null, bd = 26;
+  formation.order.forEach(n => {
+    if (n === role) return;
+    const p = (s.pos && s.pos[n]) || formation.base[n];
+    const d = dist(p, pt);
+    if (d < bd) { bd = d; best = n; }
+  });
+  return best;
+}
+
+/* שאלת מסירה. נשאלת כשיוצא מהשחקן חץ מסירה ממש, או כשיוצא ממנו חץ אפשרות
+   ואין לו ריצה משלו — כלומר כשההחלטה היא מה לעשות עם הכדור ולא לאן לזוז. */
+function passQuestion(s, formation, role, cues) {
+  const mine = ownPass(s, formation, role);
+  if (!mine) return null;
+  const run = ownRun(s, formation, role);
+  if (run && mine.k !== 'pass') return null;
+
+  /* מהיכן הוא מוסר: המיקום שלו שקרוב יותר לתחילת החץ. בקיר עם החלוץ,
+     למשל, הוא מוסר מנקודת ההתחלה ורק אחר כך רץ קדימה — בלי זה השאלה
+     הייתה מציגה אותו 16 מטר מהמקום שבו הכדור באמת היה ברגליו. */
+  const end = (s.pos && s.pos[role]) || formation.base[role];
+  const start = (s.ghosts && s.ghosts[0]) || null;
+  const at = (start && dist(mine.a, start) < dist(mine.a, end)) ? start : end;
+
+  const target = receiver(s, formation, role, mine.b);
+  if (!target) return null;   /* מסירה לחלל בלי מקבל — אין מה לשאול */
+
+  return {
+    id: s.id, scenario: s, type: 'pass',
+    from: at, to: mine.b, target,
+    before: beforeState(s, role, at, { ballAt: at }),
+    context: context(s, formation, role, true),
+    ask: 'לאן אתה מוסר?',
+    cue: s.cue,
+    cueOptions: pickCues(s.cue, cues)
+  };
+}
+
+function moveQuestion(s, formation, role, cues) {
   const to = (s.pos && s.pos[role]) || formation.base[role];
-  const run = (s.arrows || []).find(a => a.k === 'run' && dist(a.b, to) <= 25);
-  if (!run || dist(run.a, run.b) < MIN_RUN) return null;
+  const run = ownRun(s, formation, role);
+  if (!run) return null;
+
+  /* אם הכדור צויר לרגליו בסוף הפעולה, ברגע שלפניה הוא עוד אצלו בהתחלה */
+  const ballAt = dist(s.ball, to) <= 20 ? run.a : null;
+  const before = beforeState(s, role, run.a, { ballAt });
 
   return {
     id: s.id, scenario: s, type: 'move',
-    from: run.a, to,
-    before: beforeState(s, role, run.a),
-    context: context(s, formation, role),
+    from: run.a, to, before,
+    /* ההקשר מחושב על הרגע שנשאל ולא על התרחיש המלא, אחרת כדור שצויר
+       בסוף הפעולה נראה כאילו אינו אצל אף אחד */
+    context: context(before, formation, role),
     ask: 'לאן אתה זז עכשיו?',
     cue: s.cue,
     cueOptions: pickCues(s.cue, cues)
@@ -59,15 +122,17 @@ function choiceQuestion(s, booklet, formation, role) {
 }
 
 /** המגרש כפי שהוא נראה לפני הפעולה: בלי חיצים, נקודות התחלה, אזורים וצל */
-function beforeState(s, role, from) {
+function beforeState(s, role, from, opts = {}) {
   const b = { ...s, pos: { ...(s.pos || {}) } };
   b.pos[role] = from;
+  if (opts.ballAt) b.ball = opts.ballAt;
   delete b.arrows; delete b.ghosts; delete b.zones; delete b.shadow;
   return b;
 }
 
 /** שורת ההקשר נגזרת מהמגרש עצמו, כדי לא להסגיר את התשובה */
-function context(s, formation, role) {
+function context(s, formation, role, onBall) {
+  if (onBall) return s.phase + ' · הכדור אצלך';
   const near = holder(s, formation);
   const who = !near ? 'הכדור חופשי'
     : near.us ? (near.num === role ? 'הכדור אצלך' : 'הכדור אצל מספר ' + near.num)
@@ -152,7 +217,7 @@ export function mountQuiz(booklet, formation, only, onExit) {
 
     if (phase === 'reveal' || phase === 'cue') {
       pitch.render(cur.scenario, { animate: false });
-      if (cur.type === 'move' && guess) {
+      if (cur.type !== 'choice' && guess) {
         overlay.appendChild(el('circle', { cx: guess[0], cy: guess[1], r: 15, class: 'q-guess' }));
         const t = el('text', { x: guess[0], y: guess[1] + 30, class: 'q-tag' });
         t.textContent = 'סימנת';
@@ -177,7 +242,7 @@ export function mountQuiz(booklet, formation, only, onExit) {
   let dragging = false;
   const place = e => {
     if (phase !== 'ask' && phase !== 'retry') return;
-    if (q().type !== 'move') return;
+    if (q().type === 'choice') return;
     guess = svgPoint(svg, e);
     $('q-confirm').disabled = false;
     paint();
@@ -196,10 +261,13 @@ export function mountQuiz(booklet, formation, only, onExit) {
     $('q-ask').textContent = cur.ask;
     $('q-feed').hidden = true;
     $('q-choices').hidden = cur.type !== 'choice';
-    $('q-confirm').hidden = cur.type !== 'move';
+    $('q-confirm').hidden = cur.type === 'choice';
     $('q-confirm').disabled = true;
-    $('q-confirm').textContent = 'זהו, זה המקום';
-    $('q-hint').hidden = cur.type !== 'move';
+    $('q-confirm').textContent = cur.type === 'pass' ? 'זאת המסירה' : 'זהו, זה המקום';
+    $('q-hint').hidden = cur.type === 'choice';
+    $('q-hint').textContent = cur.type === 'pass'
+      ? 'גע בשחקן שאליו אתה מוסר'
+      : 'גע במגרש במקום שבו אתה צריך להיות';
     $('q-confirm').onclick = confirm;
     if (cur.type === 'choice') renderChoices(cur.options, choose);
     paint();
@@ -208,6 +276,7 @@ export function mountQuiz(booklet, formation, only, onExit) {
   function confirm() {
     const cur = q();
     tries++;
+    if (cur.type === 'pass') return confirmPass(cur);
     const off = meters(dist(guess, cur.to));
 
     /* ניסיון שני לפני שרואים את התשובה — מכריח לחשוב פעמיים */
@@ -235,6 +304,37 @@ export function mountQuiz(booklet, formation, only, onExit) {
       grade === 'exact' ? (tries === 1 ? 'מדויק.' : 'מדויק, בניסיון השני.')
       : grade === 'close' ? `קרוב — ${off.toFixed(1)} מטר מהמקום.`
       : `${off.toFixed(1)} מטר מהמקום. תראה את החץ.`;
+    $('q-hint').hidden = true;
+    paint();
+    cuePhase();
+  }
+
+  /* במסירה הציון הוא לפי מי קיבל את הכדור, לא לפי מטרים —
+     מסירה היא בחירה בשחקן, לא כיוון על המגרש */
+  function confirmPass(cur) {
+    const picked = receiver(cur.scenario, formation, booklet.role, guess);
+    const right = picked !== null && picked === cur.target;
+
+    if (!right && tries === 1) {
+      phase = 'retry';
+      $('q-feed').hidden = false;
+      $('q-feed').className = 'qfeed miss';
+      $('q-feed').textContent = 'לא. מי פנוי, ולאן הכדור באמת צריך ללכת?';
+      return;
+    }
+
+    const grade = right ? 'exact' : 'far';
+    results[i] = { id: cur.id, grade, meters: 0, tries };
+    saveQuizResult(booklet.id, cur.id, grade, 0);
+
+    phase = 'reveal';
+    $('q-confirm').hidden = true;
+    $('q-feed').hidden = false;
+    $('q-feed').className = 'qfeed ' + grade;
+    $('q-feed').textContent = right
+      ? (tries === 1 ? `נכון — מסירה למספר ${cur.target}.` : `נכון, בניסיון השני — מסירה למספר ${cur.target}.`)
+      : (picked ? `מסרת למספר ${picked}. הכדור הולך למספר ${cur.target}.`
+                : `שם אין אף אחד. הכדור הולך למספר ${cur.target}.`);
     $('q-hint').hidden = true;
     paint();
     cuePhase();
