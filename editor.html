@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl" class="loading">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>עורך תרחישים</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#E8E2D4">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32">
+<link rel="stylesheet" href="fonts.css">
+<link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/editor.css">
+</head>
+<body>
+<div class="wrap">
+
+  <div class="state" id="state">טוען…</div>
+
+  <div class="eyebrow">עורך תרחישים · <span id="e-booklet"></span></div>
+  <h1>עורך</h1>
+  <p class="lede">סדר את המגרש, כתוב את ההסבר, והורד את החוברת. מה שנראה כאן הוא בדיוק מה שהילד יראה.</p>
+
+  <div class="draft" id="draft" hidden>
+    <span id="draft-msg"></span>
+    <button type="button" id="draft-drop" class="linkish">התחל מחדש מהגרסה שפורסמה</button>
+  </div>
+
+  <!-- בחירת תרחיש -->
+  <div class="erow">
+    <select id="e-scenario" aria-label="בחירת תרחיש"></select>
+    <button type="button" id="e-prev" title="הקודם">▶</button>
+    <button type="button" id="e-next" title="הבא">◀</button>
+  </div>
+  <div class="erow">
+    <button type="button" id="e-add">תרחיש חדש</button>
+    <button type="button" id="e-dup">שכפל</button>
+    <button type="button" id="e-moveup">הזז אחורה</button>
+    <button type="button" id="e-movedn">הזז קדימה</button>
+    <button type="button" id="e-del" class="danger">מחק תרחיש</button>
+  </div>
+
+  <!-- כלים -->
+  <div class="rail"><div class="tools" id="tools">
+    <button type="button" data-tool="select" aria-pressed="true">בחירה</button>
+    <button type="button" data-tool="start">נקודת התחלה</button>
+    <button type="button" data-tool="run">חץ ריצה</button>
+    <button type="button" data-tool="pass">מסירה</button>
+    <button type="button" data-tool="opt">אפשרות</button>
+    <button type="button" data-tool="press">תנועת יריב</button>
+    <button type="button" data-tool="opp">יריב</button>
+    <button type="button" data-tool="zone">אזור</button>
+    <button type="button" data-tool="shadow">צל כיסוי</button>
+    <button type="button" data-tool="erase">מחיקה</button>
+  </div></div>
+  <p class="toolhint" id="toolhint"></p>
+
+  <div class="board" id="board"></div>
+
+  <!-- פאנל הפריט הנבחר -->
+  <div class="sel" id="sel" hidden>
+    <div class="sel-head" id="sel-head"></div>
+    <div class="erow" id="sel-kind"></div>
+    <label class="field"><span>תווית</span><input type="text" id="sel-label" maxlength="24" placeholder="אות או מילה על הציור"></label>
+    <button type="button" id="sel-del" class="danger">מחק את הפריט</button>
+  </div>
+
+  <!-- טקסט התרחיש -->
+  <h2 class="ehead">הטקסט</h2>
+  <label class="field"><span>שלב המשחק</span>
+    <input type="text" id="f-phase" list="phases" placeholder="החזקה">
+    <datalist id="phases"><option value="החזקה"><option value="הגנה"><option value="מעברים"><option value="זירה"></datalist>
+  </label>
+  <label class="field"><span>כותרת בצ'יפ</span><input type="text" id="f-chip" placeholder="לחץ גבוה"></label>
+  <label class="field"><span>כותרת</span><input type="text" id="f-title" placeholder="לחץ גבוה"></label>
+  <label class="field"><span>תת-כותרת</span><input type="text" id="f-sub" placeholder="מתי מותר לקפוץ קדימה"></label>
+  <label class="field"><span>מה עושים — שורה לכל נקודה</span><textarea id="f-does" rows="6"></textarea></label>
+  <label class="field"><span>טעות נפוצה</span><textarea id="f-mistake" rows="3"></textarea></label>
+  <label class="field"><span>מה צועקים מהקו</span><textarea id="f-cue" rows="2"></textarea></label>
+  <label class="field"><span>מזהה קבוע (id)</span><input type="text" id="f-id" dir="ltr">
+    <small>ההתקדמות של הילד נשמרת לפי המזהה. אחרי שהתרחיש פורסם — עדיף לא לגעת.</small>
+  </label>
+
+  <!-- ייצוא -->
+  <h2 class="ehead">ייצוא</h2>
+  <div class="erow">
+    <button type="button" id="x-booklet" class="primary">הורד את החוברת</button>
+    <button type="button" id="x-scenario">העתק את התרחיש</button>
+    <button type="button" id="x-link">העתק קישור לשיתוף</button>
+  </div>
+  <p class="note" id="x-note">הקובץ שיורד נכנס ל-<code>content/</code> במקום הקיים. הקישור לשיתוף עובד בלי לפרסם כלום.</p>
+
+  <!-- ייבוא -->
+  <h2 class="ehead">ייבוא מדף HTML</h2>
+  <p class="note">הדבק דף שהכנת, ואשלוף ממנו את התרחישים. מיועד לקבצים שאתה יצרת.</p>
+  <textarea id="imp-src" rows="4" placeholder="הדבק כאן את ה-HTML או את מערך S"></textarea>
+  <div class="erow">
+    <button type="button" id="imp-go">שלוף תרחישים</button>
+    <span id="imp-msg" class="note"></span>
+  </div>
+  <div id="imp-list"></div>
+
+  <p class="foot"><a href="index.html" class="linkish">← לאפליקציה</a></p>
+</div>
+
+<script type="module" src="js/editor.js"></script>
+</body>
+</html>

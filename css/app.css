@@ -5,6 +5,7 @@
   --grass:#D6DAC6; --opp:#6E7A6B;
 }
 *{box-sizing:border-box}
+[hidden]{display:none !important}   /* גובר על display:flex של .track ואחרים */
 html,body{margin:0;padding:0;overscroll-behavior-y:none}
 body{
   background:var(--paper);color:var(--ink);

@@ -90,6 +90,7 @@ export function createPitch(svg, formation, role) {
   order.forEach(n => {
     const me = n === role;
     const g = el('g', { class: 'tok ' + (me ? 'eight' : 'mate'), transform: `translate(${base[n][0]},${base[n][1]})` });
+    g.dataset.num = n;   /* לתפיסה בגרירה בעורך */
     g.appendChild(el('circle', { r: me ? 14.5 : 12.5 }));
     const t = el('text');
     t.textContent = n;
@@ -119,8 +120,10 @@ export function createPitch(svg, formation, role) {
 
     gZone.textContent = ''; gOpp.textContent = ''; gArr.textContent = ''; gGhost.textContent = '';
 
-    (s.zones || []).forEach(z => {
-      gZone.appendChild(el('rect', { x: z.x, y: z.y, width: z.w, height: z.h, rx: 6, class: 'zone' + fade }));
+    (s.zones || []).forEach((z, i) => {
+      const r = el('rect', { x: z.x, y: z.y, width: z.w, height: z.h, rx: 6, class: 'zone' + fade });
+      r.dataset.zone = i;
+      gZone.appendChild(r);
       if (z.label) {
         const t = el('text', { x: z.x + z.w - 8, y: z.y + 16, class: 'zlabel' + fade, 'text-anchor': 'end' });
         t.textContent = z.label;
@@ -135,10 +138,15 @@ export function createPitch(svg, formation, role) {
       gZone.appendChild(el('path', { d: `M${p[0]} ${p[1]} L${ex + nx} ${ey + ny} L${ex - nx} ${ey - ny} Z`, class: 'shadow' + fade }));
     }
 
-    (s.ghosts || []).forEach(g => gGhost.appendChild(el('circle', { cx: g[0], cy: g[1], r: 13, class: 'ghost' + fade })));
+    (s.ghosts || []).forEach((g, i) => {
+      const c = el('circle', { cx: g[0], cy: g[1], r: 13, class: 'ghost' + fade });
+      c.dataset.ghost = i;
+      gGhost.appendChild(c);
+    });
 
-    (s.opp || []).forEach(o => {
+    (s.opp || []).forEach((o, i) => {
       const g = el('g', { class: 'opp' + fade, transform: `translate(${o[0]},${o[1]})` });
+      g.dataset.opp = i;
       g.appendChild(el('circle', { r: 12, class: 'oppfill' }));
       g.appendChild(el('circle', { r: 12 }));
       gOpp.appendChild(g);
@@ -152,6 +160,7 @@ export function createPitch(svg, formation, role) {
         class: 'arrow ' + (ARROW_CLASS[ar.k] || 'a-run'),
         'marker-end': `url(#${marker}-${uid})`
       });
+      p.dataset.arrow = k;
       gArr.appendChild(p);
       if (decorate && !reduce) {
         if (ar.k === 'run') {

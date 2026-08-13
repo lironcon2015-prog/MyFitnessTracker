@@ -10,12 +10,12 @@
    (ראה controllerchange ב-app.js). כך עדכון שפורסם מגיע למכשיר בפתיחה
    הבאה, בלי רענון ידני.
 
-   תוכן (content/*.json) — stale-while-revalidate: מוצג מיד ומתעדכן ברקע. */
+   תוכן (content/*.json) — מהרשת קודם, עם נפילה למטמון. ראה contentFirst. */
 
 /* שם המטמון נגזר מגרסה אחת, כדי שכל שינוי קוד ינקה גם את מטמון התוכן.
    בלי זה, תוכן שנשמר בגרסה קודמת יכול להגיע לקוד חדש שמצפה למבנה אחר.
    הוספת תרחיש לא נוגעת בקובץ הזה, ולכן היא עדיין לא דורשת העלאת גרסה. */
-const VERSION = 'v5';
+const VERSION = 'v6';
 const SHELL = 'kesher8-shell-' + VERSION;
 const CONTENT = 'kesher8-content-' + VERSION;
 
@@ -23,6 +23,7 @@ const ASSETS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/pitch.js', './js/store.js',
   './js/booklet.js', './js/library.js',
+  './editor.html', './css/editor.css', './js/editor.js',
   './fonts.css', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png',
   './icons/icon-maskable-512.png', './icons/apple-touch-icon.png', './icons/favicon-32.png',

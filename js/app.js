@@ -14,9 +14,26 @@ async function getJSON(url) {
 }
 
 function parseHash() {
-  const parts = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
+  /* הכתובת מגיעה מקודדת כשיש בה תווים לא-לטיניים, ולכן מפענחים לפני ההשוואה */
+  const dec = x => { try { return decodeURIComponent(x); } catch (e) { return x; } };
+  const parts = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(dec);
   if (parts[0] === 'b' && parts[1]) return { view: 'booklet', id: parts[1], scenario: parts[2] || null };
+  if (parts[0] === 'x' && parts[1]) return { view: 'shared', data: parts[1] };
   return { view: 'library' };
+}
+
+/* תרחיש בודד שנשלח בקישור מהעורך — מגיע מקודד בכתובת, בלי לפרסם כלום.
+   נעטף בחוברת סינתטית כדי שמסך החוברת יוכל להציג אותו כמו כל תרחיש. */
+function decodeShared(data) {
+  const b64 = data.replace(/-/g, '+').replace(/_/g, '/');
+  const bin = atob(b64);
+  const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+  const { r, f, t, s } = JSON.parse(new TextDecoder().decode(bytes));
+  return {
+    id: 'shared', solo: true, role: r, formation: f, mark: String(r),
+    eyebrow: 'תרחיש ששותף', title: s.title || t || 'תרחיש', lede: s.sub || '',
+    scenarios: [s]
+  };
 }
 
 async function boot() {
@@ -44,25 +61,34 @@ async function boot() {
   function show(route) {
     if (current) { current.destroy(); current = null; }
 
-    const booklet = route.view === 'booklet'
-      ? booklets.find(b => b.id === route.id)
-      : null;
-
-    if (route.view === 'booklet' && !booklet) {
-      location.replace('#/');   // חוברת לא מוכרת — חזרה לספרייה
-      return;
+    let booklet = null;
+    if (route.view === 'booklet') {
+      booklet = booklets.find(b => b.id === route.id);
+      if (!booklet) {
+        location.replace('#/');   // חוברת לא מוכרת — חזרה לספרייה
+        return;
+      }
+    } else if (route.view === 'shared') {
+      try {
+        booklet = decodeShared(route.data);
+      } catch (err) {
+        console.error(err);
+        location.replace('#/');   // קישור פגום
+        return;
+      }
     }
 
     $('library').hidden = !!booklet;
     $('booklet').hidden = !booklet;
 
     if (booklet) {
-      current = mountBooklet(booklet, formations[booklet.formation], route.scenario, id => {
+      const onScenario = booklet.solo ? null : id => {
         /* החלפת תרחיש מעדכנת את הכתובת בלי להוסיף צעד להיסטוריה,
            כדי שכפתור "אחורה" יחזור לספרייה ולא יעבור תרחיש-תרחיש */
         const want = '#/b/' + booklet.id + '/' + id;
         if (location.hash !== want) history.replaceState(null, '', want);
-      });
+      };
+      current = mountBooklet(booklet, formations[booklet.formation], route.scenario, onScenario);
     } else {
       renderLibrary(home, booklets, formations, openBooklet, index.version);
     }

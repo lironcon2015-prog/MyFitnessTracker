@@ -21,6 +21,10 @@ export function mountBooklet(booklet, formation, startId, onScenario) {
     listeners.push([target, type, fn, opts]);
   };
 
+  /* תרחיש בודד שהגיע בקישור שיתוף: בלי התקדמות, מערך ותרגילים */
+  const solo = !!booklet.solo;
+  ['track', 'count', 'learn', 'formation', 'closing'].forEach(id => { $(id).hidden = solo; });
+
   /* --- כותרת החוברת --- */
   document.title = booklet.title + ' — תשיעיות';
   $('eyebrow').textContent = booklet.eyebrow;
@@ -28,17 +32,21 @@ export function mountBooklet(booklet, formation, startId, onScenario) {
   $('mark-p').textContent = booklet.mark;
   $('b-title').textContent = booklet.title;
   $('b-lede').textContent = booklet.lede;
-  $('f-label').textContent = booklet.formationNote.label;
-  /* צומת טקסט חשוף ולא span — כדי שגלישת השורות תהיה זהה לגרסה המקורית */
-  const formationText = document.createTextNode(' ' + booklet.formationNote.text);
-  $('f-label').after(formationText);
   $('lg-role').textContent = 'ה-' + booklet.role;
-  $('d-title').textContent = booklet.drills.title;
-  $('d-foot').textContent = booklet.drills.foot;
+
+  let formationText = null;
+  if (!solo) {
+    $('f-label').textContent = booklet.formationNote.label;
+    /* צומת טקסט חשוף ולא span — כדי שגלישת השורות תהיה זהה לגרסה המקורית */
+    formationText = document.createTextNode(' ' + booklet.formationNote.text);
+    $('f-label').after(formationText);
+    $('d-title').textContent = booklet.drills.title;
+    $('d-foot').textContent = booklet.drills.foot;
+  }
 
   const drills = $('drills');
   drills.textContent = '';
-  booklet.drills.items.forEach(d => {
+  (solo ? [] : booklet.drills.items).forEach(d => {
     const row = document.createElement('div');
     row.className = 'drill';
     const n = document.createElement('div');
@@ -56,6 +64,11 @@ export function mountBooklet(booklet, formation, startId, onScenario) {
   svg.id = 'pitch';
   board.prepend(svg);
   const pitch = createPitch(svg, formation, booklet.role);
+
+  /* --- ניווט בין תרחישים (מוסתר כשיש רק אחד) --- */
+  $('chips').parentElement.hidden = solo;   /* .rail */
+  $('prev').parentElement.hidden = solo;    /* .nav */
+  $('hint').hidden = solo;
 
   /* --- פס התקדמות --- */
   const track = $('track');
@@ -145,7 +158,7 @@ export function mountBooklet(booklet, formation, startId, onScenario) {
     destroy() {
       listeners.forEach(([t, type, fn, opts]) => t.removeEventListener(type, fn, opts));
       svg.remove();
-      formationText.remove();
+      if (formationText) formationText.remove();
     }
   };
 }
