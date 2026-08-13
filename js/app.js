@@ -3,6 +3,7 @@
 
 import { mountBooklet } from './booklet.js';
 import { renderLibrary } from './library.js';
+import { mountQuiz } from './quiz.js';
 import { migrateLegacy } from './store.js';
 
 const $ = id => document.getElementById(id);
@@ -18,6 +19,7 @@ function parseHash() {
   const dec = x => { try { return decodeURIComponent(x); } catch (e) { return x; } };
   const parts = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(dec);
   if (parts[0] === 'b' && parts[1]) return { view: 'booklet', id: parts[1], scenario: parts[2] || null };
+  if (parts[0] === 'q' && parts[1]) return { view: 'quiz', id: parts[1], scenario: parts[2] || null };
   if (parts[0] === 'x' && parts[1]) return { view: 'shared', data: parts[1] };
   return { view: 'library' };
 }
@@ -58,11 +60,15 @@ async function boot() {
     location.hash = '#/b/' + id + (scenarioId ? '/' + scenarioId : '');
   }
 
+  function screens(active) {
+    ['library', 'booklet', 'quiz'].forEach(id => { $(id).hidden = id !== active; });
+  }
+
   function show(route) {
     if (current) { current.destroy(); current = null; }
 
     let booklet = null;
-    if (route.view === 'booklet') {
+    if (route.view === 'booklet' || route.view === 'quiz') {
       booklet = booklets.find(b => b.id === route.id);
       if (!booklet) {
         location.replace('#/');   // חוברת לא מוכרת — חזרה לספרייה
@@ -78,10 +84,18 @@ async function boot() {
       }
     }
 
-    $('library').hidden = !!booklet;
-    $('booklet').hidden = !booklet;
-
-    if (booklet) {
+    if (route.view === 'quiz') {
+      screens('quiz');
+      const only = route.scenario ? [route.scenario] : [];
+      /* onExit מריץ מחדש עם תת-קבוצה: "רק את אלה שפספסתי" */
+      const start = subset => {
+        if (current) current.destroy();
+        current = mountQuiz(booklet, formations[booklet.formation], subset, start);
+        window.scrollTo(0, 0);
+      };
+      start(only);
+    } else if (booklet) {
+      screens('booklet');
       const onScenario = booklet.solo ? null : id => {
         /* החלפת תרחיש מעדכנת את הכתובת בלי להוסיף צעד להיסטוריה,
            כדי שכפתור "אחורה" יחזור לספרייה ולא יעבור תרחיש-תרחיש */
@@ -90,6 +104,7 @@ async function boot() {
       };
       current = mountBooklet(booklet, formations[booklet.formation], route.scenario, onScenario);
     } else {
+      screens('library');
       renderLibrary(home, booklets, formations, openBooklet, index.version);
     }
     window.scrollTo(0, 0);

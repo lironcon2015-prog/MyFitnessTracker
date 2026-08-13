@@ -2,7 +2,7 @@
    עובד על אותו מבנה נתונים ואותו מודול ציור כמו האפליקציה, כך שמה שמסודר
    כאן נראה בדיוק כמו אצל הילד. הפלט הוא JSON — העורך לא כותב לריפו. */
 
-import { buildPitch, createPitch, thumbnail, el, arc, trim } from './pitch.js';
+import { buildPitch, createPitch, thumbnail, el, arc, trim, svgPoint } from './pitch.js';
 
 const $ = id => document.getElementById(id);
 const draftKey = id => 'k8:draft:' + id;
@@ -182,12 +182,7 @@ function bendFrom(ar, p) {
 
 /* ---------- עכבר ומגע ---------- */
 
-function toSvg(e) {
-  const pt = svg.createSVGPoint();
-  pt.x = e.clientX; pt.y = e.clientY;
-  const p = pt.matrixTransform(svg.getScreenCTM().inverse());
-  return [clamp(Math.round(p.x), 20, 380), clamp(Math.round(p.y), 20, 600)];
-}
+const toSvg = e => svgPoint(svg, e);
 
 /* מה נתפס בנקודה מסוימת.
    הסדר חשוב: ידית לפני הכול כי היא נועדה לגרירה, אחר כך אובייקטים לפי

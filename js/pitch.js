@@ -23,6 +23,20 @@ export function arc(a, b, bend) {
   return `M${a[0]} ${a[1]} Q${mx - dy / l * bend} ${my + dx / l * bend} ${b[0]} ${b[1]}`;
 }
 
+/* המרת נקודת מגע או עכבר לקואורדינטות המגרש, מוגבלת לתוך גבולות המגרש.
+   משותפת לעורך ולמבדק. */
+export function svgPoint(svg, e) {
+  const pt = svg.createSVGPoint();
+  pt.x = e.clientX; pt.y = e.clientY;
+  const p = pt.matrixTransform(svg.getScreenCTM().inverse());
+  const clamp = (v, lo, hi) => Math.round(Math.max(lo, Math.min(hi, v)));
+  return [clamp(p.x, 20, 380), clamp(p.y, 20, 600)];
+}
+
+/* 8 יחידות ציור = מטר אחד. נבדק מול רחבת העונשין בשרטוט:
+   208 על 91 יחידות, כלומר 26 על 11.4 מטר — מידות רחבה בתשיעיות. */
+export const PER_METER = 8;
+
 const ARROW_CLASS = { pass: 'a-pass', opt: 'a-opt', press: 'a-press', run: 'a-run' };
 const ARROW_MARKER = { pass: 'hb', press: 'hg', run: 'hp', opt: 'hp' };
 const HEAD_FILL = { hp: '#E5326F', hb: '#1F4FA8', hg: '#6E7A6B' };

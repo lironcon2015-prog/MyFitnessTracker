@@ -86,9 +86,34 @@
     <div class="close" id="closing">
       <h3 id="d-title"></h3>
       <div id="drills"></div>
+      <button class="learn quizgo" id="go-quiz" type="button">מבדק — בלי הסברים, רק אתה והמגרש</button>
       <p class="foot"><span id="d-foot"></span><br>
       <button class="reset" id="reset" type="button">אפס את הסימונים</button></p>
     </div>
+  </section>
+
+  <!-- ===== מסך מבדק ===== -->
+  <section id="quiz" hidden>
+    <a class="back" href="#/" id="q-back">כל החוברות ←</a>
+    <div class="eyebrow" id="q-eyebrow"></div>
+
+    <div class="track" id="q-track" aria-hidden="true"></div>
+    <div class="count" id="q-count"></div>
+
+    <div id="q-stage">
+      <div class="phase" id="q-context"></div>
+      <h2 id="q-ask"></h2>
+
+      <div class="board" id="q-board"></div>
+      <p class="hint" id="q-hint">גע במגרש במקום שבו אתה צריך להיות</p>
+
+      <div class="qfeed" id="q-feed" hidden></div>
+      <div class="qchoices" id="q-choices" hidden></div>
+
+      <div class="nav"><button id="q-confirm" type="button">זהו, זה המקום</button></div>
+    </div>
+
+    <div id="q-result" hidden></div>
   </section>
 
 </div>

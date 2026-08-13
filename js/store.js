@@ -73,6 +73,37 @@ export function getLast(bookletId) {
   return last[bookletId] || null;
 }
 
+/* --- תוצאות המבדק, לפי מזהה תרחיש כמו ההתקדמות --- */
+const QUIZ_KEY = 'k8:quiz';
+let quiz = readJSON(QUIZ_KEY, {});
+
+export function saveQuizResult(bookletId, scenarioId, grade, offMeters) {
+  const book = quiz[bookletId] || (quiz[bookletId] = {});
+  const prev = book[scenarioId];
+  const better = !prev || rank(grade) > rank(prev.grade);
+  book[scenarioId] = {
+    grade: better ? grade : prev.grade,
+    meters: better ? +offMeters.toFixed(1) : prev.meters,
+    last: grade,
+    tries: (prev ? prev.tries : 0) + 1
+  };
+  writeJSON(QUIZ_KEY, quiz);
+}
+
+const rank = g => (g === 'exact' ? 2 : g === 'close' ? 1 : 0);
+
+/** כמה תרחישים נענו במדויק בחוברת */
+export function quizSummary(bookletId) {
+  const book = quiz[bookletId] || {};
+  const ids = Object.keys(book);
+  return { done: ids.length, exact: ids.filter(k => book[k].grade === 'exact').length };
+}
+
+export function resetQuiz(bookletId) {
+  delete quiz[bookletId];
+  writeJSON(QUIZ_KEY, quiz);
+}
+
 /** מספר החולצה של הילד. משמש לסימון "החוברות שלי", לא לצביעת הדיאגרמות —
     את השחקן המודגש קובעת החוברת, כי התרחישים מתארים תפקיד מסוים. */
 export function getMyNumber() {
