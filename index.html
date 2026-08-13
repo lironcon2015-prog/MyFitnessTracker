@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>מספר 8 — תשיעיות</title>
-<meta name="description" content="תרחישים טקטיים לכדורגל תשיעיות: מיקומים, תנועות וטעויות נפוצות.">
+<meta name="description" content="תרחישים טקטיים לכדורגל תשיעיות: מיקומים, תנועות, החלטות עם הכדור וטעויות נפוצות.">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#E8E2D4">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -52,6 +52,13 @@
 
     <div class="formation" id="formation">
       <b id="f-label"></b>
+    </div>
+
+    <div class="side" id="side">
+      <span id="side-label"></span>
+      <button type="button" data-foot="R" aria-pressed="true">ימין</button>
+      <button type="button" data-foot="L" aria-pressed="false">שמאל</button>
+      <em id="side-hint"></em>
     </div>
 
     <div class="rail"><div class="chips" id="chips" role="tablist"></div></div>

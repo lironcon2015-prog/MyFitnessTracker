@@ -1,7 +1,7 @@
 /* מסך חוברת: מגרש, צ'יפים, פאנל ההסבר, ניווט בין תרחישים. */
 
-import { buildPitch, createPitch } from './pitch.js';
-import { isLearned, toggleLearned, learnedCount, resetBooklet, setLast } from './store.js';
+import { buildPitch, createPitch, mirrorScenario } from './pitch.js';
+import { isLearned, toggleLearned, learnedCount, resetBooklet, setLast, isMirrored, setMirrored } from './store.js';
 
 const $ = id => document.getElementById(id);
 
@@ -23,7 +23,7 @@ export function mountBooklet(booklet, formation, startId, onScenario) {
 
   /* תרחיש בודד שהגיע בקישור שיתוף: בלי התקדמות, מערך ותרגילים */
   const solo = !!booklet.solo;
-  ['track', 'count', 'learn', 'formation', 'closing'].forEach(id => { $(id).hidden = solo; });
+  ['track', 'count', 'learn', 'formation', 'closing', 'side'].forEach(id => { $(id).hidden = solo; });
 
   /* --- כותרת החוברת --- */
   document.title = booklet.title + ' — תשיעיות';
@@ -100,12 +100,29 @@ export function mountBooklet(booklet, formation, startId, onScenario) {
     chips.appendChild(b);
   });
 
+  /* --- מתג הצד: משקף את כל התרחישים לילד שמאלי --- */
+  $('side-label').textContent = 'הצד של ה-' + booklet.role + ':';
+  const sideBtns = [...$('side').querySelectorAll('button')];
+  function paintSide() {
+    const m = isMirrored();
+    sideBtns.forEach(b => b.setAttribute('aria-pressed', (b.dataset.foot === 'L') === m));
+    $('side-hint').textContent = m ? 'מותאם לרגל שמאל' : 'מותאם לרגל ימין';
+  }
+  sideBtns.forEach(b => on(b, 'click', () => {
+    const want = b.dataset.foot === 'L';
+    if (want === isMirrored()) return;
+    setMirrored(want);
+    paintSide();
+    render(idx);
+  }));
+  paintSide();
+
   /* --- ציור תרחיש --- */
   let idx = 0;
   function render(i) {
     idx = i;
     const s = S[i];
-    pitch.render(s);
+    pitch.render(isMirrored() ? mirrorScenario(s, formation) : s);
 
     $('p-phase').textContent = s.phase;
     $('p-title').textContent = s.title;

@@ -104,6 +104,17 @@ export function resetQuiz(bookletId) {
   writeJSON(QUIZ_KEY, quiz);
 }
 
+/* --- הצד שבו משחקים: R כברירת מחדל, L משקף את כל התרחישים --- */
+const SIDE_KEY = 'k8:side';
+
+export function isMirrored() {
+  try { return localStorage.getItem(SIDE_KEY) === 'L'; } catch (e) { return false; }
+}
+
+export function setMirrored(on) {
+  try { localStorage.setItem(SIDE_KEY, on ? 'L' : 'R'); } catch (e) { /* לא קריטי */ }
+}
+
 /** מספר החולצה של הילד. משמש לסימון "החוברות שלי", לא לצביעת הדיאגרמות —
     את השחקן המודגש קובעת החוברת, כי התרחישים מתארים תפקיד מסוים. */
 export function getMyNumber() {

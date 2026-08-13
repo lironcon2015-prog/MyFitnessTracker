@@ -43,6 +43,14 @@ h1{font-family:'Suez One',serif;font-weight:400;font-size:34px;line-height:1.08;
   color:var(--ink-soft);background:rgba(255,255,255,.32)}
 .formation b{color:var(--ink);font-weight:700}
 
+.side{display:flex;align-items:center;gap:7px;margin-top:18px;font-family:'Heebo',sans-serif;
+  font-weight:700;font-size:12px;color:var(--ink-soft)}
+.side button{font-family:inherit;font-weight:700;font-size:12.5px;padding:7px 14px;cursor:pointer;
+  border:1px solid var(--hair);background:transparent;color:var(--ink);transition:background .18s,color .18s}
+.side button[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.side button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
+.side em{font-style:normal;flex:1;font-size:11px;text-align:left;opacity:.75}
+
 .rail{margin:24px -18px 0;padding:0 18px;overflow-x:auto;scrollbar-width:none}
 .rail::-webkit-scrollbar{display:none}
 .chips{display:flex;gap:7px;width:max-content;padding-bottom:4px}

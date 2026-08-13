@@ -9,8 +9,8 @@
    · תרחיש בלי אף אחד מהשניים (מפת תפקיד) נופל מהמבדק מעצמו.
    · תרחיש שהוא החלטה בין אפשרויות יכול לשאת שדה quiz משלו בקובץ. */
 
-import { buildPitch, createPitch, el, svgPoint, PER_METER } from './pitch.js';
-import { saveQuizResult } from './store.js';
+import { buildPitch, createPitch, el, svgPoint, PER_METER, mirrorScenario } from './pitch.js';
+import { saveQuizResult, isMirrored } from './store.js';
 
 const $ = id => document.getElementById(id);
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
@@ -24,9 +24,14 @@ const MIN_RUN = 30;   /* פחות מזה איננו תנועה אלא החלטה
 
 export function buildQuestions(booklet, formation) {
   const role = booklet.role;
-  const cues = booklet.scenarios.map(s => s.cue).filter(Boolean);
+  /* משקפים את הנתונים לפני שבונים שאלות, כך שהתשובות מגיעות משוקפות
+     יחד עם הלוח ואין צורך להמיר קואורדינטות בזמן הבדיקה */
+  const list = isMirrored()
+    ? booklet.scenarios.map(s => mirrorScenario(s, formation))
+    : booklet.scenarios;
+  const cues = list.map(s => s.cue).filter(Boolean);
 
-  return booklet.scenarios.map(s => {
+  return list.map(s => {
     if (s.quiz && s.quiz.type === 'choice') return choiceQuestion(s, booklet, formation, role);
     return passQuestion(s, formation, role, cues) || moveQuestion(s, formation, role, cues);
   }).filter(Boolean);

@@ -1,7 +1,7 @@
 /* מסך הבית: כרטיס לכל חוברת, עם מגרש מוקטן והתקדמות. */
 
-import { thumbnail } from './pitch.js';
-import { isLearned, learnedCount, getLast } from './store.js';
+import { thumbnail, mirrorScenario } from './pitch.js';
+import { isLearned, learnedCount, getLast, isMirrored } from './store.js';
 
 const $ = id => document.getElementById(id);
 
@@ -30,7 +30,8 @@ export function renderLibrary(home, booklets, formations, onOpen, version) {
 
     const thumb = document.createElement('div');
     thumb.className = 'thumb';
-    thumb.appendChild(thumbnail(b.scenarios[0], formation, b.role));
+    const first = isMirrored() ? mirrorScenario(b.scenarios[0], formation) : b.scenarios[0];
+    thumb.appendChild(thumbnail(first, formation, b.role));
 
     const body = document.createElement('div');
     body.className = 'body';

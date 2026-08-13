@@ -33,6 +33,59 @@ export function svgPoint(svg, e) {
   return [clamp(p.x, 20, 380), clamp(p.y, 20, 600)];
 }
 
+/* ---------- שיקוף לצד השני ----------
+   לילד שמאלי כל התרחישים צריכים להיות בצד ההפוך. מיישמים את זה על
+   הנתונים ולא על הציור, כדי שגם המבדק יעבוד: התשובות מגיעות משוקפות
+   יחד עם הלוח, בלי מתמטיקה כפולה. */
+
+const WIDTH = 400;
+const mirrorX = x => WIDTH - x;
+
+/* אילו מספרים מתחלפים ביניהם: אלה שמיקום ברירת המחדל שלהם הוא בבואה
+   של השני. נגזר מהמערך עצמו, כדי שלא יהיה צורך לקבע 2↔5 ו-7↔11 בקוד
+   ולתחזק רשימה לכל מערך חדש. */
+const flipCache = new WeakMap();
+function flipMap(formation) {
+  if (flipCache.has(formation)) return flipCache.get(formation);
+  const { order, base } = formation;
+  const map = {};
+  order.forEach(n => {
+    const want = [mirrorX(base[n][0]), base[n][1]];
+    const twin = order.find(m => Math.hypot(base[m][0] - want[0], base[m][1] - want[1]) <= 8);
+    map[n] = twin != null ? twin : n;
+  });
+  flipCache.set(formation, map);
+  return map;
+}
+
+/** עותק משוקף של התרחיש. אינו נוגע במקור. */
+export function mirrorScenario(s, formation) {
+  const flip = flipMap(formation);
+  const m = { ...s, pos: {} };
+
+  /* מספר שומר על הצד המקובל שלו (2 מימין, 5 משמאל), ומה שמתהפך הוא
+     האסימטריה של התרחיש — הצד שבו מתרחשת הפעולה */
+  formation.order.forEach(n => {
+    const src = flip[n];
+    const p = (s.pos && s.pos[src]) || formation.base[src];
+    m.pos[n] = [mirrorX(p[0]), p[1]];
+  });
+
+  m.ball = [mirrorX(s.ball[0]), s.ball[1]];
+  if (s.ghosts) m.ghosts = s.ghosts.map(g => [mirrorX(g[0]), g[1]]);
+  if (s.opp) m.opp = s.opp.map(o => [mirrorX(o[0]), o[1]]);
+  if (s.shadow) m.shadow = s.shadow.map(p => [mirrorX(p[0]), p[1]]);
+  if (s.zones) m.zones = s.zones.map(z => ({ ...z, x: mirrorX(z.x + z.w) }));
+  /* סימן ה-bend מתהפך: הניצב שמכופף את הקשת מתהפך יחד עם המגרש */
+  if (s.arrows) m.arrows = s.arrows.map(a => ({
+    ...a,
+    a: [mirrorX(a.a[0]), a.a[1]],
+    b: [mirrorX(a.b[0]), a.b[1]],
+    bend: -(a.bend || 0)
+  }));
+  return m;
+}
+
 /* 8 יחידות ציור = מטר אחד. נבדק מול רחבת העונשין בשרטוט:
    208 על 91 יחידות, כלומר 26 על 11.4 מטר — מידות רחבה בתשיעיות. */
 export const PER_METER = 8;
