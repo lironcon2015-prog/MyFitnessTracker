@@ -129,11 +129,6 @@ ul li::before{content:'';position:absolute;right:0;top:.62em;width:9px;height:1.
 .nav button:active{background:var(--ink);color:var(--paper)}
 .learn:focus-visible,.nav button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
 
-.close{margin-top:46px;border-top:2px solid var(--ink);padding-top:20px}
-.close h3{font-family:'Suez One',serif;font-weight:400;font-size:20px;margin:0 0 14px}
-.drill{display:flex;gap:12px;margin-bottom:14px}
-.drill .n{font-family:'Heebo',sans-serif;font-weight:900;font-size:12px;color:var(--pink);padding-top:3px}
-.drill p{margin:0;font-size:14.5px}
 .foot{margin-top:28px;font-size:12.5px;color:var(--ink-soft);border-top:1px solid var(--hair);padding-top:12px}
 .reset{background:none;border:none;color:var(--ink-soft);font-family:'Heebo',sans-serif;
   font-weight:700;font-size:11.5px;padding:6px 0;cursor:pointer;text-decoration:underline}
@@ -161,7 +156,7 @@ ul li::before{content:'';position:absolute;right:0;top:.62em;width:9px;height:1.
 #library .lede{margin-bottom:4px}
 
 .cards{margin-top:26px;display:grid;gap:12px}
-.card{display:flex;gap:14px;align-items:stretch;width:100%;text-align:right;font:inherit;color:inherit;
+.card{display:flex;gap:14px;align-items:flex-start;width:100%;text-align:right;font:inherit;color:inherit;
   border:1px solid var(--hair);background:rgba(255,255,255,.32);padding:12px;cursor:pointer;
   transition:background .18s,border-color .18s}
 .card:active{background:rgba(255,255,255,.62);border-color:var(--ink)}
@@ -176,6 +171,12 @@ ul li::before{content:'';position:absolute;right:0;top:.62em;width:9px;height:1.
   border-right:2px solid var(--pink);padding-right:8px}
 .card .track{margin-top:auto;padding-top:12px}
 .card .count{margin-top:6px}
+.card h3 button{font:inherit;color:inherit;background:none;border:none;padding:0;cursor:pointer;text-align:right}
+.card h3 button:focus-visible{outline:2px solid var(--pink);outline-offset:3px}
+.quizgo{width:100%;margin-top:12px;font-family:'Heebo',sans-serif;font-weight:700;font-size:12.5px;
+  padding:11px;border:1px dashed var(--pink);background:transparent;color:var(--pink);cursor:pointer}
+.quizgo.ready{border-style:solid;background:var(--pink);color:var(--paper)}
+.quizgo:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
 
 .ver{display:block;margin-top:8px;font-family:'Heebo',sans-serif;font-weight:700;font-size:10.5px;
   letter-spacing:.16em;color:var(--ink-soft);opacity:.75}
@@ -216,8 +217,6 @@ ul li::before{content:'';position:absolute;right:0;top:.62em;width:9px;height:1.
   color:var(--ink-soft)}
 .choice:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
 
-.quizgo{margin-top:26px;border-style:dashed}
-.quizgo.ready{border-style:solid;background:var(--pink);color:var(--paper)}
 
 #q-result h2{font-family:'Suez One',serif;font-size:26px;margin:22px 0 8px}
 .q-tally{font-family:'Heebo',sans-serif;font-weight:700;font-size:13px;letter-spacing:.1em;

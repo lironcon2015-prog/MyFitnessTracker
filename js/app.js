@@ -60,6 +60,10 @@ async function boot() {
     location.hash = '#/b/' + id + (scenarioId ? '/' + scenarioId : '');
   }
 
+  function openQuiz(id) {
+    location.hash = '#/q/' + id;
+  }
+
   function screens(active) {
     ['library', 'booklet', 'quiz'].forEach(id => { $(id).hidden = id !== active; });
   }
@@ -105,7 +109,7 @@ async function boot() {
       current = mountBooklet(booklet, formations[booklet.formation], route.scenario, onScenario);
     } else {
       screens('library');
-      renderLibrary(home, booklets, formations, openBooklet, index.version);
+      renderLibrary(home, booklets, formations, openBooklet, openQuiz, index.version);
     }
     window.scrollTo(0, 0);
   }

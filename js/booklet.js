@@ -40,23 +40,7 @@ export function mountBooklet(booklet, formation, startId, onScenario) {
     /* צומת טקסט חשוף ולא span — כדי שגלישת השורות תהיה זהה לגרסה המקורית */
     formationText = document.createTextNode(' ' + booklet.formationNote.text);
     $('f-label').after(formationText);
-    $('d-title').textContent = booklet.drills.title;
-    $('d-foot').textContent = booklet.drills.foot;
   }
-
-  const drills = $('drills');
-  drills.textContent = '';
-  (solo ? [] : booklet.drills.items).forEach(d => {
-    const row = document.createElement('div');
-    row.className = 'drill';
-    const n = document.createElement('div');
-    n.className = 'n';
-    n.textContent = d.n;
-    const p = document.createElement('p');
-    p.textContent = d.text;
-    row.append(n, p);
-    drills.appendChild(row);
-  });
 
   /* --- מגרש --- */
   const board = $('board');
@@ -78,10 +62,7 @@ export function mountBooklet(booklet, formation, startId, onScenario) {
     [...track.children].forEach((b, j) => {
       b.className = j === idx ? 'here' : (isLearned(booklet.id, ids[j]) ? 'on' : '');
     });
-    const done = learnedCount(booklet.id);
-    $('count').textContent = `למדתי ${done} מתוך ${S.length}`;
-    /* המבדק זמין תמיד, אבל מודגש רק כשסימן שלמד הכול */
-    $('go-quiz').classList.toggle('ready', done === S.length);
+    $('count').textContent = `למדתי ${learnedCount(booklet.id)} מתוך ${S.length}`;
   }
 
   /* --- צ'יפים --- */
@@ -156,7 +137,6 @@ export function mountBooklet(booklet, formation, startId, onScenario) {
   on($('prev'), 'click', () => go(-1));
   on($('learn'), 'click', () => { toggleLearned(booklet.id, ids[idx]); render(idx); });
   on($('reset'), 'click', () => { resetBooklet(booklet.id); render(idx); });
-  on($('go-quiz'), 'click', () => { location.hash = '#/q/' + booklet.id; });
 
   /* החלקה: בממשק ימין-לשמאל, החלקה ימינה מקדמת לתרחיש הבא */
   let sx = 0, sy = 0, tracking = false;

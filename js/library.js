@@ -1,11 +1,11 @@
-/* מסך הבית: כרטיס לכל חוברת, עם מגרש מוקטן והתקדמות. */
+/* מסך הבית: כרטיס לכל חוברת, עם מגרש מוקטן, התקדמות וכניסה למבדק. */
 
 import { thumbnail, mirrorScenario } from './pitch.js';
-import { isLearned, learnedCount, getLast, isMirrored } from './store.js';
+import { isLearned, learnedCount, getLast, isMirrored, quizSummary } from './store.js';
 
 const $ = id => document.getElementById(id);
 
-export function renderLibrary(home, booklets, formations, onOpen, version) {
+export function renderLibrary(home, booklets, formations, onOpen, onQuiz, version) {
   $('lib-eyebrow').textContent = home.eyebrow;
   $('lib-title').textContent = home.title;
   $('lib-lede').textContent = home.lede;
@@ -13,8 +13,7 @@ export function renderLibrary(home, booklets, formations, onOpen, version) {
   document.title = home.title + ' — תשיעיות';
 
   /* חיווי גרסה — כדי לדעת במבט אם העדכון האחרון הגיע למכשיר */
-  const ver = $('lib-ver');
-  ver.textContent = version ? 'גרסה ' + version : '';
+  $('lib-ver').textContent = version ? 'גרסה ' + version : '';
 
   const cards = $('cards');
   cards.textContent = '';
@@ -23,9 +22,10 @@ export function renderLibrary(home, booklets, formations, onOpen, version) {
     const formation = formations[b.formation];
     if (!formation) return;
 
-    const card = document.createElement('button');
+    /* הכרטיס אינו כפתור אלא מכיל כפתורים: כותרת שפותחת את החוברת וכפתור
+       מבדק. כפתור בתוך כפתור אינו חוקי, וגם לא היה מאפשר שתי פעולות. */
+    const card = document.createElement('div');
     card.className = 'card';
-    card.type = 'button';
     card.dataset.id = b.id;
 
     const thumb = document.createElement('div');
@@ -40,8 +40,15 @@ export function renderLibrary(home, booklets, formations, onOpen, version) {
     role.className = 'role';
     role.textContent = 'מספר ' + b.role;
 
+    const lastId = getLast(b.id);
+    const done = learnedCount(b.id);
+
     const h3 = document.createElement('h3');
-    h3.textContent = b.title;
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.textContent = b.title;
+    open.onclick = () => onOpen(b.id, lastId);
+    h3.appendChild(open);
 
     const desc = document.createElement('p');
     desc.className = 'desc';
@@ -50,8 +57,6 @@ export function renderLibrary(home, booklets, formations, onOpen, version) {
     body.append(role, h3, desc);
 
     /* המשך מאיפה שהפסיק — רק אם באמת התחיל ולא סיים */
-    const lastId = getLast(b.id);
-    const done = learnedCount(b.id);
     if (lastId && done < b.scenarios.length) {
       const s = b.scenarios.find(x => x.id === lastId);
       if (s) {
@@ -74,9 +79,23 @@ export function renderLibrary(home, booklets, formations, onOpen, version) {
     count.className = 'count';
     count.textContent = `למדתי ${done} מתוך ${b.scenarios.length}`;
 
-    body.append(track, count);
+    /* המבדק יושב על החוברת שאליה הוא שייך, ולא בתחתית מסך אחר */
+    const quiz = document.createElement('button');
+    quiz.type = 'button';
+    quiz.className = 'quizgo';
+    const q = quizSummary(b.id);
+    quiz.textContent = q.done
+      ? `מבדק · ${q.exact} מדויקים מתוך ${q.done}`
+      : 'מבדק — בלי הסברים, רק אתה והמגרש';
+    /* מודגש רק כשסימן שלמד את הכול */
+    quiz.classList.toggle('ready', done === b.scenarios.length);
+    quiz.onclick = e => { e.stopPropagation(); onQuiz(b.id); };
+
+    body.append(track, count, quiz);
     card.append(thumb, body);
-    card.onclick = () => onOpen(b.id, lastId);
+
+    /* לחיצה בכל מקום בכרטיס פותחת את החוברת, חוץ מכפתור המבדק */
+    card.onclick = e => { if (!e.target.closest('.quizgo')) onOpen(b.id, lastId); };
     cards.appendChild(card);
   });
 }
