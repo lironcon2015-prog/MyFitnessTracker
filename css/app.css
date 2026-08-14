@@ -27,6 +27,7 @@ body::after{
 .mark{position:relative;width:96px;flex:0 0 96px;height:104px;isolation:isolate}
 .mark span{position:absolute;inset:0;font-family:'Suez One',serif;font-size:112px;line-height:.92;
   text-align:center;mix-blend-mode:multiply}
+.mark.wide span{font-size:72px;line-height:1.44}
 .mark .b{color:var(--blue);transform:translate(4px,4px)}
 .mark .p{color:var(--pink)}
 h1{font-family:'Suez One',serif;font-weight:400;font-size:34px;line-height:1.08;margin:6px 0 8px;letter-spacing:-.01em}
@@ -140,6 +141,7 @@ ul li::before{content:'';position:absolute;right:0;top:.62em;width:9px;height:1.
   h1{font-size:40px}
   .mark{width:120px;flex-basis:120px;height:126px}
   .mark span{font-size:134px}
+  .mark.wide span{font-size:86px;line-height:1.47}
 }
 @media (prefers-reduced-motion:reduce){
   .tok{transition:none}

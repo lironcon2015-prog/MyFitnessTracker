@@ -58,6 +58,12 @@ function flipMap(formation) {
   return map;
 }
 
+/** מי השחקן המודגש כשהמגרש משוקף. בתפקיד מרכזי זה אותו מספר, ובתפקיד
+    אגף זה התפקיד המקביל בצד השני — מגן שמאלי הופך למגן ימני. */
+export function mirrorRole(formation, role) {
+  return flipMap(formation)[role] != null ? flipMap(formation)[role] : role;
+}
+
 /** עותק משוקף של התרחיש. אינו נוגע במקור. */
 export function mirrorScenario(s, formation) {
   const flip = flipMap(formation);
@@ -170,6 +176,18 @@ export function createPitch(svg, formation, role) {
   const ballDot = el('circle', { r: 4.6, class: 'ball' });
   gBall.appendChild(ballDot);
 
+  /* בשיקוף של תפקיד אגף המספר המודגש מתחלף, ולכן ההדגשה ניתנת לשינוי
+     אחרי הבנייה ולא רק בזמנה */
+  let hero = role;
+  function setRole(n) {
+    hero = n;
+    order.forEach(m => {
+      const me = m === hero;
+      toks[m].setAttribute('class', 'tok ' + (me ? 'eight' : 'mate'));
+      toks[m].firstChild.setAttribute('r', me ? 14.5 : 12.5);
+    });
+  }
+
   function render(s, opts = {}) {
     /* decorate=false רק לתמונות מוקטנות: בלי מחלקות אנימציה כלל.
        בתנועה מופחתת המחלקות כן נוספות ו-CSS מנטרל אותן — כך שהפלט
@@ -247,7 +265,7 @@ export function createPitch(svg, formation, role) {
     });
   }
 
-  return { render, tokens: toks, ball: ballDot, formation, role };
+  return { render, setRole, tokens: toks, ball: ballDot, formation, role };
 }
 
 /** מגרש קטן וסטטי לכרטיס בספרייה */

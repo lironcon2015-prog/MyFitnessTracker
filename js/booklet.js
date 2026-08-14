@@ -1,6 +1,6 @@
 /* מסך חוברת: מגרש, צ'יפים, פאנל ההסבר, ניווט בין תרחישים. */
 
-import { buildPitch, createPitch, mirrorScenario } from './pitch.js';
+import { buildPitch, createPitch, mirrorScenario, mirrorRole } from './pitch.js';
 import { isLearned, toggleLearned, learnedCount, resetBooklet, setLast, isMirrored, setMirrored } from './store.js';
 
 const $ = id => document.getElementById(id);
@@ -25,14 +25,25 @@ export function mountBooklet(booklet, formation, startId, onScenario) {
   const solo = !!booklet.solo;
   ['track', 'count', 'learn', 'formation', 'closing', 'side'].forEach(id => { $(id).hidden = solo; });
 
+  /* בשיקוף, תפקיד אגף הופך לתפקיד האגף השני: גם המספר המודגש וגם השם */
+  const hero = () => (isMirrored() ? mirrorRole(formation, booklet.role) : booklet.role);
+  const heroTitle = () => (isMirrored() && booklet.titleB ? booklet.titleB : booklet.title);
+
   /* --- כותרת החוברת --- */
-  document.title = booklet.title + ' — תשיעיות';
   $('eyebrow').textContent = booklet.eyebrow;
-  $('mark-b').textContent = booklet.mark;
-  $('mark-p').textContent = booklet.mark;
-  $('b-title').textContent = booklet.title;
   $('b-lede').textContent = booklet.lede;
-  $('lg-role').textContent = 'ה-' + booklet.role;
+
+  function paintHead() {
+    const n = String(hero());
+    document.title = heroTitle() + ' — תשיעיות';
+    $('mark-b').textContent = n;
+    $('mark-p').textContent = n;
+    /* מספר דו-ספרתי לא נכנס בגודל של ספרה אחת */
+    $('mark-b').parentElement.classList.toggle('wide', n.length > 1);
+    $('b-title').textContent = heroTitle();
+    $('lg-role').textContent = 'ה-' + n;
+  }
+  paintHead();
 
   let formationText = null;
   if (!solo) {
@@ -81,19 +92,24 @@ export function mountBooklet(booklet, formation, startId, onScenario) {
     chips.appendChild(b);
   });
 
-  /* --- מתג הצד: משקף את כל התרחישים לילד שמאלי --- */
-  $('side-label').textContent = 'הצד של ה-' + booklet.role + ':';
+  /* --- מתג הצד --- */
+  const side = booklet.side || { label: 'הצד של ה-' + booklet.role + ':', a: 'ימין', b: 'שמאל' };
+  const hintA = side.hintA || ('מותאם ל' + side.a), hintB = side.hintB || ('מותאם ל' + side.b);
+  $('side-label').textContent = side.label;
   const sideBtns = [...$('side').querySelectorAll('button')];
+  sideBtns[0].textContent = side.a;
+  sideBtns[1].textContent = side.b;
   function paintSide() {
     const m = isMirrored();
     sideBtns.forEach(b => b.setAttribute('aria-pressed', (b.dataset.foot === 'L') === m));
-    $('side-hint').textContent = m ? 'מותאם לרגל שמאל' : 'מותאם לרגל ימין';
+    $('side-hint').textContent = m ? hintB : hintA;
   }
   sideBtns.forEach(b => on(b, 'click', () => {
     const want = b.dataset.foot === 'L';
     if (want === isMirrored()) return;
     setMirrored(want);
     paintSide();
+    paintHead();
     render(idx);
   }));
   paintSide();
@@ -103,6 +119,7 @@ export function mountBooklet(booklet, formation, startId, onScenario) {
   function render(i) {
     idx = i;
     const s = S[i];
+    pitch.setRole(hero());
     pitch.render(isMirrored() ? mirrorScenario(s, formation) : s);
 
     $('p-phase').textContent = s.phase;

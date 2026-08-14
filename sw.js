@@ -15,7 +15,7 @@
 /* שם המטמון נגזר מגרסה אחת, כדי שכל שינוי קוד ינקה גם את מטמון התוכן.
    בלי זה, תוכן שנשמר בגרסה קודמת יכול להגיע לקוד חדש שמצפה למבנה אחר.
    הוספת תרחיש לא נוגעת בקובץ הזה, ולכן היא עדיין לא דורשת העלאת גרסה. */
-const VERSION = 'v10';
+const VERSION = 'v11';
 const SHELL = 'kesher8-shell-' + VERSION;
 const CONTENT = 'kesher8-content-' + VERSION;
 
@@ -36,7 +36,8 @@ const ASSETS = [
 ];
 
 const CONTENT_ASSETS = [
-  './content/booklets.json', './content/formations.json', './content/kesher-8.json'
+  './content/booklets.json', './content/formations.json',
+  './content/kesher-8.json', './content/left-back.json', './content/winger.json'
 ];
 
 /* cache:'reload' מכריח שליפה מהשרת. בלי זה אפשר למלא מטמון חדש

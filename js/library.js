@@ -1,6 +1,6 @@
 /* מסך הבית: כרטיס לכל חוברת, עם מגרש מוקטן, התקדמות וכניסה למבדק. */
 
-import { thumbnail, mirrorScenario } from './pitch.js';
+import { thumbnail, mirrorScenario, mirrorRole } from './pitch.js';
 import { isLearned, learnedCount, getLast, isMirrored, quizSummary } from './store.js';
 
 const $ = id => document.getElementById(id);
@@ -28,17 +28,22 @@ export function renderLibrary(home, booklets, formations, onOpen, onQuiz, versio
     card.className = 'card';
     card.dataset.id = b.id;
 
+    /* בשיקוף, תפקיד אגף מוצג כתפקיד האגף השני — שם ומספר כאחד */
+    const mirrored = isMirrored();
+    const hero = mirrored ? mirrorRole(formation, b.role) : b.role;
+    const title = mirrored && b.titleB ? b.titleB : b.title;
+
     const thumb = document.createElement('div');
     thumb.className = 'thumb';
-    const first = isMirrored() ? mirrorScenario(b.scenarios[0], formation) : b.scenarios[0];
-    thumb.appendChild(thumbnail(first, formation, b.role));
+    const first = mirrored ? mirrorScenario(b.scenarios[0], formation) : b.scenarios[0];
+    thumb.appendChild(thumbnail(first, formation, hero));
 
     const body = document.createElement('div');
     body.className = 'body';
 
     const role = document.createElement('div');
     role.className = 'role';
-    role.textContent = 'מספר ' + b.role;
+    role.textContent = 'מספר ' + hero;
 
     const lastId = getLast(b.id);
     const done = learnedCount(b.id);
@@ -46,7 +51,7 @@ export function renderLibrary(home, booklets, formations, onOpen, onQuiz, versio
     const h3 = document.createElement('h3');
     const open = document.createElement('button');
     open.type = 'button';
-    open.textContent = b.title;
+    open.textContent = title;
     open.onclick = () => onOpen(b.id, lastId);
     h3.appendChild(open);
 

@@ -9,7 +9,7 @@
    · תרחיש בלי אף אחד מהשניים (מפת תפקיד) נופל מהמבדק מעצמו.
    · תרחיש שהוא החלטה בין אפשרויות יכול לשאת שדה quiz משלו בקובץ. */
 
-import { buildPitch, createPitch, el, svgPoint, PER_METER, mirrorScenario } from './pitch.js';
+import { buildPitch, createPitch, el, svgPoint, PER_METER, mirrorScenario, mirrorRole } from './pitch.js';
 import { saveQuizResult, isMirrored } from './store.js';
 
 const $ = id => document.getElementById(id);
@@ -23,31 +23,49 @@ const MIN_RUN = 30;   /* פחות מזה איננו תנועה אלא החלטה
 /* ---------- בניית השאלות ---------- */
 
 export function buildQuestions(booklet, formation) {
-  const role = booklet.role;
+  const mirrored = isMirrored();
+  /* בשיקוף גם המספר המודגש מתחלף, אחרת השאלות היו נבנות סביב שחקן אחר */
+  const role = mirrored ? mirrorRole(formation, booklet.role) : booklet.role;
   /* משקפים את הנתונים לפני שבונים שאלות, כך שהתשובות מגיעות משוקפות
      יחד עם הלוח ואין צורך להמיר קואורדינטות בזמן הבדיקה */
-  const list = isMirrored()
+  const list = mirrored
     ? booklet.scenarios.map(s => mirrorScenario(s, formation))
     : booklet.scenarios;
   const cues = list.map(s => s.cue).filter(Boolean);
 
   return list.map(s => {
+    /* תרחיש בלי יריבים אינו סיטואציה אלא מפה — ומפה אין על מה לשאול */
+    if (!s.opp || !s.opp.length) return null;
     if (s.quiz && s.quiz.type === 'choice') return choiceQuestion(s, booklet, formation, role);
     return passQuestion(s, formation, role, cues) || moveQuestion(s, formation, role, cues);
   }).filter(Boolean);
 }
 
-/** החץ שיוצא מהשחקן עצמו — המסירה שהוא נותן, להבדיל מהמסירה שהוא מקבל */
-function ownPass(s, formation, role) {
-  const end = (s.pos && s.pos[role]) || formation.base[role];
+const heroAt = (s, formation, role) => (s.pos && s.pos[role]) || formation.base[role];
+
+/** האם הנקודה יושבת על השחקן — במיקומו המצויר או בנקודת ההתחלה שלו */
+function atHero(s, formation, role, p, r = 20) {
+  const end = heroAt(s, formation, role);
   const start = (s.ghosts && s.ghosts[0]) || null;
-  const fromHim = p => dist(p, end) <= 15 || (start && dist(p, start) <= 15);
-  return (s.arrows || []).find(a => (a.k === 'pass' || a.k === 'opt') && fromHim(a.a));
+  return dist(p, end) <= r || (start && dist(p, start) <= r);
 }
 
+/** המסירה שהוא נותן, להבדיל מזו שהוא מקבל.
+    מעדיפים חץ שיש לו מקבל: מסירה לחלל אי אפשר לתת עליה ציון לפי שחקן. */
+function ownPass(s, formation, role) {
+  const mine = (s.arrows || []).filter(a =>
+    (a.k === 'pass' || a.k === 'opt') && atHero(s, formation, role, a.a, 15));
+  return mine.find(a => receiver(s, formation, role, a.b)) || mine[0];
+}
+
+/** הריצה שלו. שני מוסכמות שרטוט קיימות בתוכן, ושתיהן נתמכות:
+    ריצה שמסתיימת במקום שבו הוא מצויר (הוא כבר הגיע), וריצה שיוצאת ממנו
+    אל היעד (הוא עוד בדרך). */
 function ownRun(s, formation, role) {
-  const end = (s.pos && s.pos[role]) || formation.base[role];
-  return (s.arrows || []).find(a => a.k === 'run' && dist(a.b, end) <= 25 && dist(a.a, a.b) >= MIN_RUN);
+  const end = heroAt(s, formation, role);
+  return (s.arrows || []).find(a => a.k === 'run'
+    && dist(a.a, a.b) >= MIN_RUN
+    && (dist(a.b, end) <= 25 || atHero(s, formation, role, a.a)));
 }
 
 /** השחקן שלנו שקרוב לנקודה, אם יש כזה */
@@ -63,12 +81,14 @@ function receiver(s, formation, role, pt) {
 }
 
 /* שאלת מסירה. נשאלת כשיוצא מהשחקן חץ מסירה ממש, או כשיוצא ממנו חץ אפשרות
-   ואין לו ריצה משלו — כלומר כשההחלטה היא מה לעשות עם הכדור ולא לאן לזוז. */
+   ואין לו תנועה אל מקומו — כלומר כשההחלטה היא מה לעשות עם הכדור ולא לאן לזוז.
+   ריצה שיוצאת ממנו היא מה שהוא עושה *אחרי* המסירה, ולכן אינה גוברת עליה. */
 function passQuestion(s, formation, role, cues) {
   const mine = ownPass(s, formation, role);
   if (!mine) return null;
   const run = ownRun(s, formation, role);
-  if (run && mine.k !== 'pass') return null;
+  const runIntoPlace = run && dist(run.b, heroAt(s, formation, role)) <= 25;
+  if (runIntoPlace && mine.k !== 'pass') return null;
 
   /* מהיכן הוא מוסר: המיקום שלו שקרוב יותר לתחילת החץ. בקיר עם החלוץ,
      למשל, הוא מוסר מנקודת ההתחלה ורק אחר כך רץ קדימה — בלי זה השאלה
@@ -92,12 +112,15 @@ function passQuestion(s, formation, role, cues) {
 }
 
 function moveQuestion(s, formation, role, cues) {
-  const to = (s.pos && s.pos[role]) || formation.base[role];
   const run = ownRun(s, formation, role);
   if (!run) return null;
 
-  /* אם הכדור צויר לרגליו בסוף הפעולה, ברגע שלפניה הוא עוד אצלו בהתחלה */
-  const ballAt = dist(s.ball, to) <= 20 ? run.a : null;
+  const at = heroAt(s, formation, role);
+  /* היעד הוא המקום שבו הוא מצויר אם הריצה מסתיימת שם, ואחרת סוף החץ */
+  const to = dist(run.b, at) <= 25 ? at : run.b;
+
+  /* אם הכדור צויר לרגליו, ברגע שלפני התנועה הוא עוד אצלו בנקודת ההתחלה */
+  const ballAt = dist(s.ball, at) <= 20 ? run.a : null;
   const before = beforeState(s, role, run.a, { ballAt });
 
   return {
@@ -196,11 +219,13 @@ export function mountQuiz(booklet, formation, only, onExit) {
   const svg = buildPitch();
   svg.classList.add('quizing');
   $('q-board').prepend(svg);
-  const pitch = createPitch(svg, formation, booklet.role);
+  const heroRole = isMirrored() ? mirrorRole(formation, booklet.role) : booklet.role;
+  const pitch = createPitch(svg, formation, heroRole);
   const overlay = el('g', { class: 'g-quiz' });
   svg.appendChild(overlay);
 
-  $('q-eyebrow').textContent = 'מבדק · ' + booklet.title;
+  $('q-eyebrow').textContent = 'מבדק · ' +
+    (isMirrored() && booklet.titleB ? booklet.titleB : booklet.title);
 
   const track = $('q-track');
   track.textContent = '';
@@ -230,7 +255,7 @@ export function mountQuiz(booklet, formation, only, onExit) {
       }
     } else {
       const view = { ...cur.before, pos: { ...cur.before.pos } };
-      if (guess) view.pos[booklet.role] = guess;
+      if (guess) view.pos[heroRole] = guess;
       pitch.render(view, { animate: false });
       /* מאיפה יצא — כדי שיראה את התנועה שהוא מציע */
       overlay.appendChild(el('circle', { cx: cur.from[0], cy: cur.from[1], r: 13, class: 'q-from' }));
@@ -317,7 +342,7 @@ export function mountQuiz(booklet, formation, only, onExit) {
   /* במסירה הציון הוא לפי מי קיבל את הכדור, לא לפי מטרים —
      מסירה היא בחירה בשחקן, לא כיוון על המגרש */
   function confirmPass(cur) {
-    const picked = receiver(cur.scenario, formation, booklet.role, guess);
+    const picked = receiver(cur.scenario, formation, heroRole, guess);
     const right = picked !== null && picked === cur.target;
 
     if (!right && tries === 1) {
