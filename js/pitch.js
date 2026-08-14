@@ -64,7 +64,29 @@ export function mirrorRole(formation, role) {
   return flipMap(formation)[role] != null ? flipMap(formation)[role] : role;
 }
 
-/** עותק משוקף של התרחיש. אינו נוגע במקור. */
+/* מילות צד. כשהמגרש מתהפך גם הטקסט חייב להתהפך, אחרת כתוב "המגן
+   השמאלי אחראי על הרצועה השמאלית" בזמן שהשחקן מצויר באגף ימין.
+   הביטוי מסודר מהצורה הארוכה לקצרה כדי ש"שמאלה" לא ייחתך ל"שמאל",
+   והמבט קדימה מונע התאמה בתוך מילה ארוכה יותר. תחיליות (ה, מ, ל, ב)
+   נשארות במקומן: "מימין" הופך ל"משמאל". */
+const SIDE_PAIRS = [
+  ['שמאליות', 'ימניות'], ['שמאליים', 'ימניים'],
+  ['שמאלית', 'ימנית'], ['שמאלי', 'ימני'],
+  ['שמאלה', 'ימינה'], ['שמאל', 'ימין']
+];
+const SIDE_SWAP = {};
+SIDE_PAIRS.forEach(([l, r]) => { SIDE_SWAP[l] = r; SIDE_SWAP[r] = l; });
+const SIDE_RE = new RegExp(
+  '(' + Object.keys(SIDE_SWAP).sort((a, b) => b.length - a.length).join('|') + ')(?![א-ת])',
+  'g'
+);
+
+/** מחליף ימין ושמאל בטקסט. ערך שאינו מחרוזת חוזר כמו שהוא. */
+export function mirrorText(t) {
+  return typeof t === 'string' ? t.replace(SIDE_RE, m => SIDE_SWAP[m]) : t;
+}
+
+/** עותק משוקף של התרחיש — גיאומטריה וגם טקסט. אינו נוגע במקור. */
 export function mirrorScenario(s, formation) {
   const flip = flipMap(formation);
   const m = { ...s, pos: {} };
@@ -89,6 +111,17 @@ export function mirrorScenario(s, formation) {
     b: [mirrorX(a.b[0]), a.b[1]],
     bend: -(a.bend || 0)
   }));
+
+  ['chip', 'title', 'sub', 'mistake', 'cue'].forEach(k => {
+    if (s[k] != null) m[k] = mirrorText(s[k]);
+  });
+  if (s.does) m.does = s.does.map(d => mirrorText(d));
+  if (s.quiz) m.quiz = {
+    ...s.quiz,
+    ask: mirrorText(s.quiz.ask),
+    why: mirrorText(s.quiz.why),
+    options: (s.quiz.options || []).map(o => mirrorText(o))
+  };
   return m;
 }
 

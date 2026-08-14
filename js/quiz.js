@@ -9,7 +9,7 @@
    · תרחיש בלי אף אחד מהשניים (מפת תפקיד) נופל מהמבדק מעצמו.
    · תרחיש שהוא החלטה בין אפשרויות יכול לשאת שדה quiz משלו בקובץ. */
 
-import { buildPitch, createPitch, el, svgPoint, PER_METER, mirrorScenario, mirrorRole } from './pitch.js';
+import { buildPitch, createPitch, el, svgPoint, PER_METER, mirrorScenario, mirrorRole, mirrorText } from './pitch.js';
 import { saveQuizResult, isMirrored } from './store.js';
 
 const $ = id => document.getElementById(id);
@@ -224,8 +224,9 @@ export function mountQuiz(booklet, formation, only, onExit) {
   const overlay = el('g', { class: 'g-quiz' });
   svg.appendChild(overlay);
 
+  const flip = t => (isMirrored() ? mirrorText(t) : t);
   $('q-eyebrow').textContent = 'מבדק · ' +
-    (isMirrored() && booklet.titleB ? booklet.titleB : booklet.title);
+    (isMirrored() && booklet.titleB ? booklet.titleB : flip(booklet.title));
 
   const track = $('q-track');
   track.textContent = '';
@@ -467,7 +468,7 @@ export function mountQuiz(booklet, formation, only, onExit) {
         const li = document.createElement('li');
         const a = document.createElement('a');
         a.href = `#/b/${booklet.id}/${id}`;
-        a.textContent = s ? s.title : id;
+        a.textContent = s ? flip(s.title) : id;
         li.appendChild(a);
         ul.appendChild(li);
       });

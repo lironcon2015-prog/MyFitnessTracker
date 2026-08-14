@@ -1,6 +1,6 @@
 /* מסך הבית: כרטיס לכל חוברת, עם מגרש מוקטן, התקדמות וכניסה למבדק. */
 
-import { thumbnail, mirrorScenario, mirrorRole } from './pitch.js';
+import { thumbnail, mirrorScenario, mirrorRole, mirrorText } from './pitch.js';
 import { isLearned, learnedCount, getLast, isMirrored, quizSummary } from './store.js';
 
 const $ = id => document.getElementById(id);
@@ -31,7 +31,8 @@ export function renderLibrary(home, booklets, formations, onOpen, onQuiz, versio
     /* בשיקוף, תפקיד אגף מוצג כתפקיד האגף השני — שם ומספר כאחד */
     const mirrored = isMirrored();
     const hero = mirrored ? mirrorRole(formation, b.role) : b.role;
-    const title = mirrored && b.titleB ? b.titleB : b.title;
+    const flip = t => (mirrored ? mirrorText(t) : t);
+    const title = mirrored && b.titleB ? b.titleB : flip(b.title);
 
     const thumb = document.createElement('div');
     thumb.className = 'thumb';
@@ -57,7 +58,7 @@ export function renderLibrary(home, booklets, formations, onOpen, onQuiz, versio
 
     const desc = document.createElement('p');
     desc.className = 'desc';
-    desc.textContent = b.lede;
+    desc.textContent = flip(b.lede);
 
     body.append(role, h3, desc);
 
@@ -67,7 +68,7 @@ export function renderLibrary(home, booklets, formations, onOpen, onQuiz, versio
       if (s) {
         const resume = document.createElement('p');
         resume.className = 'resume';
-        resume.textContent = 'המשך: ' + s.title;
+        resume.textContent = 'המשך: ' + flip(s.title);
         body.appendChild(resume);
       }
     }

@@ -1,6 +1,6 @@
 /* מסך חוברת: מגרש, צ'יפים, פאנל ההסבר, ניווט בין תרחישים. */
 
-import { buildPitch, createPitch, mirrorScenario, mirrorRole } from './pitch.js';
+import { buildPitch, createPitch, mirrorScenario, mirrorRole, mirrorText } from './pitch.js';
 import { isLearned, toggleLearned, learnedCount, resetBooklet, setLast, isMirrored, setMirrored } from './store.js';
 
 const $ = id => document.getElementById(id);
@@ -25,13 +25,22 @@ export function mountBooklet(booklet, formation, startId, onScenario) {
   const solo = !!booklet.solo;
   ['track', 'count', 'learn', 'formation', 'closing', 'side'].forEach(id => { $(id).hidden = solo; });
 
-  /* בשיקוף, תפקיד אגף הופך לתפקיד האגף השני: גם המספר המודגש וגם השם */
+  /* בשיקוף, תפקיד אגף הופך לתפקיד האגף השני: גם המספר המודגש וגם השם.
+     titleB הוא עקיפה ידנית; בלעדיו מספיקה החלפת מילות הצד. */
   const hero = () => (isMirrored() ? mirrorRole(formation, booklet.role) : booklet.role);
-  const heroTitle = () => (isMirrored() && booklet.titleB ? booklet.titleB : booklet.title);
+  const flip = t => (isMirrored() ? mirrorText(t) : t);
+  const heroTitle = () => (isMirrored() && booklet.titleB ? booklet.titleB : flip(booklet.title));
 
   /* --- כותרת החוברת --- */
   $('eyebrow').textContent = booklet.eyebrow;
-  $('b-lede').textContent = booklet.lede;
+
+  let formationText = null;
+  if (!solo) {
+    $('f-label').textContent = booklet.formationNote.label;
+    /* צומת טקסט חשוף ולא span — כדי שגלישת השורות תהיה זהה לגרסה המקורית */
+    formationText = document.createTextNode('');
+    $('f-label').after(formationText);
+  }
 
   function paintHead() {
     const n = String(hero());
@@ -42,16 +51,10 @@ export function mountBooklet(booklet, formation, startId, onScenario) {
     $('mark-b').parentElement.classList.toggle('wide', n.length > 1);
     $('b-title').textContent = heroTitle();
     $('lg-role').textContent = 'ה-' + n;
+    $('b-lede').textContent = flip(booklet.lede);
+    if (formationText) formationText.nodeValue = ' ' + flip(booklet.formationNote.text);
   }
   paintHead();
-
-  let formationText = null;
-  if (!solo) {
-    $('f-label').textContent = booklet.formationNote.label;
-    /* צומת טקסט חשוף ולא span — כדי שגלישת השורות תהיה זהה לגרסה המקורית */
-    formationText = document.createTextNode(' ' + booklet.formationNote.text);
-    $('f-label').after(formationText);
-  }
 
   /* --- מגרש --- */
   const board = $('board');
@@ -78,6 +81,7 @@ export function mountBooklet(booklet, formation, startId, onScenario) {
 
   /* --- צ'יפים --- */
   const chips = $('chips');
+  const chipText = [];
   chips.textContent = '';
   S.forEach((s, i) => {
     const b = document.createElement('button');
@@ -87,10 +91,14 @@ export function mountBooklet(booklet, formation, startId, onScenario) {
     b.dataset.phase = s.phase;
     const dot = document.createElement('i');
     dot.className = 'dot';
-    b.append(dot, document.createTextNode(s.chip));
+    const t = document.createTextNode('');
+    chipText.push(t);
+    b.append(dot, t);
     b.onclick = () => render(i);
     chips.appendChild(b);
   });
+  const paintChips = () => chipText.forEach((t, i) => { t.nodeValue = flip(S[i].chip); });
+  paintChips();
 
   /* --- מתג הצד --- */
   const side = booklet.side || { label: 'הצד של ה-' + booklet.role + ':', a: 'ימין', b: 'שמאל' };
@@ -110,6 +118,7 @@ export function mountBooklet(booklet, formation, startId, onScenario) {
     setMirrored(want);
     paintSide();
     paintHead();
+    paintChips();
     render(idx);
   }));
   paintSide();
@@ -118,9 +127,11 @@ export function mountBooklet(booklet, formation, startId, onScenario) {
   let idx = 0;
   function render(i) {
     idx = i;
-    const s = S[i];
+    /* גם הטקסט מגיע מהעותק המשוקף, אחרת ההסבר מדבר על צד אחד
+       בזמן שהמגרש מראה את השני */
+    const s = isMirrored() ? mirrorScenario(S[i], formation) : S[i];
     pitch.setRole(hero());
-    pitch.render(isMirrored() ? mirrorScenario(s, formation) : s);
+    pitch.render(s);
 
     $('p-phase').textContent = s.phase;
     $('p-title').textContent = s.title;
