@@ -2,6 +2,7 @@
 
 import { buildPitch, createPitch, mirrorScenario, mirrorRole, mirrorText } from './pitch.js';
 import { isLearned, toggleLearned, learnedCount, resetBooklet, setLast, isMirrored, setMirrored } from './store.js';
+import { createGlossary } from './terms.js';
 
 const $ = id => document.getElementById(id);
 
@@ -10,9 +11,10 @@ const $ = id => document.getElementById(id);
  * @param {object} formation מיקומי ברירת מחדל
  * @param {string|null} startId  מזהה התרחיש לפתיחה
  * @param {(id:string)=>void} onScenario  נקרא בכל מעבר תרחיש, לעדכון הכתובת
+ * @param {Object<string,string>} [terms]  מילון המונחים מ-booklets.json
  * @returns {{go:Function, destroy:Function}}
  */
-export function mountBooklet(booklet, formation, startId, onScenario) {
+export function mountBooklet(booklet, formation, startId, onScenario, terms) {
   const S = booklet.scenarios;
   const ids = S.map(s => s.id);
   const listeners = [];
@@ -62,6 +64,61 @@ export function mountBooklet(booklet, formation, startId, onScenario) {
   svg.id = 'pitch';
   board.prepend(svg);
   const pitch = createPitch(svg, formation, booklet.role);
+
+  /* --- הרצת התנועה --- */
+  const playBtn = $('play');
+  let playing = false;
+
+  function stopPlaying() {
+    pitch.stopPlay();
+    playing = false;
+    playBtn.disabled = false;
+    playBtn.textContent = 'הראה לי את התנועה';
+  }
+
+  on(playBtn, 'click', () => {
+    if (playing) return;
+    playing = true;
+    playBtn.disabled = true;
+    playBtn.textContent = 'רץ…';
+    pitch.play(shown(), stopPlaying);
+  });
+
+  /* --- מילון המונחים --- */
+  const glossary = createGlossary(terms);
+  const panel = $('panel');
+  let openTerm = null;
+
+  function closeTerm() {
+    const box = panel.querySelector('.termdef');
+    if (box) box.remove();
+    if (openTerm) openTerm.setAttribute('aria-expanded', 'false');
+    openTerm = null;
+  }
+
+  on(panel, 'click', e => {
+    const b = e.target.closest('.term');
+    if (!b) return;
+    const wasOpen = b === openTerm;
+    closeTerm();
+    if (wasOpen) return;
+
+    const text = glossary.define(b.dataset.term);
+    if (!text) return;
+    const box = document.createElement('p');
+    box.className = 'termdef';
+    box.textContent = text;
+
+    /* ההסבר יושב מתחת לפסקה שבה המונח, ולא מעל השורה — כדי שהטקסט
+       שהילד קורא לא יזוז לו מתחת לאצבע */
+    /* בתוך פריט רשימה או בתוך הטעות ההסבר נכנס פנימה ולא אחרי — פסקה
+       בין שני li אינה חוקית, וגם הייתה נראית כאילו היא שייכת לשניהם */
+    const block = b.closest('li, h2, .sub, .mistake') || b;
+    if (block.tagName === 'LI' || block.tagName === 'DETAILS') block.appendChild(box);
+    else block.after(box);
+    b.setAttribute('aria-expanded', 'true');
+    openTerm = b;
+  });
 
   /* --- ניווט בין תרחישים (מוסתר כשיש רק אחד) --- */
   $('chips').parentElement.hidden = solo;   /* .rail */
@@ -125,25 +182,52 @@ export function mountBooklet(booklet, formation, startId, onScenario) {
 
   /* --- ציור תרחיש --- */
   let idx = 0;
+
+  /** התרחיש הנוכחי כפי שהוא מוצג — משוקף אם צריך */
+  const shown = () => (isMirrored() ? mirrorScenario(S[idx], formation) : S[idx]);
+
   function render(i) {
     idx = i;
     /* גם הטקסט מגיע מהעותק המשוקף, אחרת ההסבר מדבר על צד אחד
        בזמן שהמגרש מראה את השני */
     const s = isMirrored() ? mirrorScenario(S[i], formation) : S[i];
+    stopPlaying();
+    closeTerm();
     pitch.setRole(hero());
     pitch.render(s);
 
+    /* קורא מסך מקבל את התרחיש עצמו ולא "דיאגרמת מגרש" סתמית */
+    svg.setAttribute('aria-label', s.title + '. ' + s.sub);
+    /* מפת תפקיד אין בה תנועה להריץ */
+    playBtn.parentElement.hidden = !pitch.canPlay(s);
+
     $('p-phase').textContent = s.phase;
-    $('p-title').textContent = s.title;
-    $('p-sub').textContent = s.sub;
+
+    /* ההופעה הראשונה של מונח בכל תרחיש הופכת לכפתור הסבר. הכותרת קודמת
+       לגוף, כי מונחים כמו "בלוק הגנתי" ו"לחץ גבוה" מופיעים רק בה —
+       בלעדיה ההסבר שלהם לא היה נגיש משום מקום. הצ'יפים נשארים נקיים:
+       כפתור בתוך כפתור אינו חוקי ושובר את הניווט. */
+    glossary.reset();
+    const h2 = $('p-title');
+    h2.textContent = '';
+    h2.appendChild(glossary.decorate(s.title));
+
+    const sub = $('p-sub');
+    sub.textContent = '';
+    sub.appendChild(glossary.decorate(s.sub));
+
     const ul = $('p-does');
     ul.textContent = '';
     s.does.forEach(d => {
       const li = document.createElement('li');
-      li.textContent = d;
+      li.appendChild(glossary.decorate(d));
       ul.appendChild(li);
     });
-    $('p-mistake').textContent = s.mistake;
+
+    const mis = $('p-mistake');
+    mis.textContent = '';
+    mis.appendChild(glossary.decorate(s.mistake));
+
     $('p-cue').textContent = s.cue;
 
     const learned = isLearned(booklet.id, s.id);
@@ -185,6 +269,8 @@ export function mountBooklet(booklet, formation, startId, onScenario) {
   return {
     go,
     destroy() {
+      stopPlaying();
+      closeTerm();
       listeners.forEach(([t, type, fn, opts]) => t.removeEventListener(type, fn, opts));
       svg.remove();
       if (formationText) formationText.remove();

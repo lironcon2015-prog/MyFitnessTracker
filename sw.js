@@ -15,14 +15,14 @@
 /* שם המטמון נגזר מגרסה אחת, כדי שכל שינוי קוד ינקה גם את מטמון התוכן.
    בלי זה, תוכן שנשמר בגרסה קודמת יכול להגיע לקוד חדש שמצפה למבנה אחר.
    הוספת תרחיש לא נוגעת בקובץ הזה, ולכן היא עדיין לא דורשת העלאת גרסה. */
-const VERSION = 'v12';
+const VERSION = 'v13';
 const SHELL = 'kesher8-shell-' + VERSION;
 const CONTENT = 'kesher8-content-' + VERSION;
 
 const ASSETS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/pitch.js', './js/store.js',
-  './js/booklet.js', './js/library.js', './js/quiz.js',
+  './js/booklet.js', './js/library.js', './js/quiz.js', './js/terms.js',
   './editor.html', './css/editor.css', './js/editor.js',
   './fonts.css', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png',

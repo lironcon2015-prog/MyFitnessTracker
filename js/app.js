@@ -3,8 +3,8 @@
 
 import { mountBooklet } from './booklet.js';
 import { renderLibrary } from './library.js';
-import { mountQuiz } from './quiz.js';
-import { migrateLegacy } from './store.js';
+import { mountQuiz, buildQuestions } from './quiz.js';
+import { migrateLegacy, dailyPicks } from './store.js';
 
 const $ = id => document.getElementById(id);
 
@@ -20,6 +20,8 @@ function parseHash() {
   const parts = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(dec);
   if (parts[0] === 'b' && parts[1]) return { view: 'booklet', id: parts[1], scenario: parts[2] || null };
   if (parts[0] === 'q' && parts[1]) return { view: 'quiz', id: parts[1], scenario: parts[2] || null };
+  /* האימון הקצר. התרחישים נבחרים בכל כניסה מחדש ולכן אינם בכתובת */
+  if (parts[0] === 't' && parts[1]) return { view: 'train', id: parts[1] };
   if (parts[0] === 'x' && parts[1]) return { view: 'shared', data: parts[1] };
   return { view: 'library' };
 }
@@ -64,6 +66,10 @@ async function boot() {
     location.hash = '#/q/' + id;
   }
 
+  function openTrain(id) {
+    location.hash = '#/t/' + id;
+  }
+
   function screens(active) {
     ['library', 'booklet', 'quiz'].forEach(id => { $(id).hidden = id !== active; });
   }
@@ -72,7 +78,7 @@ async function boot() {
     if (current) { current.destroy(); current = null; }
 
     let booklet = null;
-    if (route.view === 'booklet' || route.view === 'quiz') {
+    if (route.view === 'booklet' || route.view === 'quiz' || route.view === 'train') {
       booklet = booklets.find(b => b.id === route.id);
       if (!booklet) {
         location.replace('#/');   // חוברת לא מוכרת — חזרה לספרייה
@@ -98,6 +104,21 @@ async function boot() {
         window.scrollTo(0, 0);
       };
       start(only);
+    } else if (route.view === 'train') {
+      screens('quiz');
+      const formation = formations[booklet.formation];
+      /* רק תרחישים שבאמת נגזרת מהם שאלה נכנסים לבחירה, אחרת "שלושה
+         תרחישים" היה יכול לצאת אחד */
+      const askable = buildQuestions(booklet, formation).map(q => q.id);
+      const start = subset => {
+        if (current) current.destroy();
+        /* קבוצה ריקה — "עוד שלושה": בוחרים מחדש לפי מה שפוספס עכשיו */
+        const pick = subset && subset.length ? subset : dailyPicks(booklet.id, askable, 3);
+        current = mountQuiz(booklet, formation, pick, start,
+          { label: 'האימון של היום', short: true });
+        window.scrollTo(0, 0);
+      };
+      start([]);
     } else if (booklet) {
       screens('booklet');
       const onScenario = booklet.solo ? null : id => {
@@ -106,10 +127,10 @@ async function boot() {
         const want = '#/b/' + booklet.id + '/' + id;
         if (location.hash !== want) history.replaceState(null, '', want);
       };
-      current = mountBooklet(booklet, formations[booklet.formation], route.scenario, onScenario);
+      current = mountBooklet(booklet, formations[booklet.formation], route.scenario, onScenario, index.terms);
     } else {
       screens('library');
-      renderLibrary(home, booklets, formations, openBooklet, openQuiz, index.version);
+      renderLibrary(home, booklets, formations, openBooklet, openQuiz, openTrain, index.version);
     }
     window.scrollTo(0, 0);
   }

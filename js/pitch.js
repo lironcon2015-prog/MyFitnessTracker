@@ -298,8 +298,157 @@ export function createPitch(svg, formation, role) {
     });
   }
 
-  return { render, setRole, tokens: toks, ball: ballDot, formation, role };
+  /* ---------- הרצת התרחיש ----------
+     ילד בן 11 קורא תנועה טוב בהרבה משהוא קורא חץ מכופף — חץ הוא ייצוג
+     מופשט שצריך ללמוד לקרוא. הנתונים כבר מחזיקים מסלול מלא (a, b, bend),
+     ולכן אין כאן תוכן חדש: רק הזזת האסימונים לאורך מה שכבר משורטט. */
+
+  const RUN_MS = 1150, PASS_MS = 800;
+  const closeTo = (a, b, r) => Math.hypot(a[0] - b[0], a[1] - b[1]) <= r;
+
+  /** מה זז בתרחיש: לכל חץ, מי הולך לאורכו ומתי. */
+  function plan(s) {
+    const posOf = n => (s.pos && s.pos[n]) || base[n];
+    const acts = [];
+
+    (s.arrows || []).forEach(ar => {
+      const path = { from: ar.a, to: ar.b, bend: ar.bend || 0 };
+
+      if (ar.k === 'run') {
+        /* הרץ הוא מי שמצויר בסוף החץ — מוסכמת השרטוט הרווחת בתוכן, שבה
+           השחקן כבר הגיע ונקודת ההתחלה מסומנת בעיגול מקווקו. אם אין שם
+           אף אחד, הוא זה שמצויר בתחילתו ועדיין בדרך. */
+        let num = order.find(n => closeTo(posOf(n), ar.b, 22));
+        if (num == null) num = order.find(n => closeTo(posOf(n), ar.a, 22));
+        if (num != null) acts.push({ ...path, kind: 'run', num, dur: RUN_MS, delay: 0 });
+
+      } else if (ar.k === 'pass') {
+        acts.push({ ...path, kind: 'pass', ball: true, dur: PASS_MS, delay: 0 });
+
+      } else if (ar.k === 'press') {
+        const i = (s.opp || []).findIndex(o => closeTo(o, ar.a, 22) || closeTo(o, ar.b, 22));
+        if (i >= 0) acts.push({ ...path, kind: 'press', oppIndex: i, dur: RUN_MS, delay: 0 });
+      }
+      /* חץ opt הוא אפשרות שלא נבחרה — אין מה להזיז לאורכו */
+    });
+
+    /* מי שמסר וגם רץ, רץ אחרי המסירה ולא יחד איתה. זה בדיוק הקיר עם
+       החלוץ: מוסרים, ורק אז יוצאים. */
+    acts.forEach(a => {
+      if (a.kind !== 'run') return;
+      const pass = acts.find(p => p.kind === 'pass' && closeTo(p.from, a.from, 26));
+      if (pass) a.delay = Math.round(pass.dur * 0.55);
+    });
+
+    /* הובלה עם הכדור: אין מסירה, והכדור לרגליו של מי שרץ — הוא לוקח אותו */
+    if (!acts.some(a => a.ball)) {
+      const carry = acts.find(a => a.kind === 'run' && closeTo(s.ball, a.from, 18));
+      if (carry) acts.push({ ...carry, kind: 'carry', ball: true, num: undefined });
+    }
+
+    return acts;
+  }
+
+  /** המגרש ברגע שלפני התנועה: כל מי שזז חוזר לתחילת החץ שלו */
+  function beforeOf(s, acts) {
+    const b = { ...s, pos: { ...(s.pos || {}) } };
+    acts.forEach(a => { if (a.num != null) b.pos[a.num] = a.from; });
+
+    const ballAct = acts.find(a => a.ball);
+    if (ballAct) b.ball = ballAct.from;
+
+    if (acts.some(a => a.oppIndex != null)) {
+      b.opp = (s.opp || []).map((o, i) => {
+        const a = acts.find(x => x.oppIndex === i);
+        return a ? a.from : o;
+      });
+    }
+
+    /* בלי חיצים ובלי נקודות התחלה — התנועה עצמה מחליפה אותם.
+       אזורים וצל נשארים: הם ההקשר, לא התנועה. */
+    delete b.arrows; delete b.ghosts;
+    return b;
+  }
+
+  let cancel = null;
+
+  /**
+   * מריץ את התרחיש פעם אחת ומסיים בתמונה המלאה, על החיצים.
+   * בתנועה מופחתת מדלג ישר לתמונה המלאה.
+   * @param {object} s תרחיש (משוקף כבר, אם צריך)
+   * @param {Function} [onDone] נקרא בסוף, גם כשלא הייתה אנימציה
+   */
+  function play(s, onDone) {
+    if (cancel) cancel();
+
+    const reduce = window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+    const acts = reduce ? [] : plan(s);
+    if (!acts.length) { render(s); if (onDone) onDone(); return; }
+
+    render(beforeOf(s, acts), { animate: false });
+
+    /* אסימוני היריב נבנים מחדש בכל ציור, ולכן ההפניות נאספות אחרי */
+    const oppEls = [...gOpp.children];
+    const defs = svg.querySelector('defs');
+    const live = [];
+
+    acts.forEach(a => {
+      const node = a.ball ? ballDot : a.num != null ? toks[a.num] : oppEls[a.oppIndex];
+      if (!node) return;
+      /* מסלול לדגימה בלבד. יושב ב-defs כדי שלא ייצבע, אבל כן יהיה במסמך —
+         getTotalLength על אלמנט מנותק אינו אמין בכל דפדפן. */
+      const probe = el('path', { d: arc(a.from, a.to, a.bend) });
+      defs.appendChild(probe);
+      live.push({ ...a, node, probe, len: probe.getTotalLength() });
+    });
+
+    if (!live.length) { render(s); if (onDone) onDone(); return; }
+
+    svg.classList.add('playing');
+    const total = Math.max(...live.map(a => a.delay + a.dur));
+    const t0 = performance.now();
+    let raf = 0;
+
+    const clear = () => {
+      cancelAnimationFrame(raf);
+      live.forEach(a => a.probe.remove());
+      svg.classList.remove('playing');
+      cancel = null;
+    };
+
+    function frame(now) {
+      const t = now - t0;
+      live.forEach(a => {
+        const k = Math.max(0, Math.min(1, (t - a.delay) / a.dur));
+        const p = a.probe.getPointAtLength(ease(k) * a.len);
+        if (a.node === ballDot) {
+          a.node.setAttribute('cx', p.x);
+          a.node.setAttribute('cy', p.y);
+        } else {
+          a.node.setAttribute('transform', `translate(${p.x},${p.y})`);
+        }
+      });
+      if (t < total) { raf = requestAnimationFrame(frame); return; }
+      clear();
+      render(s);                /* התמונה המלאה, עם החיצים */
+      if (onDone) onDone();
+    }
+
+    cancel = clear;
+    raf = requestAnimationFrame(frame);
+  }
+
+  return {
+    render, setRole, play,
+    /* תרחיש בלי תנועה — מפת תפקיד, למשל — לא מקבל כפתור הרצה */
+    canPlay: s => plan(s).length > 0,
+    stopPlay: () => { if (cancel) cancel(); },
+    tokens: toks, ball: ballDot, formation, role
+  };
 }
+
+/** האטה בקצוות: יוצא לאט, מגיע לאט. תנועה קבועה נראית מכנית */
+const ease = k => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
 
 /** מגרש קטן וסטטי לכרטיס בספרייה */
 export function thumbnail(scenario, formation, role) {

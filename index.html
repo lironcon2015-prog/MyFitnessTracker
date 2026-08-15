@@ -26,6 +26,8 @@
     <h1 id="lib-title"></h1>
     <p class="lede" id="lib-lede"></p>
 
+    <div class="me" id="me" hidden></div>
+
     <button id="install" type="button">התקן את האפליקציה על המסך</button>
 
     <div class="cards" id="cards"></div>
@@ -73,15 +75,19 @@
         <span><i class="sw" style="border:1.4px dashed #E5326F"></i>נקודת התחלה</span>
       </div>
     </div>
+    <div class="playrow"><button class="play" id="play" type="button">הראה לי את התנועה</button></div>
     <div class="hint" id="hint">החלק ימינה ושמאלה כדי לעבור בין התרחישים</div>
 
-    <div class="panel">
+    <div class="panel" id="panel">
       <div class="phase" id="p-phase"></div>
       <h2 id="p-title"></h2>
       <p class="sub" id="p-sub"></p>
-      <ul id="p-does"></ul>
-      <div class="mistake"><b>טעות נפוצה</b><span id="p-mistake"></span></div>
+
+      <!-- המשפט הוא מה שנשאר בראש אחרי שבוע, ולכן הוא קודם לפירוט -->
       <div class="cue"><small>מה צועקים מהקו</small><span id="p-cue"></span></div>
+
+      <ul id="p-does"></ul>
+      <details class="mistake"><summary>טעות נפוצה</summary><span id="p-mistake"></span></details>
 
       <button class="learn" id="learn" type="button" aria-pressed="false"><span id="learn-txt">סמן שלמדתי את זה</span></button>
       <div class="nav">

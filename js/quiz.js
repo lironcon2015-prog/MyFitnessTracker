@@ -205,7 +205,15 @@ function shuffle(a) {
 
 /* ---------- המסך ---------- */
 
-export function mountQuiz(booklet, formation, only, onExit) {
+/**
+ * @param {object} booklet
+ * @param {object} formation
+ * @param {string[]} only  תת-קבוצה של מזהי תרחישים, או ריק לכל החוברת
+ * @param {(subset:string[])=>void} onExit
+ * @param {{label?:string, short?:boolean}} [opts]  short — האימון הקצר
+ */
+export function mountQuiz(booklet, formation, only, onExit, opts = {}) {
+  const label = opts.label || 'מבדק';
   let questions = shuffle(buildQuestions(booklet, formation));
   if (only && only.length) questions = questions.filter(q => only.includes(q.id));
   if (!questions.length) {
@@ -225,7 +233,7 @@ export function mountQuiz(booklet, formation, only, onExit) {
   svg.appendChild(overlay);
 
   const flip = t => (isMirrored() ? mirrorText(t) : t);
-  $('q-eyebrow').textContent = 'מבדק · ' +
+  $('q-eyebrow').textContent = label + ' · ' +
     (isMirrored() && booklet.titleB ? booklet.titleB : flip(booklet.title));
 
   const track = $('q-track');
@@ -449,7 +457,9 @@ export function mountQuiz(booklet, formation, only, onExit) {
     box.textContent = '';
 
     const h = document.createElement('h2');
-    h.textContent = exact === results.length ? 'הכול מדויק.' : 'סיימת את המבדק';
+    h.textContent = exact === results.length
+      ? 'הכול מדויק.'
+      : (opts.short ? 'סיימת את האימון של היום' : 'סיימת את המבדק');
     box.appendChild(h);
 
     const line = document.createElement('p');
@@ -486,7 +496,7 @@ export function mountQuiz(booklet, formation, only, onExit) {
     all.className = 'nav';
     const b1 = document.createElement('button');
     b1.type = 'button';
-    b1.textContent = 'מבדק מלא מחדש';
+    b1.textContent = opts.short ? 'עוד שלושה' : 'מבדק מלא מחדש';
     b1.onclick = () => onExit([]);
     const b2 = document.createElement('button');
     b2.type = 'button';

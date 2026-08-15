@@ -20,7 +20,7 @@ body::after{
 .wrap{max-width:660px;margin:0 auto;
   padding:calc(24px + env(safe-area-inset-top)) 18px calc(56px + env(safe-area-inset-bottom))}
 
-.eyebrow{font-family:'Heebo',sans-serif;font-weight:700;font-size:11px;letter-spacing:.18em;
+.eyebrow{font-family:'Heebo',sans-serif;font-weight:700;font-size:12px;letter-spacing:.18em;
   color:var(--ink-soft);display:flex;align-items:center;gap:9px;margin-bottom:14px}
 .eyebrow::after{content:'';flex:1;height:1px;background:var(--hair)}
 .head{display:flex;align-items:flex-start;gap:18px}
@@ -37,7 +37,7 @@ h1{font-family:'Suez One',serif;font-weight:400;font-size:34px;line-height:1.08;
 .track i{flex:1;height:4px;background:var(--hair);transition:background .3s}
 .track i.on{background:var(--pink)}
 .track i.here{background:var(--ink)}
-.count{font-family:'Heebo',sans-serif;font-weight:700;font-size:11px;letter-spacing:.14em;
+.count{font-family:'Heebo',sans-serif;font-weight:700;font-size:12px;letter-spacing:.14em;
   color:var(--ink-soft);margin-top:7px}
 
 .formation{margin-top:20px;padding:10px 13px;border:1px solid var(--hair);font-size:13.5px;
@@ -50,7 +50,7 @@ h1{font-family:'Suez One',serif;font-weight:400;font-size:34px;line-height:1.08;
   border:1px solid var(--hair);background:transparent;color:var(--ink);transition:background .18s,color .18s}
 .side button[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
 .side button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
-.side em{font-style:normal;flex:1;font-size:11px;text-align:left;opacity:.75}
+.side em{font-style:normal;flex:1;font-size:12px;text-align:left;opacity:.75}
 
 .rail{margin:24px -18px 0;padding:0 18px;overflow-x:auto;scrollbar-width:none}
 .rail::-webkit-scrollbar{display:none}
@@ -72,7 +72,7 @@ h1{font-family:'Suez One',serif;font-weight:400;font-size:34px;line-height:1.08;
 svg.pitch{display:block;width:100%;height:auto}
 .tok{transition:transform .68s cubic-bezier(.6,.02,.2,1)}
 .tok circle{stroke-width:0}
-.tok text{font-family:'Heebo',sans-serif;font-weight:900;font-size:13px;text-anchor:middle;
+.tok text{font-family:'Heebo',sans-serif;font-weight:900;font-size:14px;text-anchor:middle;
   dominant-baseline:central;fill:var(--paper)}
 .mate circle{fill:var(--blue)}
 .eight circle{fill:var(--pink)}
@@ -88,37 +88,78 @@ svg.pitch{display:block;width:100%;height:auto}
 .a-pass{stroke:var(--blue);stroke-width:2;stroke-dasharray:7 6}
 .a-opt{stroke:var(--pink);stroke-width:2.2;stroke-dasharray:6 6}
 .a-press{stroke:var(--opp);stroke-width:2;stroke-dasharray:2 5}
-.alabel{font-family:'Heebo',sans-serif;font-weight:900;font-size:11px;fill:var(--pink)}
-.zlabel{font-family:'Heebo',sans-serif;font-weight:700;font-size:10.5px;fill:var(--pink);opacity:.85}
+/* טקסט בתוך המגרש נמדד ביחידות ה-viewBox: על טלפון 400 יחידות מוצגות
+   ברוחב ~350px, כך שכל ערך כאן קטן בפועל בכעשירית. */
+.alabel{font-family:'Heebo',sans-serif;font-weight:900;font-size:12.5px;fill:var(--pink)}
+.zlabel{font-family:'Heebo',sans-serif;font-weight:700;font-size:12px;fill:var(--pink);opacity:.85}
 .draw{stroke-dasharray:var(--len);stroke-dashoffset:var(--len);animation:draw .62s cubic-bezier(.3,.7,.3,1) forwards}
 .a-pass.draw,.a-opt.draw,.a-press.draw{stroke-dashoffset:0;opacity:0;animation:fadein .5s forwards}
 @keyframes draw{to{stroke-dashoffset:0}}
 @keyframes fadein{to{opacity:1}}
 .fade{opacity:0;animation:fadein .45s .1s forwards}
-.hint{text-align:center;font-family:'Heebo',sans-serif;font-weight:700;font-size:11px;
+.hint{text-align:center;font-family:'Heebo',sans-serif;font-weight:700;font-size:12.5px;
   letter-spacing:.12em;color:var(--ink-soft);margin-top:8px}
 
-.legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:12px;font-size:12px;
+/* --- הרצת התנועה ---
+   בזמן ההרצה האסימונים מקבלים מיקום בכל פריים, ולכן המעבר החלק שמשרת
+   החלפת תרחיש חייב לרדת — אחרת הוא רודף אחרי האנימציה ומפגר אחריה. */
+.playrow{margin-top:10px}
+.play{width:100%;font-family:'Heebo',sans-serif;font-weight:700;font-size:14.5px;padding:13px;
+  border:1.5px solid var(--blue);background:transparent;color:var(--blue);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:10px;transition:background .18s,color .18s}
+.play::before{content:'';width:0;height:0;border-style:solid;border-width:6px 0 6px 9px;
+  border-color:transparent transparent transparent currentColor}
+.play:active{background:var(--blue);color:var(--paper)}
+.play:disabled{opacity:.5;cursor:default}
+.play:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
+.playing .tok{transition:none}
+
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:12px;font-size:12.5px;
   color:var(--ink-soft);font-family:'Heebo',sans-serif;font-weight:700}
 .legend span{display:flex;align-items:center;gap:6px}
 .sw{width:16px;height:10px;display:inline-block}
 
 .panel{margin-top:30px}
-.phase{font-family:'Heebo',sans-serif;font-weight:700;font-size:11px;letter-spacing:.16em;
+.phase{font-family:'Heebo',sans-serif;font-weight:700;font-size:12px;letter-spacing:.16em;
   color:var(--pink);margin-bottom:6px}
 h2{font-family:'Suez One',serif;font-weight:400;font-size:25px;margin:0 0 4px;line-height:1.15}
 .sub{margin:0 0 18px;color:var(--ink-soft);font-size:15px}
 ul{list-style:none;margin:0;padding:0}
 ul li{position:relative;padding:0 22px 0 0;margin-bottom:11px;font-size:15.5px}
 ul li::before{content:'';position:absolute;right:0;top:.62em;width:9px;height:1.5px;background:var(--blue)}
-.mistake{margin-top:20px;padding:13px 15px;border-right:3px solid var(--opp);
-  background:rgba(110,122,107,.1);font-size:14.5px}
-.mistake b{font-family:'Heebo',sans-serif;font-size:11px;letter-spacing:.14em;display:block;
-  margin-bottom:4px;color:var(--opp)}
-.cue{margin-top:14px;padding:16px 0 0;border-top:1px solid var(--hair);
-  font-family:'Suez One',serif;font-size:20px;line-height:1.35;color:var(--pink)}
-.cue small{display:block;font-family:'Heebo',sans-serif;font-size:10.5px;letter-spacing:.16em;
+
+/* המשפט עלה מתחתית הפאנל לראשו: זה מה שנשאר לילד בראש אחרי שבוע,
+   והוא היה יושב אחרי קיר טקסט שרובם לא הגיעו לסופו. */
+.cue{margin:0 0 20px;padding:14px 16px;background:rgba(229,50,111,.08);
+  border-right:3px solid var(--pink);
+  font-family:'Suez One',serif;font-size:19px;line-height:1.4;color:var(--pink)}
+.cue small{display:block;font-family:'Heebo',sans-serif;font-size:11.5px;letter-spacing:.16em;
   color:var(--ink-soft);margin-bottom:7px;font-weight:700}
+
+/* הטעות היא משני — נפתחת בנגיעה במקום לתפוס מקום תמיד */
+.mistake{margin-top:20px;border-right:3px solid var(--opp);
+  background:rgba(110,122,107,.1);font-size:14.5px}
+.mistake summary{font-family:'Heebo',sans-serif;font-weight:700;font-size:12px;letter-spacing:.14em;
+  color:var(--opp);padding:12px 15px;cursor:pointer;list-style:none;display:flex;
+  align-items:center;justify-content:space-between;gap:10px}
+.mistake summary::-webkit-details-marker{display:none}
+.mistake summary::after{content:'+';font-size:17px;font-weight:700;line-height:1}
+.mistake[open] summary::after{content:'−'}
+.mistake summary:focus-visible{outline:2px solid var(--pink);outline-offset:-2px}
+.mistake>span{display:block;padding:0 15px 14px}
+.mistake>.termdef{margin:0 15px 14px}
+
+/* --- מונח מוסבר ---
+   השפה של המשחק היא חצי מהתוכן, וילד בן 11 לא מכיר אותה. ההופעה
+   הראשונה בכל תרחיש היא כפתור, והנגיעה פותחת שורה אחת מתחת לפסקה. */
+.term{font:inherit;background:none;border:0;padding:0;cursor:pointer;color:var(--blue);
+  border-bottom:1.5px dotted var(--blue);text-align:inherit}
+.term[aria-expanded="true"]{background:rgba(31,79,168,.12);border-bottom-style:solid}
+/* בכותרת המונח שומר על צבע הכותרת — רק הקו מסגיר שאפשר לגעת */
+h2 .term{color:inherit;border-bottom-width:2px}
+.term:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
+.termdef{margin:9px 0 4px;padding:11px 13px;background:rgba(31,79,168,.08);
+  border-right:3px solid var(--blue);font-size:14.5px;line-height:1.55;color:var(--ink)}
 
 .learn{width:100%;margin-top:24px;font-family:'Heebo',sans-serif;font-weight:700;font-size:14px;
   padding:14px;border:1.5px solid var(--pink);background:transparent;color:var(--pink);cursor:pointer;
@@ -132,7 +173,29 @@ ul li::before{content:'';position:absolute;right:0;top:.62em;width:9px;height:1.
 
 .foot{margin-top:28px;font-size:12.5px;color:var(--ink-soft);border-top:1px solid var(--hair);padding-top:12px}
 .reset{background:none;border:none;color:var(--ink-soft);font-family:'Heebo',sans-serif;
-  font-weight:700;font-size:11.5px;padding:6px 0;cursor:pointer;text-decoration:underline}
+  font-weight:700;font-size:12px;padding:6px 0;cursor:pointer;text-decoration:underline}
+
+/* ===== המספר שלי =====
+   שאלה אחת בפתיחה הראשונה. יעדי מגע של 44px, כי האצבע שנוגעת כאן
+   היא של ילד על טלפון, לפעמים בחוץ ובאור יום. */
+.me{margin-top:20px;padding:15px 16px;border:1px solid var(--hair);background:rgba(255,255,255,.32)}
+.me.set{padding:10px 0 0;border:0;border-top:1px solid var(--hair);background:none}
+.me-ask{margin:0;font-family:'Suez One',serif;font-size:20px;line-height:1.2}
+.me-hint{margin:5px 0 0;font-size:13.5px;color:var(--ink-soft)}
+.me-nums{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.me-nums button{font-family:'Heebo',sans-serif;font-weight:900;font-size:16px;
+  min-width:44px;min-height:44px;border:1px solid var(--hair);background:rgba(255,255,255,.55);
+  color:var(--ink);cursor:pointer}
+.me-nums button:active{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.me-nums button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
+.me-later{margin-top:12px;background:none;border:none;color:var(--ink-soft);
+  font-family:'Heebo',sans-serif;font-weight:700;font-size:12.5px;padding:6px 0;cursor:pointer;
+  text-decoration:underline}
+.me-line{margin:0;font-family:'Heebo',sans-serif;font-weight:700;font-size:12.5px;
+  letter-spacing:.06em;color:var(--ink-soft)}
+.me-change{font:inherit;background:none;border:none;color:var(--pink);cursor:pointer;
+  padding:0;text-decoration:underline}
+.me-later:focus-visible,.me-change:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
 
 #install{display:none;width:100%;margin-top:18px;font-family:'Heebo',sans-serif;font-weight:700;
   font-size:13.5px;padding:13px;border:1px dashed var(--blue);background:transparent;color:var(--blue);cursor:pointer}
@@ -165,8 +228,11 @@ ul li::before{content:'';position:absolute;right:0;top:.62em;width:9px;height:1.
 .card:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
 .card .thumb{flex:0 0 78px;width:78px;border:1px solid var(--hair);background:rgba(255,255,255,.4);padding:3px}
 .card .body{flex:1;min-width:0;display:flex;flex-direction:column}
-.card .role{font-family:'Heebo',sans-serif;font-weight:700;font-size:10.5px;letter-spacing:.16em;
+.card.mine{border-color:var(--pink);background:rgba(229,50,111,.06)}
+.card .role{font-family:'Heebo',sans-serif;font-weight:700;font-size:11.5px;letter-spacing:.16em;
   color:var(--pink);margin-bottom:5px}
+.mytag{margin-right:8px;padding:2px 7px;background:var(--pink);color:var(--paper);
+  font-size:10.5px;letter-spacing:.08em}
 .card h3{font-family:'Suez One',serif;font-weight:400;font-size:20px;line-height:1.15;margin:0 0 5px}
 .card .desc{margin:0;font-size:13.5px;line-height:1.5;color:var(--ink-soft)}
 .card .resume{margin:9px 0 0;font-size:12.5px;color:var(--ink);
@@ -175,12 +241,17 @@ ul li::before{content:'';position:absolute;right:0;top:.62em;width:9px;height:1.
 .card .count{margin-top:6px}
 .card h3 button{font:inherit;color:inherit;background:none;border:none;padding:0;cursor:pointer;text-align:right}
 .card h3 button:focus-visible{outline:2px solid var(--pink);outline-offset:3px}
-.quizgo{width:100%;margin-top:12px;font-family:'Heebo',sans-serif;font-weight:700;font-size:12.5px;
-  padding:11px;border:1px dashed var(--pink);background:transparent;color:var(--pink);cursor:pointer}
-.quizgo.ready{border-style:solid;background:var(--pink);color:var(--paper)}
+/* האימון הקצר הוא הפעולה הראשית בכרטיס; המבדק המלא ירד לשורה משנית */
+.traingo{width:100%;margin-top:12px;font-family:'Heebo',sans-serif;font-weight:700;font-size:14px;
+  padding:13px;border:1.5px solid var(--pink);background:var(--pink);color:var(--paper);cursor:pointer}
+.traingo:active{opacity:.82}
+.traingo:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.quizgo{width:100%;margin-top:7px;font-family:'Heebo',sans-serif;font-weight:700;font-size:12.5px;
+  padding:10px;border:1px solid var(--hair);background:transparent;color:var(--ink-soft);cursor:pointer}
+.quizgo.ready{border-color:var(--pink);color:var(--pink)}
 .quizgo:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
 
-.ver{display:block;margin-top:8px;font-family:'Heebo',sans-serif;font-weight:700;font-size:10.5px;
+.ver{display:block;margin-top:8px;font-family:'Heebo',sans-serif;font-weight:700;font-size:11px;
   letter-spacing:.16em;color:var(--ink-soft);opacity:.75}
 
 /* ===== חזרה ===== */
@@ -200,7 +271,7 @@ ul li::before{content:'';position:absolute;right:0;top:.62em;width:9px;height:1.
 .quizing .tok{transition:transform .25s cubic-bezier(.4,0,.2,1)}
 .q-from{fill:none;stroke:var(--ink);stroke-opacity:.45;stroke-width:1.4;stroke-dasharray:3 4}
 .q-guess{fill:none;stroke:var(--ink);stroke-width:2;stroke-dasharray:5 4}
-.q-tag{font-family:'Heebo',sans-serif;font-weight:700;font-size:11px;fill:var(--ink);
+.q-tag{font-family:'Heebo',sans-serif;font-weight:700;font-size:12.5px;fill:var(--ink);
   text-anchor:middle;opacity:.7}
 
 .qfeed{margin-top:14px;padding:13px 15px;font-size:15px;border-right:3px solid var(--ink)}
