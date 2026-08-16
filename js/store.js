@@ -85,12 +85,40 @@ export function saveQuizResult(bookletId, scenarioId, grade, offMeters) {
     grade: better ? grade : prev.grade,
     meters: better ? +offMeters.toFixed(1) : prev.meters,
     last: grade,
+    /* מתי נענה לאחרונה — כדי שהאימון היומי יוכל להעדיף את מה שלא נגעו בו
+       מזמן. רשומות מגרסה קודמת אין להן at, והן נחשבות הישנות ביותר. */
+    at: Date.now(),
     tries: (prev ? prev.tries : 0) + 1
   };
   writeJSON(QUIZ_KEY, quiz);
 }
 
 const rank = g => (g === 'exact' ? 2 : g === 'close' ? 1 : 0);
+
+/* --- האימון של היום ---
+   מבדק של שלוש-עשרה שאלות הוא יותר מדי לילד בערב אחרי אימון, ומבחן שנעשה
+   פעם אחת אינו מלמד. שלוש שאלות שנבחרות לפי מה שפוספס הן חזרה מרווחת:
+   קודם מה שנכשל, אחר כך מה שעוד לא נוסה, ולבסוף מה שהצליח מזמן. */
+
+export function dailyPicks(bookletId, ids, n = 3) {
+  const book = quiz[bookletId] || {};
+  const tier = r => {
+    if (!r) return 1;                      /* עוד לא נוסה */
+    if (r.last === 'far') return 0;        /* פוספס בפעם האחרונה */
+    if (r.last === 'close') return 0.5;
+    return 2;                              /* מדויק — חזרה, לא תרגול */
+  };
+  return ids
+    .map(id => ({ id, t: tier(book[id]), at: (book[id] && book[id].at) || 0 }))
+    .sort((a, b) => a.t - b.t || a.at - b.at)
+    .slice(0, n)
+    .map(x => x.id);
+}
+
+/** האם כבר נענה משהו בחוברת — קובע אם הכפתור אומר "התחל" או "המשך" */
+export function quizTouched(bookletId) {
+  return Object.keys(quiz[bookletId] || {}).length > 0;
+}
 
 /** כמה תרחישים נענו במדויק בחוברת */
 export function quizSummary(bookletId) {
@@ -115,13 +143,28 @@ export function setMirrored(on) {
   try { localStorage.setItem(SIDE_KEY, on ? 'L' : 'R'); } catch (e) { /* לא קריטי */ }
 }
 
-/** מספר החולצה של הילד. משמש לסימון "החוברות שלי", לא לצביעת הדיאגרמות —
-    את השחקן המודגש קובעת החוברת, כי התרחישים מתארים תפקיד מסוים. */
-export function getMyNumber() {
-  const v = parseInt(localStorage.getItem(ME_KEY) || '', 10);
-  return Number.isFinite(v) ? v : 8;
+/* --- מספר החולצה של הילד ---
+   משמש לסידור הספרייה: החוברת של התפקיד שלו עולה ראשונה ומסומנת.
+   אינו קובע את צביעת הדיאגרמות — את השחקן המודגש קובעת החוברת, כי
+   התרחישים מתארים תפקיד מסוים.
+
+   שלושה מצבים, ולכן צריך גם hasMyNumber: לא נשאל עדיין · בחר מספר ·
+   בחר לדלג (0). בלי ההבחנה הזאת השאלה הייתה חוזרת בכל פתיחה. */
+
+export function hasMyNumber() {
+  try { return localStorage.getItem(ME_KEY) !== null; } catch (e) { return false; }
 }
 
+/** מספר החולצה, או 0 אם בחר לדלג */
+export function getMyNumber() {
+  const v = parseInt(localStorage.getItem(ME_KEY) || '', 10);
+  return Number.isFinite(v) ? v : 0;
+}
+
+/** null מוחק את הבחירה ומחזיר את השאלה */
 export function setMyNumber(n) {
-  try { localStorage.setItem(ME_KEY, String(n)); } catch (e) { /* לא קריטי */ }
+  try {
+    if (n === null) localStorage.removeItem(ME_KEY);
+    else localStorage.setItem(ME_KEY, String(n));
+  } catch (e) { /* לא קריטי */ }
 }
