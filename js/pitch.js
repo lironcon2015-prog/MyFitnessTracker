@@ -303,63 +303,206 @@ export function createPitch(svg, formation, role) {
      מופשט שצריך ללמוד לקרוא. הנתונים כבר מחזיקים מסלול מלא (a, b, bend),
      ולכן אין כאן תוכן חדש: רק הזזת האסימונים לאורך מה שכבר משורטט. */
 
-  const RUN_MS = 1150, PASS_MS = 800;
-  const closeTo = (a, b, r) => Math.hypot(a[0] - b[0], a[1] - b[1]) <= r;
+  /* מרחקי זיהוי. AT — שחקן עומד בנקודה. SAME — שני חצים מתכוונים לאותה
+     נקודה, וזה סובלני יותר כי כל אחד מהם צויר בנפרד. BALL — הכדור לרגליו. */
+  const R_AT = 24, R_SAME = 32, R_BALL = 20;
+  const PAUSE = 130;   /* נגיעה ראשונה, לפני שממשיכים */
 
-  /** מה זז בתרחיש: לכל חץ, מי הולך לאורכו ומתי. */
+  const closeTo = (a, b, r) => Math.hypot(a[0] - b[0], a[1] - b[1]) <= r;
+  const span = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  /* המשך תלוי מרחק: צעד קצר וספרינט של שלושים מטר אינם אורכים אותו זמן.
+     הכדור מהיר מהרגליים. */
+  const runMs = d => clamp(d * 3.4, 450, 1500);
+  const passMs = d => clamp(d * 2.6, 340, 1100);
+
+  /** האם הנקודה יושבת על הקטע בין שני קצוות החץ — לא עליהם, אלא בדרך */
+  function onSegment(p, a, b, r) {
+    const dx = b[0] - a[0], dy = b[1] - a[1];
+    const len2 = dx * dx + dy * dy;
+    if (!len2) return false;
+    const t = ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / len2;
+    if (t <= 0.15 || t >= 0.85) return false;   /* הקצוות נבדקו כבר */
+    return closeTo(p, [a[0] + dx * t, a[1] + dy * t], r);
+  }
+
+  /**
+   * מה זז בתרחיש, ומתי.
+   *
+   * הקושי אינו בציור אלא בתזמון: שרטוט אחד מחזיק כמה אירועים שקרו זה
+   * אחר זה, והחיצים אינם אומרים מי קדם למי. הסדר נגזר כאן מהגיאומטריה —
+   * מסירה מתחילה מהמקום שאליו הגיעה הקודמת, ריצה שמסתיימת בנקודת מסירה
+   * חייבת להסתיים לפניה, וריצה שמסתיימת ביעד של מסירה מתוזמנת להגיע
+   * יחד עם הכדור ולא לפניו או אחריו.
+   */
   function plan(s) {
     const posOf = n => (s.pos && s.pos[n]) || base[n];
-    const acts = [];
+    const opps = s.opp || [];
+    const arrows = s.arrows || [];
 
-    (s.arrows || []).forEach(ar => {
-      const path = { from: ar.a, to: ar.b, bend: ar.bend || 0 };
+    /** מי מצויר בנקודה: קודם הקצוות, ואז מי שמצויר באמצע החץ ועוד בדרך.
+        mid מסמן את המקרה השלישי, וחשוב: מי שמצויר באמצע החץ **עוצר שם**
+        ולא בקצהו. אחרת הוא היה רץ עד הסוף ואז קופץ אחורה למקום שבו
+        התרחיש מצייר אותו. שארית החץ היא לאן שהוא ממשיך. */
+    const actorAt = (ar, pick) => {
+      let n = pick(p => closeTo(p, ar.b, R_AT));
+      if (n != null) return { n, mid: false };
+      n = pick(p => closeTo(p, ar.a, R_AT));
+      if (n != null) return { n, mid: false };
+      n = pick(p => onSegment(p, ar.a, ar.b, R_AT));
+      return n != null ? { n, mid: true } : null;
+    };
 
-      if (ar.k === 'run') {
-        /* הרץ הוא מי שמצויר בסוף החץ — מוסכמת השרטוט הרווחת בתוכן, שבה
-           השחקן כבר הגיע ונקודת ההתחלה מסומנת בעיגול מקווקו. אם אין שם
-           אף אחד, הוא זה שמצויר בתחילתו ועדיין בדרך. */
-        let num = order.find(n => closeTo(posOf(n), ar.b, 22));
-        if (num == null) num = order.find(n => closeTo(posOf(n), ar.a, 22));
-        if (num != null) acts.push({ ...path, kind: 'run', num, dur: RUN_MS, delay: 0 });
+    /* --- מסירות --- */
+    const passes = arrows.filter(a => a.k === 'pass').map(a => ({
+      kind: 'pass', ball: true, from: a.a, to: a.b, bend: a.bend || 0,
+      dur: passMs(span(a.a, a.b)), start: 0
+    }));
 
-      } else if (ar.k === 'pass') {
-        acts.push({ ...path, kind: 'pass', ball: true, dur: PASS_MS, delay: 0 });
+    /* חץ שנקודת התחלה מסומנת בשני קצותיו אינו תנועה אלא טווח: כך מצוירת
+       מפת התפקיד, "בין כאן לכאן אתה חי". אין מה להריץ לאורכו. */
+    const ghosts = s.ghosts || [];
+    const isRange = ar => ghosts.some(g => closeTo(g, ar.a, R_AT))
+                       && ghosts.some(g => closeTo(g, ar.b, R_AT));
 
-      } else if (ar.k === 'press') {
-        const i = (s.opp || []).findIndex(o => closeTo(o, ar.a, 22) || closeTo(o, ar.b, 22));
-        if (i >= 0) acts.push({ ...path, kind: 'press', oppIndex: i, dur: RUN_MS, delay: 0 });
-      }
-      /* חץ opt הוא אפשרות שלא נבחרה — אין מה להזיז לאורכו */
+    /* --- ריצות --- */
+    const runs = [];
+    arrows.filter(a => a.k === 'run' && !isRange(a)).forEach(ar => {
+      const found = actorAt(ar, test => order.find(n => test(posOf(n))));
+      if (!found) return;
+      const at = posOf(found.n);
+      const end = found.mid ? at : ar.b;
+      runs.push({
+        kind: 'run', num: found.n, at, from: ar.a, to: ar.b, end,
+        stopAt: found.mid ? at : null, bend: ar.bend || 0,
+        dur: runMs(span(ar.a, end)), start: 0
+      });
     });
 
-    /* מי שמסר וגם רץ, רץ אחרי המסירה ולא יחד איתה. זה בדיוק הקיר עם
-       החלוץ: מוסרים, ורק אז יוצאים. */
-    acts.forEach(a => {
-      if (a.kind !== 'run') return;
-      const pass = acts.find(p => p.kind === 'pass' && closeTo(p.from, a.from, 26));
-      if (pass) a.delay = Math.round(pass.dur * 0.55);
+    /* --- לחץ ---
+       ה-README מגדיר press כתנועת יריב, אבל בתוכן הוא משמש גם לריצת לחץ
+       של שחקן שלנו. מי שמצויר בתחילת החץ הוא מי שזז, ולא מי שבסופו —
+       אחרת יריב שעומד ביעד היה נשאב אחורה אל נקודת ההתחלה. */
+    const presses = [];
+    arrows.filter(a => a.k === 'press').forEach(ar => {
+      const add = (who, at, mid) => {
+        const end = mid ? at : ar.b;
+        presses.push({
+          kind: 'press', ...who, at, from: ar.a, to: ar.b, end,
+          stopAt: mid ? at : null, bend: ar.bend || 0,
+          dur: runMs(span(ar.a, end)), start: 0
+        });
+      };
+      let i = opps.findIndex(o => closeTo(o, ar.a, R_AT));
+      if (i >= 0) return add({ oppIndex: i }, opps[i], false);
+      const num = order.find(n => closeTo(posOf(n), ar.a, R_AT));
+      if (num != null) return add({ num }, posOf(num), false);
+      i = opps.findIndex(o => closeTo(o, ar.b, R_AT));
+      if (i >= 0) return add({ oppIndex: i }, opps[i], false);
+      i = opps.findIndex(o => onSegment(o, ar.a, ar.b, R_AT));
+      if (i >= 0) add({ oppIndex: i }, opps[i], true);
     });
 
-    /* הובלה עם הכדור: אין מסירה, והכדור לרגליו של מי שרץ — הוא לוקח אותו */
-    if (!acts.some(a => a.ball)) {
-      const carry = acts.find(a => a.kind === 'run' && closeTo(s.ball, a.from, 18));
-      if (carry) acts.push({ ...carry, kind: 'carry', ball: true, num: undefined });
+    /* --- שרשרת המסירות ---
+       כל מסירה מתחילה מהמקום שאליו הגיעה הקודמת. בלי זה שתי מסירות
+       באותו תרחיש רצות יחד ושתיהן מזיזות את אותו כדור — וזה נראה
+       כאילו הכדור קופץ. */
+    const chain = [];
+    const pool = passes.slice();
+    let cursor = s.ball;
+    while (pool.length) {
+      let k = pool.findIndex(p => closeTo(p.from, cursor, R_SAME));
+      if (k < 0) k = 0;
+      const p = pool.splice(k, 1)[0];
+      chain.push(p);
+      cursor = p.to;
     }
 
-    return acts;
+    /* --- תזמון המסירות ---
+       מסירה שיוצאת מנקודה שאליה מגיעה ריצה מחכה לה: המוסר עוד בדרך. */
+    let t = 0;
+    chain.forEach(p => {
+      const carrier = runs.find(r => closeTo(r.end, p.from, R_SAME));
+      p.start = Math.max(t, carrier ? carrier.dur + PAUSE : 0);
+      t = p.start + p.dur + PAUSE;
+    });
+
+    /* מסירה אל מי שרץ אליה ממתינה לו כשהריצה ארוכה ממנה — עדיף שהכדור
+       יפגוש אותו מאשר שינחת בחלל ריק וימתין שם. אחרי הדחייה מסדרים את
+       השרשרת מחדש, כדי ששתי מסירות לא יחפפו. */
+    chain.forEach(p => {
+      const runner = runs.find(r => closeTo(r.end, p.to, R_SAME));
+      if (!runner) return;
+      const need = runner.dur - p.dur;
+      if (need > 60) p.start = Math.max(p.start, need);
+    });
+    let acc = 0;
+    chain.forEach(p => { p.start = Math.max(p.start, acc); acc = p.start + p.dur + PAUSE; });
+
+    /* --- תזמון הריצות --- */
+    runs.forEach(r => {
+      /* הוא המוסר, ומגיע לנקודת המסירה ראשון */
+      if (chain.some(p => closeTo(r.end, p.from, R_SAME))) { r.start = 0; return; }
+      /* קיבל את הכדור וממשיך איתו */
+      const recv = chain.find(p => closeTo(p.to, r.from, R_SAME));
+      if (recv) { r.start = recv.start + recv.dur + PAUSE; r.after = recv; return; }
+      /* מסר ואז יצא לריצה — הקיר עם החלוץ */
+      const passer = chain.find(p => closeTo(p.from, r.from, R_AT));
+      if (passer) { r.start = passer.start + Math.round(passer.dur * 0.5); return; }
+      /* רץ אל הכדור: מגיע יחד איתו, לא לפניו ולא אחריו */
+      const deliver = chain.find(p => closeTo(p.to, r.end, R_SAME));
+      if (deliver) { r.start = Math.max(0, deliver.start + deliver.dur - r.dur); return; }
+      r.start = 0;
+    });
+
+    /* --- מי מוביל את הכדור ---
+       הכדור נוסע עם שחקן כשהוא מצויר לרגליו, או כשמסירה הרגע הגיעה
+       אליו. יריב שעומד על הכדור גובר: אז הוא לא שלנו להוביל. */
+    const oppOnBall = opps.some(o => closeTo(o, s.ball, R_BALL));
+    const delivered = p => chain.some(c => closeTo(c.to, p, R_SAME));
+
+    const rides = mover => ({
+      kind: 'carry', ball: true, link: mover,
+      from: mover.from, to: mover.to, end: mover.end, stopAt: mover.stopAt,
+      bend: mover.bend, dur: mover.dur, start: mover.start
+    });
+
+    const carries = [];
+    runs.forEach(r => {
+      const dribbles = !oppOnBall && closeTo(s.ball, r.at, R_BALL) && !delivered(r.at);
+      if (r.after || dribbles) carries.push(rides(r));
+    });
+    presses.forEach(pr => {
+      if (closeTo(s.ball, pr.at, R_BALL) && !delivered(pr.at)) carries.push(rides(pr));
+    });
+
+    /* --- כדור אחד, נהג אחד בכל רגע ---
+       אם שני מהלכים של הכדור חופפים בזמן, השני נדחה — ומי שמוביל אותו
+       נדחה איתו, אחרת השחקן והכדור נפרדים. */
+    const ballActs = chain.concat(carries).sort((a, b) => a.start - b.start);
+    for (let i = 1; i < ballActs.length; i++) {
+      const prev = ballActs[i - 1], cur = ballActs[i];
+      const earliest = prev.start + prev.dur;
+      if (cur.start >= earliest) continue;
+      const shift = earliest - cur.start;
+      cur.start += shift;
+      if (cur.link) cur.link.start += shift;
+    }
+
+    return { acts: runs.concat(presses, chain, carries), ball: ballActs[0] || null };
   }
 
   /** המגרש ברגע שלפני התנועה: כל מי שזז חוזר לתחילת החץ שלו */
-  function beforeOf(s, acts) {
+  function beforeOf(s, plan) {
     const b = { ...s, pos: { ...(s.pos || {}) } };
-    acts.forEach(a => { if (a.num != null) b.pos[a.num] = a.from; });
+    plan.acts.forEach(a => { if (a.num != null) b.pos[a.num] = a.from; });
 
-    const ballAct = acts.find(a => a.ball);
-    if (ballAct) b.ball = ballAct.from;
+    if (plan.ball) b.ball = plan.ball.from;
 
-    if (acts.some(a => a.oppIndex != null)) {
+    if (plan.acts.some(a => a.oppIndex != null)) {
       b.opp = (s.opp || []).map((o, i) => {
-        const a = acts.find(x => x.oppIndex === i);
+        const a = plan.acts.find(x => x.oppIndex === i);
         return a ? a.from : o;
       });
     }
@@ -382,30 +525,33 @@ export function createPitch(svg, formation, role) {
     if (cancel) cancel();
 
     const reduce = window.matchMedia('(prefers-reduced-motion:reduce)').matches;
-    const acts = reduce ? [] : plan(s);
-    if (!acts.length) { render(s); if (onDone) onDone(); return; }
+    const p = reduce ? { acts: [], ball: null } : plan(s);
+    if (!p.acts.length) { render(s); if (onDone) onDone(); return; }
 
-    render(beforeOf(s, acts), { animate: false });
+    render(beforeOf(s, p), { animate: false });
 
     /* אסימוני היריב נבנים מחדש בכל ציור, ולכן ההפניות נאספות אחרי */
     const oppEls = [...gOpp.children];
     const defs = svg.querySelector('defs');
     const live = [];
 
-    acts.forEach(a => {
+    p.acts.forEach(a => {
       const node = a.ball ? ballDot : a.num != null ? toks[a.num] : oppEls[a.oppIndex];
       if (!node) return;
       /* מסלול לדגימה בלבד. יושב ב-defs כדי שלא ייצבע, אבל כן יהיה במסמך —
          getTotalLength על אלמנט מנותק אינו אמין בכל דפדפן. */
       const probe = el('path', { d: arc(a.from, a.to, a.bend) });
       defs.appendChild(probe);
-      live.push({ ...a, node, probe, len: probe.getTotalLength() });
+      /* מי שמצויר באמצע החץ עוצר במקום שבו הוא מצויר. הקשת אינה קו ישר,
+         ולכן מוצאים את הנקודה על המסלול ולא מחשבים אותה. */
+      live.push({ ...a, node, probe, len: a.stopAt ? lengthAt(probe, a.stopAt) : probe.getTotalLength() });
     });
 
     if (!live.length) { render(s); if (onDone) onDone(); return; }
 
     svg.classList.add('playing');
-    const total = Math.max(...live.map(a => a.delay + a.dur));
+    /* שהות קצרה בסוף, כדי שהתמונה הסופית תיראה לפני שהחיצים חוזרים */
+    const total = Math.max(...live.map(a => a.start + a.dur)) + 260;
     const t0 = performance.now();
     let raf = 0;
 
@@ -416,22 +562,57 @@ export function createPitch(svg, formation, role) {
       cancel = null;
     };
 
+    /* הכדור מקבל נהג אחד בכל רגע: המהלך האחרון שכבר התחיל. בלי הבחירה
+       הזאת גם ההובלה וגם המסירה היו כותבות לו מיקום בכל פריים, והאחרונה
+       ברשימה — לא האחרונה בזמן — הייתה מנצחת. */
+    const ballLive = live.filter(a => a.ball).sort((a, b) => a.start - b.start);
+    const moverLive = live.filter(a => !a.ball);
+    const at = (a, t) => a.probe.getPointAtLength(
+      ease(Math.max(0, Math.min(1, (t - a.start) / a.dur))) * a.len);
+    const driver = t => {
+      let cur = ballLive[0];
+      ballLive.forEach(a => { if (t >= a.start) cur = a; });
+      return cur;
+    };
+
     function frame(now) {
       const t = now - t0;
-      live.forEach(a => {
-        const k = Math.max(0, Math.min(1, (t - a.delay) / a.dur));
-        const p = a.probe.getPointAtLength(ease(k) * a.len);
-        if (a.node === ballDot) {
-          a.node.setAttribute('cx', p.x);
-          a.node.setAttribute('cy', p.y);
-        } else {
-          a.node.setAttribute('transform', `translate(${p.x},${p.y})`);
-        }
+      moverLive.forEach(a => {
+        const p = at(a, t);
+        a.node.setAttribute('transform', `translate(${p.x},${p.y})`);
       });
+      if (ballLive.length) {
+        const p = at(driver(t), t);
+        ballDot.setAttribute('cx', p.x);
+        ballDot.setAttribute('cy', p.y);
+      }
       if (t < total) { raf = requestAnimationFrame(frame); return; }
+      const end = settled();
       clear();
-      render(s);                /* התמונה המלאה, עם החיצים */
+      render(end);              /* התמונה המלאה, עם החיצים */
       if (onDone) onDone();
+    }
+
+    /* התרחיש כפי שהוא נראה אחרי הפעולה.
+       חייב להיגזר מהמקום שבו כל אחד באמת עצר, ולא מהנתונים: השרטוט הוא
+       לפעמים הרגע שלפני הפעולה ולא אחריה — הכדור מצויר לרגלי המוסר,
+       או השחקן מצויר בתחילת חץ הריצה — וציור התרחיש כמות שהוא היה מחזיר
+       אותם אחורה בקפיצה ברגע האחרון. */
+    function settled() {
+      const out = { ...s, pos: { ...(s.pos || {}) } };
+      const opp = (s.opp || []).slice();
+      moverLive.forEach(a => {
+        const p = a.probe.getPointAtLength(a.len);
+        if (a.num != null) out.pos[a.num] = [p.x, p.y];
+        else if (a.oppIndex != null) opp[a.oppIndex] = [p.x, p.y];
+      });
+      if (ballLive.length) {
+        const last = ballLive[ballLive.length - 1];
+        const p = last.probe.getPointAtLength(last.len);
+        out.ball = [p.x, p.y];
+      }
+      if (moverLive.some(a => a.oppIndex != null)) out.opp = opp;
+      return out;
     }
 
     cancel = clear;
@@ -441,7 +622,9 @@ export function createPitch(svg, formation, role) {
   return {
     render, setRole, play,
     /* תרחיש בלי תנועה — מפת תפקיד, למשל — לא מקבל כפתור הרצה */
-    canPlay: s => plan(s).length > 0,
+    canPlay: s => plan(s).acts.length > 0,
+    /* לבדיקות: הלוח זמנים שנגזר מהתרחיש, בלי לצייר */
+    planOf: plan,
     stopPlay: () => { if (cancel) cancel(); },
     tokens: toks, ball: ballDot, formation, role
   };
@@ -449,6 +632,19 @@ export function createPitch(svg, formation, role) {
 
 /** האטה בקצוות: יוצא לאט, מגיע לאט. תנועה קבועה נראית מכנית */
 const ease = k => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
+
+/** האורך שבו המסלול הכי קרוב לנקודה — דגימה, כי לקשת אין פתרון סגור */
+function lengthAt(path, pt) {
+  const total = path.getTotalLength();
+  let best = total, bd = Infinity;
+  for (let i = 0; i <= 64; i++) {
+    const L = total * i / 64;
+    const p = path.getPointAtLength(L);
+    const d = Math.hypot(p.x - pt[0], p.y - pt[1]);
+    if (d < bd) { bd = d; best = L; }
+  }
+  return best;
+}
 
 /** מגרש קטן וסטטי לכרטיס בספרייה */
 export function thumbnail(scenario, formation, role) {
