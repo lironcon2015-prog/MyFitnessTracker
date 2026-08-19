@@ -19,6 +19,7 @@ editor.html             העורך — לא מקושר מהאפליקציה
 css/editor.css js/editor.js
 content/booklets.json   מסך הבית, מילון המונחים ורשימת החוברות
 content/formations.json מערכים ומיקומי ברירת מחדל לפי מספר חולצה
+content/kesher-6.json   חוברת מספר 6
 content/kesher-8.json   חוברת מספר 8
 content/left-back.json  חוברת מגן שמאלי
 content/winger.json     חוברת כנף

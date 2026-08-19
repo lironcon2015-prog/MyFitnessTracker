@@ -1,5 +1,5 @@
 {
- "version": "9.1",
+ "version": "9.2",
  "home": {
   "eyebrow": "כדורגל תשיעיות · גילאי 9–12",
   "title": "מה לומדים היום",
@@ -22,6 +22,10 @@
   "מתפרצת": "התקפה מהירה מיד אחרי שזכינו בכדור, לפני שההגנה שלהם הספיקה להתארגן."
  },
  "booklets": [
+  {
+   "id": "kesher-6",
+   "file": "content/kesher-6.json"
+  },
   {
    "id": "kesher-8",
    "file": "content/kesher-8.json"
