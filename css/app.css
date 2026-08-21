@@ -369,6 +369,12 @@ h2 .term{color:inherit;border-bottom-width:2px}
   font-size:13.5px;color:var(--ink-soft)}
 .vcard{border:1px solid var(--hair);background:rgba(255,255,255,.32);padding:12px;
   display:grid;grid-template-columns:96px 1fr;gap:12px;align-items:start}
+/* יש תמונה אמיתית של הסרטון — היא יושבת מעל הטקסט לכל רוחב הכרטיס,
+   כמו תצוגה מקדימה של קישור בוואטסאפ */
+.vcard.wide{grid-template-columns:1fr}
+.vcard.wide .vthumb{width:100%;aspect-ratio:16/9}
+.vcard.playing .vthumb{display:none}
+.vcard.playing{grid-template-columns:1fr}
 .vthumb{width:96px;aspect-ratio:16/10;border:1px solid var(--hair);background:rgba(255,255,255,.4);
   overflow:hidden;display:flex;align-items:center;justify-content:center;
   font-family:'Heebo',sans-serif;font-weight:700;font-size:11.5px;letter-spacing:.08em;color:var(--ink-soft)}
@@ -398,8 +404,9 @@ h2 .term{color:inherit;border-bottom-width:2px}
 .vacts .vedit:active,.vacts .vdel:active{background:transparent;color:var(--ink);border-color:transparent}
 .vacts a:active,.vacts button:active{background:var(--ink);color:var(--paper);border-color:var(--ink)}
 .vacts a:focus-visible,.vacts button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
-/* הנגן נטען רק בלחיצה, ולכן הוא יושב מתחת לכרטיס ותופס את כל רוחבו */
-.vframe{grid-column:1 / -1;margin-top:10px;border:1px solid var(--hair);background:var(--ink)}
+/* הנגן נטען רק בלחיצה, ויושב בראש הכרטיס לכל רוחבו — מתחת לכפתורים הוא
+   היה נוחת מתחת לקצה המסך */
+.vframe{grid-column:1 / -1;margin-bottom:12px;border:1px solid var(--hair);background:var(--ink)}
 /* רילס וטיקטוק הם לאורך — מסגרת רחבה הייתה משאירה שתי רצועות שחורות */
 .vframe.tall{max-width:340px;margin-inline:auto;background:var(--paper)}
 .vframe.tall iframe{aspect-ratio:9/14}
@@ -408,12 +415,20 @@ h2 .term{color:inherit;border-bottom-width:2px}
 .vout{margin:0;padding:9px 11px;background:rgba(255,255,255,.42);border-top:1px solid var(--hair);
   font-size:12.5px;line-height:1.5;color:var(--ink-soft)}
 .vout a{color:var(--blue);font-weight:600}
-.vabout{margin:16px 0 0;font-size:12px;line-height:1.5;color:var(--ink-soft);
-  border-right:2px solid var(--hair);padding-right:9px}
+.vauto{display:flex;gap:9px;align-items:flex-start;margin:16px 0 0;cursor:pointer}
+.vauto input{width:20px;height:20px;min-height:0;flex:0 0 auto;margin-top:2px;accent-color:var(--pink)}
+.vauto span{font-family:'Heebo',sans-serif;font-weight:700;font-size:12.5px;color:var(--ink)}
+.vauto em{display:block;font-family:'Assistant',sans-serif;font-weight:400;font-style:normal;
+  font-size:12px;line-height:1.5;color:var(--ink-soft);margin-top:3px}
 .vretry{font:inherit;font-size:12.5px;background:none;border:none;padding:0;cursor:pointer;
   color:var(--pink);text-decoration:underline}
 .vretry:disabled{color:var(--ink-soft);cursor:default;text-decoration:none}
 .vretry:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
+/* דיווח על מה שקרה מול שירותי התצוגה המקדימה */
+.vlog{margin-top:8px;font-size:11.5px;color:var(--ink-soft)}
+.vlog summary{cursor:pointer;font-family:'Heebo',sans-serif;font-weight:700;font-size:11.5px}
+.vlog ul{margin:6px 0 0;padding-inline-start:0;padding-inline-end:16px;line-height:1.6}
+.vlog li{direction:ltr;text-align:right;unicode-bidi:plaintext}
 /* למה אין כאן כפתור ניגון */
 .vwhy{margin:9px 0 0;font-size:12.5px;line-height:1.5;color:var(--ink-soft);
   border-right:2px solid var(--hair);padding-right:9px}

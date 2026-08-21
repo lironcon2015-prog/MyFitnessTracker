@@ -7,12 +7,17 @@
 import {
   listCategories, addCategory, renameCategory, removeCategory, countByCategory,
   listVideos, addVideo, updateVideo, removeVideo, categoryName,
-  detectPlatform, platformName, embedUrl, embedBlocked, isPortrait, playable,
+  detectPlatform, platformName, embedUrl, embedBlocked, isPortrait, playable, posterOf,
   thumbUrl, normalizeUrl, videoCount
 } from './videos.js';
-import { needsResolve, resolveUrl } from './resolve.js';
+import { needsResolve, lookup, cachePoster } from './preview.js';
 
 const $ = id => document.getElementById(id);
+
+/* האם למשוך תצוגה מקדימה מהרשת */
+const AUTO_KEY = 'k8:videos:auto';
+const autoOn = () => { try { return localStorage.getItem(AUTO_KEY) !== 'off'; } catch (e) { return true; } };
+const setAuto = on => { try { localStorage.setItem(AUTO_KEY, on ? 'on' : 'off'); } catch (e) { /* לא קריטי */ } };
 
 /* הקטגוריה שמסוננת כרגע: null הכול · '' בלי כותרת · מזהה קטגוריה */
 let filter = null;
@@ -216,19 +221,25 @@ function videoCard(v, repaint) {
   const card = document.createElement('div');
   card.className = 'vcard';
 
-  /* תמונה מוקטנת קיימת ליוטיוב בלבד; בשאר מוצג שם הפלטפורמה כאריח.
-     כשאין רשת גם התמונה נופלת, ולכן onerror מחליף אותה באריח. */
+  /* התמונה של הסרטון, כמו בתצוגה מקדימה של קישור בוואטסאפ. כשיש תמונה
+     הכרטיס נפתח לרוחב והיא יושבת מעל הטקסט; כשאין, נשאר אריח צר עם שם
+     הפלטפורמה, כדי שכרטיס בלי תמונה לא ייקח גובה של כרטיס עם תמונה. */
+  const src = posterOf(v);
+  if (src) card.classList.add('wide');
+
   const thumb = document.createElement('div');
   thumb.className = 'vthumb p-' + v.platform;
   const tile = () => {
+    card.classList.remove('wide');
     thumb.textContent = platformName(v.platform);
   };
-  const src = thumbUrl(v.url);
   if (src) {
     const img = document.createElement('img');
     img.src = src;
     img.alt = '';
     img.loading = 'lazy';
+    img.referrerPolicy = 'no-referrer';
+    /* כתובת תמונה של פייסבוק פגה אחרי זמן — ואז חוזרים לאריח */
     img.onerror = tile;
     thumb.appendChild(img);
   } else {
@@ -288,6 +299,7 @@ function videoCard(v, repaint) {
     play.onclick = () => {
       if (card.querySelector('.vframe')) {
         card.querySelector('.vframe').remove();
+        card.classList.remove('playing');
         play.textContent = 'נגן כאן';
         return;
       }
@@ -317,7 +329,13 @@ function videoCard(v, repaint) {
       out.append('.');
       frame.appendChild(out);
 
-      card.appendChild(frame);
+      /* בראש הכרטיס ולא בסופו: כשהנגן נפתח מתחת לכפתורים ולהערה, הוא
+         נוחת מתחת לקצה המסך וצריך לגלול כדי בכלל לראות אותו. */
+      card.insertBefore(frame, card.firstChild);
+      /* התמונה יורדת בזמן הניגון: היא אותו סרטון, והיא רק דוחפת את
+         הטקסט למטה בזמן שהנגן כבר תופס את המקום */
+      card.classList.add('playing');
+      frame.scrollIntoView({ block: 'center', behavior: 'smooth' });
       play.textContent = 'סגור';
     };
     acts.appendChild(play);
@@ -362,10 +380,18 @@ function videoCard(v, repaint) {
       retry.onclick = async () => {
         retry.disabled = true;
         retry.textContent = 'פותח…';
-        const full = await resolveUrl(v.url);
-        if (full) { updateVideo(v.id, { full }); repaint(); return; }
+        const found = await lookup(v.url);
+        if (found.full) {
+          updateVideo(v.id, {
+            full: found.full,
+            poster: v.poster || await cachePoster(found.image)
+          });
+          repaint();
+          return;
+        }
         retry.disabled = false;
         retry.textContent = 'לא הצלחנו — נסה שוב';
+        note.appendChild(report(found.log));
       };
       note.append(' ');
       note.appendChild(retry);
@@ -374,6 +400,24 @@ function videoCard(v, repaint) {
   }
   card.append(thumb, body);
   return card;
+}
+
+/* מה כל שירות ענה. לא למשתמש הרגיל — אבל כשמשהו לא עובד בטלפון מסוים
+   ואי אפשר לשחזר אותו, זו הדרך היחידה לדעת מה בעצם קרה. */
+function report(log) {
+  const box = document.createElement('details');
+  box.className = 'vlog';
+  const sum = document.createElement('summary');
+  sum.textContent = 'מה קרה?';
+  box.appendChild(sum);
+  const list = document.createElement('ul');
+  (log.length ? log : ['לא נשלחה אף בקשה']).forEach(line => {
+    const li = document.createElement('li');
+    li.textContent = line;
+    list.appendChild(li);
+  });
+  box.appendChild(list);
+  return box;
 }
 
 /* --- הרכבת המסך --- */
@@ -393,6 +437,10 @@ export function mountVideos(prefill) {
   const defaultCat = () => (filter && filter !== '' ? filter : '');
 
   document.title = 'ספריית הסרטונים — תשיעיות';
+  /* ברירת המחדל היא כן: בלי זה אין תמונות ואין פתיחת קישור מקוצר.
+     מי שמעדיף שהקישורים לא יצאו מהמכשיר מכבה, וזה נזכר. */
+  $('v-auto').checked = autoOn();
+  $('v-auto').onchange = () => setAuto($('v-auto').checked);
   resetForm();
   fillCategorySelect($('v-cat'), defaultCat());
 
@@ -434,13 +482,20 @@ export function mountVideos(prefill) {
       category: category || null
     };
 
-    /* קישור מקוצר נפתח לפני השמירה, כדי שהפנייה החוצה תקרה פעם אחת.
-       הכפתור מדווח, כי זו השהיה של שנייה-שתיים שהמשתמש רואה. */
-    if (needsResolve(normalizeUrl(url))) {
+    /* התצוגה המקדימה נמשכת פעם אחת, לפני השמירה: היא מביאה את הכתובת
+       המלאה, את שם הסרטון ואת התמונה שלו. הכפתור מדווח, כי זו השהיה של
+       שנייה-שתיים שהמשתמש רואה. */
+    let log = [];
+    if ($('v-auto').checked) {
       const label = $('v-save').textContent;
       $('v-save').disabled = true;
-      $('v-save').textContent = 'פותח את הקישור…';
-      fields.full = await resolveUrl(normalizeUrl(url));
+      $('v-save').textContent = 'מביא תמונה ושם…';
+      const found = await lookup(normalizeUrl(url));
+      log = found.log;
+      if (found.full) fields.full = found.full;
+      /* שם שהוקלד ידנית מנצח את מה שהפלטפורמה קוראת לסרטון */
+      if (found.title && !fields.title) fields.title = found.title;
+      fields.poster = await cachePoster(found.image);
       $('v-save').disabled = false;
       $('v-save').textContent = label;
     }
@@ -448,10 +503,17 @@ export function mountVideos(prefill) {
     const saved = editing ? updateVideo(editing, fields) : addVideo(fields);
     if (!saved) { setError('לא הצלחנו לשמור את הקישור.'); return; }
     const wasEditing = !!editing;
+    const stuck = needsResolve(saved.url) && !saved.full;
     resetForm();
     fillCategorySelect($('v-cat'), saved.category || '');
     repaint();
     if (!wasEditing) $('v-form').open = true;
+    /* נשמר, אבל בלי כתובת מלאה — עדיף לומר את זה מיד מאשר להשאיר את
+       הכרטיס בלי כפתור ניגון בלי הסבר */
+    if (stuck) {
+      setError('הסרטון נשמר, אבל לא הצלחנו לפתוח את הקישור המקוצר לכתובת מלאה. "פתח" עובד, ובכרטיס יש "נסה לפתוח את הקישור".');
+      $('v-error').appendChild(report(log));
+    }
   };
   $('v-formel').addEventListener('submit', onSubmit);
 

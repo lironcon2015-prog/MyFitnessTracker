@@ -155,7 +155,10 @@
         <label for="v-note">מה לשים לב בו <em>לא חובה</em></label>
         <textarea id="v-note" rows="2" placeholder="שורה אחת שתזכיר לך למה שמרת אותו"></textarea>
 
-        <p class="vabout">קישור מקוצר (fb.watch, פייסבוק share, טיקטוק) נפתח לכתובת המלאה דרך שירות ציבורי, כדי שאפשר יהיה לנגן אותו כאן. כתובת מלאה נבדקת על המכשיר ואינה נשלחת לאף אחד.</p>
+        <label class="vauto" for="v-auto">
+          <input type="checkbox" id="v-auto" checked>
+          <span>הבא תמונה ושם אוטומטית<em>הקישור נשלח לשירות תצוגה מקדימה, שמחזיר את התמונה של הסרטון, את שמו, ואת הכתובת המלאה של קישור מקוצר. בלי זה — אין תמונות, וקישור מקוצר לא ינוגן כאן.</em></span>
+        </label>
         <p class="verror" id="v-error" hidden></p>
         <div class="vsubmit">
           <button type="submit" id="v-save">הוסף לספרייה</button>
