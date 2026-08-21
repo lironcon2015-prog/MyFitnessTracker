@@ -119,12 +119,15 @@ export function getVideo(id) {
 }
 
 /** null אם הקישור אינו כתובת http/https תקינה */
-export function addVideo({ url, title, note, category }) {
+export function addVideo({ url, title, note, category, full }) {
   const clean = normalizeUrl(url);
   if (!clean) return null;
   const video = {
     id: uid(),
     url: clean,
+    /* הכתובת המלאה שנפתחה מקישור מקוצר. הקישור המקורי נשמר כמו שהוא, כי
+       הוא מה שהילד יראה ב"פתח" והוא עובד; full משמש רק לנגן המשובץ. */
+    full: full ? normalizeUrl(full) : null,
     platform: detectPlatform(clean).id,
     title: String(title || '').trim() || defaultTitle(clean),
     note: String(note || '').trim(),
@@ -143,9 +146,12 @@ export function updateVideo(id, patch) {
   if (patch.url !== undefined) {
     const clean = normalizeUrl(patch.url);
     if (!clean) return null;
+    /* כתובת חדשה מבטלת פתיחה קודמת — היא שייכת לקישור הישן */
+    if (clean !== video.url) video.full = null;
     video.url = clean;
     video.platform = detectPlatform(clean).id;
   }
+  if (patch.full !== undefined) video.full = patch.full ? normalizeUrl(patch.full) : null;
   if (patch.title !== undefined) video.title = String(patch.title).trim() || defaultTitle(video.url);
   if (patch.note !== undefined) video.note = String(patch.note).trim();
   if (patch.category !== undefined) video.category = patch.category || null;
@@ -281,6 +287,11 @@ export function embedUrl(url) {
   return null;
 }
 
+/** הכתובת שהנגן מקבל: המלאה אם נפתחה, אחרת המקורית */
+export function playable(video) {
+  return video.full || video.url;
+}
+
 /* למה אין כפתור "נגן כאן". מוחזר רק כשהפלטפורמה בעצם יודעת לשבץ, אבל
    הקישור המסוים הזה לא — כדי שההסבר יופיע בדיוק במקום שבו הכפתור חסר. */
 export function embedBlocked(url) {
@@ -291,11 +302,11 @@ export function embedBlocked(url) {
 
   if (platform === 'facebook') {
     if (u.hostname.endsWith('fb.watch') || /^\/share\//.test(u.pathname)) {
-      return 'קישור מקוצר של פייסבוק לא מתנגן בתוך הדף. פתח אותו, ואם תרצה ניגון כאן — העתק מהדפדפן את הכתובת המלאה של הסרטון.';
+      return 'לא הצלחנו לפתוח את הקישור המקוצר הזה לכתובת מלאה, ולכן אין ניגון בתוך הדף. "פתח" עובד כרגיל.';
     }
     return 'פייסבוק מנגנת בתוך הדף רק סרטונים ציבוריים עם כתובת מלאה.';
   }
-  if (platform === 'tiktok') return 'קישור מקוצר של טיקטוק לא מתנגן בתוך הדף.';
+  if (platform === 'tiktok') return 'לא הצלחנו לפתוח את הקישור המקוצר הזה לכתובת מלאה. "פתח" עובד כרגיל.';
   if (platform === 'instagram') return 'אינסטגרם מנגנת בתוך הדף רק פוסטים ורילסים ציבוריים.';
   return null;
 }
