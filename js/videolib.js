@@ -7,7 +7,8 @@
 import {
   listCategories, addCategory, renameCategory, removeCategory, countByCategory,
   listVideos, addVideo, updateVideo, removeVideo, categoryName,
-  detectPlatform, platformName, embedUrl, thumbUrl, normalizeUrl, videoCount
+  detectPlatform, platformName, embedUrl, embedBlocked, isPortrait,
+  thumbUrl, normalizeUrl, videoCount
 } from './videos.js';
 
 const $ = id => document.getElementById(id);
@@ -290,7 +291,7 @@ function videoCard(v, repaint) {
         return;
       }
       const frame = document.createElement('div');
-      frame.className = 'vframe p-' + v.platform;
+      frame.className = 'vframe' + (isPortrait(v.url) ? ' tall' : '');
       const f = document.createElement('iframe');
       f.src = embed;
       f.title = v.title;
@@ -299,11 +300,29 @@ function videoCard(v, repaint) {
       f.allowFullscreen = true;
       f.referrerPolicy = 'strict-origin-when-cross-origin';
       frame.appendChild(f);
+
+      /* מה שקורה בתוך המסגרת שייך לפייסבוק או לאינסטגרם, והדף לא יכול
+         לקרוא אותו — גם לא כדי לדעת שהוצג "Video unavailable". לכן דרך
+         היציאה כתובה מראש מתחת לנגן, ולא מחכה לזיהוי שאי אפשר לעשות. */
+      const out = document.createElement('p');
+      out.className = 'vout';
+      out.append('לא נטען? יש סרטונים שהפלטפורמה לא מרשה לנגן מחוץ לאפליקציה שלה. ');
+      const link = document.createElement('a');
+      link.href = v.url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = 'פתח אותו שם';
+      out.appendChild(link);
+      out.append('.');
+      frame.appendChild(out);
+
       card.appendChild(frame);
       play.textContent = 'סגור';
     };
     acts.appendChild(play);
   }
+
+  const why = embed ? null : embedBlocked(v.url);
 
   const edit = document.createElement('button');
   edit.type = 'button';
@@ -328,6 +347,12 @@ function videoCard(v, repaint) {
   acts.appendChild(del);
 
   body.appendChild(acts);
+  if (why) {
+    const note = document.createElement('p');
+    note.className = 'vwhy';
+    note.textContent = why;
+    body.appendChild(note);
+  }
   card.append(thumb, body);
   return card;
 }
