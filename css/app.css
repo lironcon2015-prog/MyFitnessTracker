@@ -298,3 +298,114 @@ h2 .term{color:inherit;border-bottom-width:2px}
 #q-result li{position:relative;padding:0 22px 0 0;margin-bottom:9px;font-size:15.5px}
 #q-result li::before{content:'';position:absolute;right:0;top:.62em;width:9px;height:1.5px;background:var(--pink)}
 #q-result a{color:var(--ink);text-decoration-color:var(--hair);text-underline-offset:3px}
+
+/* ===== ספריית הסרטונים =====
+   אותו נייר ואותם צבעים כמו החוברות. הכניסה היא כפתור בתחתית מסך הבית,
+   כדי שהחוברות יישארו הדבר הראשון שרואים. */
+#videosgo{width:100%;margin-top:16px;font-family:'Heebo',sans-serif;font-weight:700;font-size:14px;
+  padding:13px;border:1px solid var(--hair);background:rgba(255,255,255,.32);color:var(--ink);cursor:pointer}
+#videosgo:active{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+#videosgo:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
+#videosn{color:var(--pink);font-weight:900}
+#videosgo:active #videosn{color:var(--paper)}
+
+#videos h1{margin-top:14px}
+#videos .lede{margin-bottom:4px}
+
+/* --- טופס ההוספה --- */
+.vform{margin-top:22px;border:1px solid var(--hair);background:rgba(255,255,255,.32);padding:0}
+.vform>summary{font-family:'Heebo',sans-serif;font-weight:700;font-size:14px;padding:13px 16px;
+  cursor:pointer;list-style:none;display:flex;align-items:center;gap:9px}
+.vform>summary::-webkit-details-marker{display:none}
+.vform>summary::before{content:'＋';font-size:17px;color:var(--pink);line-height:1}
+.vform[open]>summary::before{content:'–'}
+.vform>summary:focus-visible{outline:2px solid var(--pink);outline-offset:-2px}
+.vform form{padding:0 16px 16px}
+.vform label{display:block;font-family:'Heebo',sans-serif;font-weight:700;font-size:12px;
+  letter-spacing:.1em;color:var(--ink-soft);margin:14px 0 6px}
+.vform label em{font-style:normal;font-weight:400;letter-spacing:0;opacity:.7}
+.vform input,.vform select,.vform textarea{width:100%;font:inherit;font-size:15px;color:var(--ink);
+  background:rgba(255,255,255,.62);border:1px solid var(--hair);padding:11px 12px;min-height:46px}
+.vform textarea{min-height:0;resize:vertical;line-height:1.5}
+.vform input:focus,.vform select:focus,.vform textarea:focus{outline:2px solid var(--pink);outline-offset:-1px}
+.vform input[type="url"]{direction:ltr;text-align:left}
+.vurl{display:flex;gap:8px}
+.vurl input{flex:1;min-width:0}
+#v-paste{flex:0 0 auto;font-family:'Heebo',sans-serif;font-weight:700;font-size:13px;padding:0 15px;
+  border:1px solid var(--hair);background:transparent;color:var(--ink);cursor:pointer;min-height:46px}
+#v-paste:active{background:var(--ink);color:var(--paper)}
+#v-newcat{margin-top:8px}
+.verror{margin:12px 0 0;font-size:13px;color:var(--pink);border-right:2px solid var(--pink);padding-right:9px}
+.vsubmit{display:flex;gap:8px;margin-top:16px}
+#v-save{flex:1;font-family:'Heebo',sans-serif;font-weight:700;font-size:14.5px;padding:13px;
+  border:1.5px solid var(--pink);background:var(--pink);color:var(--paper);cursor:pointer}
+#v-save:active{opacity:.82}
+#v-cancel{font-family:'Heebo',sans-serif;font-weight:700;font-size:13px;padding:13px 16px;
+  border:1px solid var(--hair);background:transparent;color:var(--ink-soft);cursor:pointer}
+#v-save:focus-visible,#v-cancel:focus-visible,#v-paste:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+
+/* --- סינון וניהול כותרות --- */
+#v-chips .chip .chipn{font-size:11.5px;opacity:.7}
+.vmanage{margin-top:12px;background:none;border:none;color:var(--ink-soft);font-family:'Heebo',sans-serif;
+  font-weight:700;font-size:12px;letter-spacing:.1em;padding:6px 0;cursor:pointer;text-decoration:underline}
+.vmanage:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
+.cats{margin-top:8px;border:1px solid var(--hair);background:rgba(255,255,255,.32);padding:12px 14px}
+.catrow{display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:1px solid var(--hair)}
+.catname{flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.catn{font-family:'Heebo',sans-serif;font-weight:700;font-size:11px;letter-spacing:.08em;color:var(--ink-soft)}
+.catrow button{font-family:'Heebo',sans-serif;font-weight:700;font-size:12px;padding:8px 10px;
+  border:1px solid var(--hair);background:transparent;color:var(--ink);cursor:pointer}
+.catrow button.danger{color:var(--pink);border-color:rgba(229,50,111,.4)}
+.catrow button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
+.catadd{display:flex;gap:8px;margin-top:12px}
+.catadd input{flex:1;min-width:0;font:inherit;font-size:14.5px;background:rgba(255,255,255,.62);
+  border:1px solid var(--hair);padding:10px 12px;color:var(--ink)}
+.catadd button{font-family:'Heebo',sans-serif;font-weight:700;font-size:12.5px;padding:10px 13px;
+  border:1px solid var(--ink);background:transparent;color:var(--ink);cursor:pointer;white-space:nowrap}
+
+/* --- הסרטונים עצמם --- */
+.vlist{margin-top:18px;display:grid;gap:12px}
+.vempty{margin:0;padding:20px 16px;border:1px dashed var(--hair);text-align:center;
+  font-size:13.5px;color:var(--ink-soft)}
+.vcard{border:1px solid var(--hair);background:rgba(255,255,255,.32);padding:12px;
+  display:grid;grid-template-columns:96px 1fr;gap:12px;align-items:start}
+.vthumb{width:96px;aspect-ratio:16/10;border:1px solid var(--hair);background:rgba(255,255,255,.4);
+  overflow:hidden;display:flex;align-items:center;justify-content:center;
+  font-family:'Heebo',sans-serif;font-weight:700;font-size:11.5px;letter-spacing:.08em;color:var(--ink-soft)}
+.vthumb img{width:100%;height:100%;object-fit:cover;display:block}
+.vthumb.p-youtube{background:rgba(229,50,111,.09)}
+.vthumb.p-instagram{background:rgba(229,50,111,.13)}
+.vthumb.p-facebook,.vthumb.p-x{background:rgba(31,79,168,.11)}
+.vthumb.p-tiktok{background:rgba(23,33,31,.08)}
+.vbody{min-width:0}
+.vmeta{display:flex;align-items:center;flex-wrap:wrap;gap:7px;font-family:'Heebo',sans-serif;
+  font-weight:700;font-size:11px;letter-spacing:.14em;color:var(--pink);margin-bottom:5px}
+.vtag{padding:2px 7px;background:rgba(31,79,168,.1);color:var(--blue);letter-spacing:.06em}
+.vwhen{color:var(--ink-soft);letter-spacing:.06em;font-weight:400}
+.vcard h3{font-family:'Suez One',serif;font-weight:400;font-size:18px;line-height:1.2;margin:0;
+  overflow-wrap:anywhere}
+.vnote{margin:7px 0 0;font-size:13.5px;line-height:1.5;color:var(--ink-soft)}
+.vacts{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}
+.vacts a,.vacts button{font-family:'Heebo',sans-serif;font-weight:700;font-size:12.5px;padding:9px 13px;
+  border:1px solid var(--hair);background:transparent;color:var(--ink);cursor:pointer;text-decoration:none;
+  min-height:38px;display:inline-flex;align-items:center}
+.vacts .vopen{border-color:var(--blue);color:var(--blue)}
+.vacts .vplay{border-color:var(--pink);color:var(--pink)}
+/* פתח ונגן הם הפעולות; ערוך ומחק הם תחזוקה ולכן הם טקסט בלבד —
+   כך כל השורה נכנסת בשורה אחת גם במסך צר */
+.vacts .vedit,.vacts .vdel{border-color:transparent;color:var(--ink-soft);padding:9px 6px;
+  text-decoration:underline}
+.vacts .vedit:active,.vacts .vdel:active{background:transparent;color:var(--ink);border-color:transparent}
+.vacts a:active,.vacts button:active{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.vacts a:focus-visible,.vacts button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
+/* הנגן נטען רק בלחיצה, ולכן הוא יושב מתחת לכרטיס ותופס את כל רוחבו */
+.vframe{grid-column:1 / -1;margin-top:10px;border:1px solid var(--hair);background:var(--ink);
+  aspect-ratio:16/9}
+/* רילס וטיקטוק הם לאורך — מסגרת רחבה הייתה משאירה שתי רצועות שחורות */
+.vframe.p-instagram,.vframe.p-tiktok{aspect-ratio:9/14;max-width:340px;margin-inline:auto;background:var(--paper)}
+.vframe iframe{width:100%;height:100%;border:0;display:block}
+
+@media (max-width:380px){
+  .vcard{grid-template-columns:72px 1fr;gap:10px}
+  .vthumb{width:72px}
+}

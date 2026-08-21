@@ -32,6 +32,8 @@
 
     <div class="cards" id="cards"></div>
 
+    <button id="videosgo" type="button">ספריית הסרטונים<span id="videosn"></span></button>
+
     <p class="foot"><span id="lib-foot"></span><span class="ver" id="lib-ver"></span></p>
   </section>
 
@@ -123,6 +125,52 @@
     </div>
 
     <div id="q-result" hidden></div>
+  </section>
+
+  <!-- ===== מסך ספריית הסרטונים ===== -->
+  <section id="videos" hidden>
+    <a class="back" href="#/" id="v-back">חזרה לחוברות ←</a>
+
+    <div class="eyebrow">סרטונים ששווה לראות שוב</div>
+    <h1>ספריית הסרטונים</h1>
+    <p class="lede">מדביקים קישור מיוטיוב, אינסטגרם, פייסבוק או טיקטוק, ובוחרים כותרת. הסרטונים נשמרים על המכשיר הזה.</p>
+
+    <details class="vform" id="v-form">
+      <summary id="v-formtitle">הוסף סרטון</summary>
+      <form id="v-formel" novalidate>
+        <label for="v-url">הקישור לסרטון</label>
+        <div class="vurl">
+          <input type="url" id="v-url" inputmode="url" autocomplete="off"
+                 placeholder="https://www.instagram.com/reel/…">
+          <button type="button" id="v-paste">הדבק</button>
+        </div>
+
+        <label for="v-title">שם הסרטון <em>לא חובה</em></label>
+        <input type="text" id="v-title" autocomplete="off" placeholder="למשל: מסירה ראשונה מתחת ללחץ">
+
+        <label for="v-cat">כותרת</label>
+        <select id="v-cat"></select>
+        <input type="text" id="v-newcat" hidden autocomplete="off" placeholder="שם הכותרת החדשה">
+
+        <label for="v-note">מה לשים לב בו <em>לא חובה</em></label>
+        <textarea id="v-note" rows="2" placeholder="שורה אחת שתזכיר לך למה שמרת אותו"></textarea>
+
+        <p class="verror" id="v-error" hidden></p>
+        <div class="vsubmit">
+          <button type="submit" id="v-save">הוסף לספרייה</button>
+          <button type="button" id="v-cancel" hidden>בטל</button>
+        </div>
+      </form>
+    </details>
+
+    <div class="rail"><div class="chips" id="v-chips" role="tablist"></div></div>
+
+    <button class="vmanage" id="v-managego" type="button" aria-expanded="false">נהל כותרות</button>
+    <div class="cats" id="v-manage" hidden></div>
+
+    <div class="vlist" id="v-list"></div>
+
+    <p class="foot">הסרטונים נשמרים על המכשיר הזה בלבד. הקישורים לא מועלים לשום מקום, והצפייה עצמה נעשית בפלטפורמה שממנה הגיע הסרטון.</p>
   </section>
 
 </div>
