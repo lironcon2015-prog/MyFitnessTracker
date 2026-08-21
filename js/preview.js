@@ -38,7 +38,9 @@ const PROVIDERS = [
       return {
         full: d.url || null,
         title: d.title || null,
-        image: (d.image && d.image.url) || (d.logo && d.logo.url) || null
+        image: (d.image && d.image.url) || (d.logo && d.logo.url) || null,
+        /* הקובץ עצמו. זה מה שמאפשר לנגן בלי הנגן של פייסבוק. */
+        media: (d.video && d.video.url) || null
       };
     }
   },
@@ -52,7 +54,8 @@ const PROVIDERS = [
         /* הכותרת של הקורא היא השורה הראשונה, והכתובת הסופית מגיעה אחריה */
         full: line(/^URL Source:\s*(\S+)/m),
         title: line(/^Title:\s*(.+)$/m),
-        image: line(/!\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/)
+        image: line(/!\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/),
+        media: line(/(https?:\/\/[^\s")]+\.mp4[^\s")]*)/)
       };
     }
   },
@@ -83,36 +86,55 @@ export function needsResolve(url) {
 
 /** מה שידוע על הקישור. השדות שלא נמצאו חוזרים null, והשאר עדיין שימושי. */
 export async function lookup(url) {
-  const out = { full: null, title: null, image: thumbUrl(url), log: [] };
+  const out = { full: null, title: null, image: thumbUrl(url), media: null, log: [] };
   const wantFull = needsResolve(url);
-  const until = Date.now() + BUDGET;
+  /* media הוא מה שבאמת מנגן, ולכן הוא זה שקובע אם מספיק. כתובת מלאה
+     נחוצה רק כשאין קובץ ונופלים לנגן של הפלטפורמה. */
+  const enough = () => out.media && out.title && out.image;
 
-  for (const provider of PROVIDERS) {
-    /* יש כבר כל מה שצריך — אין סיבה להעיר עוד שירות */
-    if (out.image && (!wantFull || out.full) && out.title) break;
-    if (Date.now() >= until) { out.log.push('נגמר הזמן — לא נוסו כל השירותים'); break; }
-    try {
-      const res = await withTimeout(provider.build(url));
-      if (!res.ok) { out.log.push(provider.id + ': ' + res.status); continue; }
-      const got = await provider.read(res);
-
-      /* כתובת מתקבלת רק אם הנגן באמת יודע לפתוח אותה, אחרת החלפנו קישור
-         תקין באחר שגם הוא לא ינוגן */
-      if (!out.full && got.full) {
-        const clean = normalizeUrl(unwrap(got.full));
-        if (clean && embedUrl(clean)) out.full = clean;
-      }
-      if (!out.title && got.title) out.title = clean_title(got.title);
-      if (!out.image && got.image) out.image = normalizeUrl(got.image);
-
-      out.log.push(provider.id + ': ' +
-        [out.full ? 'כתובת' : '', out.title ? 'שם' : '', out.image ? 'תמונה' : '']
-          .filter(Boolean).join(' + ') || 'בלי כלום');
-    } catch (e) {
-      out.log.push(provider.id + ': ' + reason(e));
-    }
+  /* הספק הראשון לבדו, כי בדרך כלל הוא מספיק — ואז יצאה בקשה אחת בלבד.
+     רק אם הוא לא סגר את העניין, נשלחים השאר, וביחד ולא בזה אחר זה:
+     בטור, שני ספקים תקועים אכלו שש-עשרה שניות לפני שהשלישי בכלל התחיל. */
+  await Promise.all([visit(PROVIDERS[0], url, out)]);
+  if (!enough() && !(out.media && !wantFull)) {
+    const rest = PROVIDERS.slice(1).map(p => visit(p, url, out));
+    await Promise.race([
+      Promise.all(rest),
+      new Promise(resolve => setTimeout(() => { out.log.push('נגמר הזמן'); resolve(); }, BUDGET))
+    ]);
   }
   return out;
+}
+
+/** רק הקובץ, לרענון לפני ניגון — כתובת של קובץ בפייסבוק פגה אחרי שעות */
+export async function refreshMedia(url) {
+  const found = await lookup(url);
+  return { media: found.media, full: found.full, log: found.log };
+}
+
+async function visit(provider, url, out) {
+  try {
+    const res = await withTimeout(provider.build(url));
+    if (!res.ok) { out.log.push(provider.id + ': ' + res.status); return; }
+    const got = await provider.read(res);
+
+    /* כתובת מתקבלת רק אם הנגן באמת יודע לפתוח אותה, אחרת החלפנו קישור
+       תקין באחר שגם הוא לא ינוגן */
+    if (!out.full && got.full) {
+      const clean = normalizeUrl(unwrap(got.full));
+      if (clean && embedUrl(clean)) out.full = clean;
+    }
+    if (!out.media && got.media) out.media = normalizeUrl(got.media);
+    if (!out.title && got.title) out.title = clean_title(got.title);
+    if (!out.image && got.image) out.image = normalizeUrl(got.image);
+
+    out.log.push(provider.id + ': ' + ([
+      out.media ? 'קובץ' : '', out.full ? 'כתובת' : '',
+      out.title ? 'שם' : '', out.image ? 'תמונה' : ''
+    ].filter(Boolean).join(' + ') || 'בלי כלום'));
+  } catch (e) {
+    out.log.push(provider.id + ': ' + reason(e));
+  }
 }
 
 /* נוסח השגיאה עצמו, ולא "לא נגיש" סתמי. כשארבעה ספקים נופלים באותה
@@ -160,7 +182,9 @@ function fromHtml(html) {
   return {
     full: pick(['og:url']) || (canonical && decode(canonical[1])) || (loose && decode(loose[1])) || null,
     title: pick(['og:title', 'twitter:title']),
-    image: pick(['og:image', 'og:image:secure_url', 'twitter:image'])
+    image: pick(['og:image', 'og:image:secure_url', 'twitter:image']),
+    /* הקובץ עצמו, כפי שהדף מצהיר עליו */
+    media: pick(['og:video:secure_url', 'og:video:url', 'og:video', 'twitter:player:stream'])
   };
 }
 

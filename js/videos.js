@@ -131,7 +131,7 @@ export function getVideo(id) {
 }
 
 /** null אם הקישור אינו כתובת http/https תקינה */
-export function addVideo({ url, title, note, category, full, poster }) {
+export function addVideo({ url, title, note, category, full, poster, media }) {
   const clean = normalizeUrl(url);
   if (!clean) return null;
   const video = {
@@ -142,6 +142,11 @@ export function addVideo({ url, title, note, category, full, poster }) {
     full: full ? normalizeUrl(full) : null,
     /* התמונה שמוצגת בכרטיס — תמונה שמורה או כתובת, ראה cachePoster */
     poster: poster || null,
+    /* קובץ הווידאו עצמו, כפי שהדף של הסרטון מצהיר עליו. זה מה שמנוגן,
+       ולכן אין תלות בנגן של הפלטפורמה. הכתובת חתומה ופגה אחרי שעות,
+       ולכן נשמר גם מתי — ראה mediaFresh. */
+    media: media || null,
+    mediaAt: media ? now() : 0,
     platform: detectPlatform(clean).id,
     title: String(title || '').trim() || defaultTitle(clean),
     note: String(note || '').trim(),
@@ -161,12 +166,16 @@ export function updateVideo(id, patch) {
     const clean = normalizeUrl(patch.url);
     if (!clean) return null;
     /* כתובת חדשה מבטלת פתיחה קודמת — היא שייכת לקישור הישן */
-    if (clean !== video.url) { video.full = null; video.poster = null; }
+    if (clean !== video.url) { video.full = null; video.poster = null; video.media = null; }
     video.url = clean;
     video.platform = detectPlatform(clean).id;
   }
   if (patch.full !== undefined) video.full = patch.full ? normalizeUrl(patch.full) : null;
   if (patch.poster !== undefined) video.poster = patch.poster || null;
+  if (patch.media !== undefined) {
+    video.media = patch.media || null;
+    video.mediaAt = patch.media ? now() : 0;
+  }
   if (patch.title !== undefined) video.title = String(patch.title).trim() || defaultTitle(video.url);
   if (patch.note !== undefined) video.note = String(patch.note).trim();
   if (patch.category !== undefined) video.category = patch.category || null;
@@ -287,7 +296,7 @@ export function embedUrl(url) {
        ולכן במקרים האלה עדיף בלי כפתור ניגון מאשר עם מסך שחור. */
     if (u.hostname.endsWith('fb.watch')) return null;
     if (/^\/share\//.test(u.pathname)) return null;
-    const known = /\/videos\/\d+/.test(u.pathname)
+    const known = /\/videos\//.test(u.pathname)
       || /\/reel\/\d+/.test(u.pathname)
       || /\/posts\//.test(u.pathname)
       || u.pathname.startsWith('/watch')
@@ -300,6 +309,14 @@ export function embedUrl(url) {
     return m ? 'https://www.tiktok.com/embed/v2/' + m[1] : null;
   }
   return null;
+}
+
+/* כתובת של קובץ בפייסבוק ובאינסטגרם חתומה ופגה. שלוש שעות הן הערכה
+   שמרנית: מעבר להן מרעננים לפני הניגון במקום להראות נגן שנופל. */
+const MEDIA_TTL = 3 * 60 * 60 * 1000;
+
+export function mediaFresh(video) {
+  return !!(video.media && Date.now() - (video.mediaAt || 0) < MEDIA_TTL);
 }
 
 /** התמונה של הכרטיס: מה שנשמר, ואם אין — התמונה שיוטיוב נותנת מהכתובת */
