@@ -41,7 +41,19 @@ function save() {
   doc.updatedAt = now();
   try {
     localStorage.setItem(KEY, JSON.stringify(doc));
-  } catch (e) { /* אחסון מלא — ממשיכים בלי לשמור */ }
+  } catch (e) {
+    /* התמונות השמורות הן כמעט כל המשקל, והן גם הדבר היחיד כאן שאפשר
+       לוותר עליו בלי לאבד מידע: הכתובת נשארת והתמונה תיבנה מחדש. זורקים
+       את הישנות ומנסים שוב, כדי ששמירה לא תיכשל בשקט. */
+    const withPoster = doc.videos.filter(v => v.poster).sort((a, b) => a.at - b.at);
+    for (const video of withPoster) {
+      video.poster = null;
+      try {
+        localStorage.setItem(KEY, JSON.stringify(doc));
+        return doc;
+      } catch (e2) { /* עוד לא נכנס — מוותרים על עוד תמונה */ }
+    }
+  }
   return doc;
 }
 
@@ -119,7 +131,7 @@ export function getVideo(id) {
 }
 
 /** null אם הקישור אינו כתובת http/https תקינה */
-export function addVideo({ url, title, note, category, full }) {
+export function addVideo({ url, title, note, category, full, poster }) {
   const clean = normalizeUrl(url);
   if (!clean) return null;
   const video = {
@@ -128,6 +140,8 @@ export function addVideo({ url, title, note, category, full }) {
     /* הכתובת המלאה שנפתחה מקישור מקוצר. הקישור המקורי נשמר כמו שהוא, כי
        הוא מה שהילד יראה ב"פתח" והוא עובד; full משמש רק לנגן המשובץ. */
     full: full ? normalizeUrl(full) : null,
+    /* התמונה שמוצגת בכרטיס — תמונה שמורה או כתובת, ראה cachePoster */
+    poster: poster || null,
     platform: detectPlatform(clean).id,
     title: String(title || '').trim() || defaultTitle(clean),
     note: String(note || '').trim(),
@@ -147,11 +161,12 @@ export function updateVideo(id, patch) {
     const clean = normalizeUrl(patch.url);
     if (!clean) return null;
     /* כתובת חדשה מבטלת פתיחה קודמת — היא שייכת לקישור הישן */
-    if (clean !== video.url) video.full = null;
+    if (clean !== video.url) { video.full = null; video.poster = null; }
     video.url = clean;
     video.platform = detectPlatform(clean).id;
   }
   if (patch.full !== undefined) video.full = patch.full ? normalizeUrl(patch.full) : null;
+  if (patch.poster !== undefined) video.poster = patch.poster || null;
   if (patch.title !== undefined) video.title = String(patch.title).trim() || defaultTitle(video.url);
   if (patch.note !== undefined) video.note = String(patch.note).trim();
   if (patch.category !== undefined) video.category = patch.category || null;
@@ -285,6 +300,11 @@ export function embedUrl(url) {
     return m ? 'https://www.tiktok.com/embed/v2/' + m[1] : null;
   }
   return null;
+}
+
+/** התמונה של הכרטיס: מה שנשמר, ואם אין — התמונה שיוטיוב נותנת מהכתובת */
+export function posterOf(video) {
+  return video.poster || thumbUrl(video.full || video.url);
 }
 
 /** הכתובת שהנגן מקבל: המלאה אם נפתחה, אחרת המקורית */
