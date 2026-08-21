@@ -8,11 +8,14 @@ import {
   listCategories, addCategory, renameCategory, removeCategory, countByCategory,
   listVideos, addVideo, updateVideo, removeVideo, categoryName,
   detectPlatform, platformName, embedUrl, embedBlocked, isPortrait, playable, posterOf,
-  thumbUrl, normalizeUrl, videoCount
+  mediaFresh, thumbUrl, normalizeUrl, videoCount
 } from './videos.js';
-import { needsResolve, lookup, cachePoster, probe } from './preview.js';
+import { needsResolve, lookup, refreshMedia, cachePoster, probe } from './preview.js';
 
 const $ = id => document.getElementById(id);
+
+/* פלטפורמות שהדף שלהן מצהיר על קובץ וידאו או ניתן לשיבוץ */
+const FETCHABLE = new Set(['facebook', 'instagram', 'tiktok', 'youtube', 'x', 'vimeo']);
 
 /* האם למשוך תצוגה מקדימה מהרשת */
 const AUTO_KEY = 'k8:videos:auto';
@@ -289,59 +292,138 @@ function videoCard(v, repaint) {
   open.textContent = 'פתח';
   acts.appendChild(open);
 
-  /* השיבוץ נטען רק בלחיצה — אחרת כל גלילה בספרייה הייתה מושכת נגנים */
+  /* הנגן נטען רק בלחיצה — אחרת כל גלילה בספרייה הייתה מושכת נגנים.
+     סדר הניסיונות: קודם קובץ הווידאו עצמו בנגן שלנו, ורק אם אין —
+     הנגן המשובץ של הפלטפורמה. הקובץ עדיף בכל מובן: הוא מתנגן בלי
+     אפליקציה ובלי חשבון, אין לו דעה על קישור מקוצר, והגודל והמיקום
+     שלו בידינו. */
   const embed = embedUrl(playable(v));
-  if (embed) {
+  const canFetch = autoOn() && FETCHABLE.has(v.platform);
+  if (v.media || embed || canFetch) {
     const play = document.createElement('button');
     play.type = 'button';
     play.className = 'vplay';
     play.textContent = 'נגן כאן';
-    play.onclick = () => {
-      if (card.querySelector('.vframe')) {
-        card.querySelector('.vframe').remove();
-        card.classList.remove('playing');
-        play.textContent = 'נגן כאן';
-        return;
-      }
+
+    const close = () => {
+      const open = card.querySelector('.vframe');
+      if (open) open.remove();
+      card.classList.remove('playing');
+      play.textContent = 'נגן כאן';
+    };
+
+    const frameFor = node => {
       const frame = document.createElement('div');
       frame.className = 'vframe' + (isPortrait(playable(v)) ? ' tall' : '');
-      const f = document.createElement('iframe');
-      f.src = embed;
-      f.title = v.title;
-      f.loading = 'lazy';
-      f.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
-      f.allowFullscreen = true;
-      f.referrerPolicy = 'strict-origin-when-cross-origin';
-      frame.appendChild(f);
+      frame.appendChild(node);
 
-      /* מה שקורה בתוך המסגרת שייך לפייסבוק או לאינסטגרם, והדף לא יכול
-         לקרוא אותו — גם לא כדי לדעת שהוצג "Video unavailable". לכן דרך
-         היציאה כתובה מראש מתחת לנגן, ולא מחכה לזיהוי שאי אפשר לעשות. */
+      /* מה שקורה בתוך נגן משובץ שייך לפייסבוק, והדף אינו יכול לקרוא
+         אותו — גם לא כדי לדעת שהוצג "Video unavailable". לכן דרך
+         היציאה כתובה מראש ולא מחכה לזיהוי שאי אפשר לעשות. */
       const out = document.createElement('p');
       out.className = 'vout';
-      out.append('לא נטען? יש סרטונים שהפלטפורמה לא מרשה לנגן מחוץ לאפליקציה שלה. ');
+      out.append('לא נטען? ');
       const link = document.createElement('a');
       link.href = v.url;
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
-      link.textContent = 'פתח אותו שם';
+      link.textContent = 'פתח אותו בפלטפורמה';
       out.appendChild(link);
       out.append('.');
       frame.appendChild(out);
 
-      /* בראש הכרטיס ולא בסופו: כשהנגן נפתח מתחת לכפתורים ולהערה, הוא
-         נוחת מתחת לקצה המסך וצריך לגלול כדי בכלל לראות אותו. */
+      /* בראש הכרטיס ולא בסופו: מתחת לכפתורים ולהערה הוא נוחת מתחת
+         לקצה המסך וצריך לגלול כדי בכלל לראות אותו. */
       card.insertBefore(frame, card.firstChild);
-      /* התמונה יורדת בזמן הניגון: היא אותו סרטון, והיא רק דוחפת את
-         הטקסט למטה בזמן שהנגן כבר תופס את המקום */
       card.classList.add('playing');
       frame.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      play.textContent = 'סגור';
+      return frame;
+    };
+
+    const showFile = src => {
+      const el = document.createElement('video');
+      el.src = src;
+      el.controls = true;
+      el.playsInline = true;
+      el.preload = 'metadata';
+      el.autoplay = true;
+      const still = posterOf(v);
+      if (still) el.poster = still;
+      /* כתובת חתומה שפגה בינתיים — מרעננים פעם אחת ומנסים שוב, ורק
+         אחר כך נופלים לנגן המשובץ */
+      let retried = false;
+      el.onerror = async () => {
+        if (retried) { fallback(); return; }
+        retried = true;
+        const fresh = await refreshMedia(v.url);
+        /* אותה כתובת בדיוק תיכשל שוב — אין טעם בסיבוב נוסף */
+        if (fresh.media && fresh.media !== src) {
+          updateVideo(v.id, { media: fresh.media });
+          el.src = fresh.media;
+          el.load();
+          return;
+        }
+        fallback();
+      };
+      frameFor(el);
+    };
+
+    const showEmbed = src => {
+      const el = document.createElement('iframe');
+      el.src = src;
+      el.title = v.title;
+      el.loading = 'lazy';
+      el.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+      el.allowFullscreen = true;
+      el.referrerPolicy = 'strict-origin-when-cross-origin';
+      frameFor(el);
+    };
+
+    /* כישלון אינו נעילה: תקלת רשת רגעית לא צריכה להשאיר כפתור מת עד
+       שמרעננים את הדף. הכפתור חוזר להיות לחיץ ומזמין ניסיון נוסף. */
+    const fallback = () => {
+      close();
+      if (embed) { showEmbed(embed); return; }
+      play.disabled = false;
+      play.textContent = 'לא נטען — נסה שוב';
+    };
+
+    play.onclick = async () => {
+      if (card.querySelector('.vframe')) { close(); return; }
+
+      if (mediaFresh(v)) { showFile(v.media); return; }
+
+      /* אין קובץ, או שהוא ישן מכדי לסמוך עליו — מנסים להשיג אחד */
+      let lastLog = [];
+      if (canFetch) {
+        play.disabled = true;
+        play.textContent = 'מכין…';
+        const fresh = await refreshMedia(v.url);
+        lastLog = fresh.log;
+        play.disabled = false;
+        play.textContent = 'סגור';
+        if (fresh.media) {
+          updateVideo(v.id, { media: fresh.media, full: fresh.full || undefined });
+          v.media = fresh.media;
+          showFile(fresh.media);
+          return;
+        }
+        if (fresh.full && !embed) {
+          updateVideo(v.id, { full: fresh.full });
+          showEmbed(embedUrl(fresh.full));
+          return;
+        }
+      }
+      if (embed) { showEmbed(embed); return; }
+      if (v.media) { showFile(v.media); return; }
+      play.textContent = 'לא נטען — נסה שוב';
+      /* הדיווח נכתב פעם אחת, גם אם לוחצים שוב ושוב */
+      if (!body.querySelector('.vlog')) body.appendChild(report(lastLog));
     };
     acts.appendChild(play);
   }
 
-  const why = embed ? null : embedBlocked(playable(v));
+  const why = (embed || v.media || canFetch) ? null : embedBlocked(playable(v));
 
   const edit = document.createElement('button');
   edit.type = 'button';
@@ -493,6 +575,8 @@ export function mountVideos(prefill) {
       const found = await lookup(normalizeUrl(url));
       log = found.log;
       if (found.full) fields.full = found.full;
+      /* הקובץ נשמר כבר עכשיו, כדי שהלחיצה על "נגן" תהיה מיידית */
+      if (found.media) fields.media = found.media;
       /* שם שהוקלד ידנית מנצח את מה שהפלטפורמה קוראת לסרטון */
       if (found.title && !fields.title) fields.title = found.title;
       fields.poster = await cachePoster(found.image);
