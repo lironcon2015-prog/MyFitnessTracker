@@ -410,11 +410,10 @@ h2 .term{color:inherit;border-bottom-width:2px}
 /* רילס וטיקטוק הם לאורך — מסגרת רחבה הייתה משאירה שתי רצועות שחורות */
 .vframe.tall{max-width:340px;margin-inline:auto;background:var(--paper)}
 .vframe.tall iframe{aspect-ratio:9/14}
-.vframe iframe,.vframe video{width:100%;aspect-ratio:16/9;border:0;display:block;background:#000}
-.vframe.tall video{aspect-ratio:9/14}
-/* וידאו לאורך אינו ממלא מסגרת רחבה, ולהיפך — contain שומר על הפריים
-   שלם במקום לחתוך ממנו */
-.vframe video{object-fit:contain}
+.vframe iframe{width:100%;aspect-ratio:16/9;border:0;display:block;background:#000}
+/* הווידאו שומר על הצורה שלו במקום להידחס למסגרת קבועה: כך כפתור הניגון
+   שהדפדפן מצייר יושב במרכז הסרטון, ולא במרכז קופסה עם פסים שחורים. */
+.vframe video{width:100%;height:auto;max-height:72vh;border:0;display:block;background:#000}
 /* דרך היציאה כשהפלטפורמה מסרבת לנגן — הדף לא יכול לדעת שזה קרה */
 .vout{margin:0;padding:9px 11px;background:rgba(255,255,255,.42);border-top:1px solid var(--hair);
   font-size:12.5px;line-height:1.5;color:var(--ink-soft)}
