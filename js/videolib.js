@@ -7,9 +7,10 @@
 import {
   listCategories, addCategory, renameCategory, removeCategory, countByCategory,
   listVideos, addVideo, updateVideo, removeVideo, categoryName,
-  detectPlatform, platformName, embedUrl, embedBlocked, isPortrait,
+  detectPlatform, platformName, embedUrl, embedBlocked, isPortrait, playable,
   thumbUrl, normalizeUrl, videoCount
 } from './videos.js';
+import { needsResolve, resolveUrl } from './resolve.js';
 
 const $ = id => document.getElementById(id);
 
@@ -278,7 +279,7 @@ function videoCard(v, repaint) {
   acts.appendChild(open);
 
   /* השיבוץ נטען רק בלחיצה — אחרת כל גלילה בספרייה הייתה מושכת נגנים */
-  const embed = embedUrl(v.url);
+  const embed = embedUrl(playable(v));
   if (embed) {
     const play = document.createElement('button');
     play.type = 'button';
@@ -291,7 +292,7 @@ function videoCard(v, repaint) {
         return;
       }
       const frame = document.createElement('div');
-      frame.className = 'vframe' + (isPortrait(v.url) ? ' tall' : '');
+      frame.className = 'vframe' + (isPortrait(playable(v)) ? ' tall' : '');
       const f = document.createElement('iframe');
       f.src = embed;
       f.title = v.title;
@@ -322,7 +323,7 @@ function videoCard(v, repaint) {
     acts.appendChild(play);
   }
 
-  const why = embed ? null : embedBlocked(v.url);
+  const why = embed ? null : embedBlocked(playable(v));
 
   const edit = document.createElement('button');
   edit.type = 'button';
@@ -351,6 +352,24 @@ function videoCard(v, repaint) {
     const note = document.createElement('p');
     note.className = 'vwhy';
     note.textContent = why;
+    /* קישור שנשמר לפני שהפותח היה קיים, או שהפתיחה נכשלה אז — כאן אפשר
+       לנסות שוב בלי למחוק ולהוסיף מחדש */
+    if (needsResolve(v.url)) {
+      const retry = document.createElement('button');
+      retry.type = 'button';
+      retry.className = 'vretry';
+      retry.textContent = 'נסה לפתוח את הקישור';
+      retry.onclick = async () => {
+        retry.disabled = true;
+        retry.textContent = 'פותח…';
+        const full = await resolveUrl(v.url);
+        if (full) { updateVideo(v.id, { full }); repaint(); return; }
+        retry.disabled = false;
+        retry.textContent = 'לא הצלחנו — נסה שוב';
+      };
+      note.append(' ');
+      note.appendChild(retry);
+    }
     body.appendChild(note);
   }
   card.append(thumb, body);
@@ -395,7 +414,7 @@ export function mountVideos(prefill) {
   };
   $('v-paste').addEventListener('click', onPaste);
 
-  const onSubmit = e => {
+  const onSubmit = async e => {
     e.preventDefault();
     const url = $('v-url').value;
     if (!normalizeUrl(url)) {
@@ -414,6 +433,18 @@ export function mountVideos(prefill) {
       note: $('v-note').value,
       category: category || null
     };
+
+    /* קישור מקוצר נפתח לפני השמירה, כדי שהפנייה החוצה תקרה פעם אחת.
+       הכפתור מדווח, כי זו השהיה של שנייה-שתיים שהמשתמש רואה. */
+    if (needsResolve(normalizeUrl(url))) {
+      const label = $('v-save').textContent;
+      $('v-save').disabled = true;
+      $('v-save').textContent = 'פותח את הקישור…';
+      fields.full = await resolveUrl(normalizeUrl(url));
+      $('v-save').disabled = false;
+      $('v-save').textContent = label;
+    }
+
     const saved = editing ? updateVideo(editing, fields) : addVideo(fields);
     if (!saved) { setError('לא הצלחנו לשמור את הקישור.'); return; }
     const wasEditing = !!editing;

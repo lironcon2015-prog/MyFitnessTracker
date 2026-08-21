@@ -15,7 +15,7 @@
 /* שם המטמון נגזר מגרסה אחת, כדי שכל שינוי קוד ינקה גם את מטמון התוכן.
    בלי זה, תוכן שנשמר בגרסה קודמת יכול להגיע לקוד חדש שמצפה למבנה אחר.
    הוספת תרחיש לא נוגעת בקובץ הזה, ולכן היא עדיין לא דורשת העלאת גרסה. */
-const VERSION = 'v18';
+const VERSION = 'v19';
 const SHELL = 'nines-shell-' + VERSION;
 const CONTENT = 'nines-content-' + VERSION;
 
@@ -23,7 +23,7 @@ const ASSETS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/pitch.js', './js/store.js',
   './js/booklet.js', './js/library.js', './js/quiz.js', './js/terms.js',
-  './js/videos.js', './js/videolib.js',
+  './js/videos.js', './js/videolib.js', './js/resolve.js',
   './editor.html', './css/editor.css', './js/editor.js',
   './fonts.css', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/logo.svg',

@@ -408,6 +408,12 @@ h2 .term{color:inherit;border-bottom-width:2px}
 .vout{margin:0;padding:9px 11px;background:rgba(255,255,255,.42);border-top:1px solid var(--hair);
   font-size:12.5px;line-height:1.5;color:var(--ink-soft)}
 .vout a{color:var(--blue);font-weight:600}
+.vabout{margin:16px 0 0;font-size:12px;line-height:1.5;color:var(--ink-soft);
+  border-right:2px solid var(--hair);padding-right:9px}
+.vretry{font:inherit;font-size:12.5px;background:none;border:none;padding:0;cursor:pointer;
+  color:var(--pink);text-decoration:underline}
+.vretry:disabled{color:var(--ink-soft);cursor:default;text-decoration:none}
+.vretry:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
 /* למה אין כאן כפתור ניגון */
 .vwhy{margin:9px 0 0;font-size:12.5px;line-height:1.5;color:var(--ink-soft);
   border-right:2px solid var(--hair);padding-right:9px}
