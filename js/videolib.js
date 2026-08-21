@@ -458,6 +458,31 @@ function videoCard(v, repaint) {
 
 let overlay = null;
 let pushed = false;   // האם הוספנו צעד להיסטוריה עבור השכבה
+let lockedAt = 0;     // המקום שאליו חוזרים אחרי הצפייה
+
+/* נעילת גלילה שעובדת גם באייפון.
+   overflow:hidden על ה-body אינו נועל את סאפרי בטלפון — הדף ממשיך לזוז
+   מתחת לשכבה, ואז גם השכבה עצמה נראית מוזזת וצריך לגלול אליה. הדרך
+   היחידה שעובדת היא לקבע את הדף עצמו: position:fixed עם top שלילי בגובה
+   הגלילה הנוכחית. הדף נשאר בדיוק איפה שהוא נראה, אבל מפסיק להיות ניתן
+   לגלילה — ולכן inset:0 של השכבה נמדד מול מה שבאמת רואים. */
+function lockScroll() {
+  lockedAt = window.scrollY || window.pageYOffset || 0;
+  document.body.style.position = 'fixed';
+  document.body.style.top = -lockedAt + 'px';
+  document.body.style.left = '0';
+  document.body.style.right = '0';
+  document.body.style.width = '100%';
+}
+
+function unlockScroll() {
+  document.body.style.position = '';
+  document.body.style.top = '';
+  document.body.style.left = '';
+  document.body.style.right = '';
+  document.body.style.width = '';
+  window.scrollTo(0, lockedAt);
+}
 
 export function closeOverlay(fromBack) {
   if (!overlay) return;
@@ -466,7 +491,7 @@ export function closeOverlay(fromBack) {
   if (media) { media.pause(); media.removeAttribute('src'); media.load(); }
   overlay.remove();
   overlay = null;
-  document.body.classList.remove('noscroll');
+  unlockScroll();
   document.removeEventListener('keydown', onKey);
   window.removeEventListener('popstate', onBack);
   /* סגירה בכפתור או ב-Escape מוחקת גם את הצעד שהוספנו, אחרת "אחורה"
@@ -523,9 +548,9 @@ function openOverlay(node, video) {
 
   box.append(bar, node, out);
   overlay.appendChild(box);
+  /* הנעילה לפני ההוספה: כך השכבה נמדדת כבר מול דף מקובע */
+  lockScroll();
   document.body.appendChild(overlay);
-  /* נעילת גלילה: בלעדיה הדף שמאחור זז מתחת לאצבע בזמן הצפייה */
-  document.body.classList.add('noscroll');
   document.addEventListener('keydown', onKey);
   try {
     history.pushState({ vplayer: true }, '', location.hash);
