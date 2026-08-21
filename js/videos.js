@@ -37,6 +37,21 @@ function readDoc() {
 
 let doc = readDoc();
 
+/* ניקוי חד-פעמי: גרסאות קודמות שמרו לפעמים תמונה שחורה — בד שצויר לפני
+   שהתמונה פוענחה — ובלי posterUrl לצידה אין דרך להבחין בין תמונה תקינה
+   לפגומה. לכן כל התמונות מאותן גרסאות נזרקות, והן נמשכות מחדש ברקע
+   בפתיחה הבאה של הספרייה. הכתובות עצמן אינן נוגעות. */
+(function purgeLegacyPosters() {
+  let touched = false;
+  doc.videos.forEach(v => {
+    if (v.poster && !v.posterUrl && String(v.poster).startsWith('data:')) {
+      v.poster = null;
+      touched = true;
+    }
+  });
+  if (touched) save();
+})();
+
 function save() {
   doc.updatedAt = now();
   try {
@@ -131,7 +146,7 @@ export function getVideo(id) {
 }
 
 /** null אם הקישור אינו כתובת http/https תקינה */
-export function addVideo({ url, title, note, category, full, poster, media }) {
+export function addVideo({ url, title, note, category, full, poster, posterUrl, media }) {
   const clean = normalizeUrl(url);
   if (!clean) return null;
   const video = {
@@ -140,8 +155,11 @@ export function addVideo({ url, title, note, category, full, poster, media }) {
     /* הכתובת המלאה שנפתחה מקישור מקוצר. הקישור המקורי נשמר כמו שהוא, כי
        הוא מה שהילד יראה ב"פתח" והוא עובד; full משמש רק לנגן המשובץ. */
     full: full ? normalizeUrl(full) : null,
-    /* התמונה שמוצגת בכרטיס — תמונה שמורה או כתובת, ראה cachePoster */
+    /* התמונה שמוצגת בכרטיס — תמונה שמורה, ראה cachePoster */
     poster: poster || null,
+    /* והכתובת המקורית לצידה: אם השמורה יצאה פגומה, או שהאחסון התמלא
+       והיא נזרקה, עדיין יש למה ליפול לפני שמוותרים על תמונה בכלל */
+    posterUrl: posterUrl || null,
     /* קובץ הווידאו עצמו, כפי שהדף של הסרטון מצהיר עליו. זה מה שמנוגן,
        ולכן אין תלות בנגן של הפלטפורמה. הכתובת חתומה ופגה אחרי שעות,
        ולכן נשמר גם מתי — ראה mediaFresh. */
@@ -166,12 +184,15 @@ export function updateVideo(id, patch) {
     const clean = normalizeUrl(patch.url);
     if (!clean) return null;
     /* כתובת חדשה מבטלת פתיחה קודמת — היא שייכת לקישור הישן */
-    if (clean !== video.url) { video.full = null; video.poster = null; video.media = null; }
+    if (clean !== video.url) {
+      video.full = null; video.poster = null; video.posterUrl = null; video.media = null;
+    }
     video.url = clean;
     video.platform = detectPlatform(clean).id;
   }
   if (patch.full !== undefined) video.full = patch.full ? normalizeUrl(patch.full) : null;
   if (patch.poster !== undefined) video.poster = patch.poster || null;
+  if (patch.posterUrl !== undefined) video.posterUrl = patch.posterUrl || null;
   if (patch.media !== undefined) {
     video.media = patch.media || null;
     video.mediaAt = patch.media ? now() : 0;
@@ -319,9 +340,20 @@ export function mediaFresh(video) {
   return !!(video.media && Date.now() - (video.mediaAt || 0) < MEDIA_TTL);
 }
 
-/** התמונה של הכרטיס: מה שנשמר, ואם אין — התמונה שיוטיוב נותנת מהכתובת */
+/** סרטונים שאין להם תמונה כלל — מועמדים להשלמה ברקע */
+export function missingPoster() {
+  return doc.videos.filter(v => !v.poster && !v.posterUrl && !thumbUrl(v.full || v.url));
+}
+
+/** התמונות של הכרטיס לפי סדר עדיפות, כדי שאפשר יהיה ליפול מאחת לבאה */
+export function postersOf(video) {
+  return [video.poster, video.posterUrl, thumbUrl(video.full || video.url)]
+    .filter(Boolean);
+}
+
+/** התמונה המועדפת, לכל מי שרוצה אחת בלבד */
 export function posterOf(video) {
-  return video.poster || thumbUrl(video.full || video.url);
+  return postersOf(video)[0] || null;
 }
 
 /** הכתובת שהנגן מקבל: המלאה אם נפתחה, אחרת המקורית */

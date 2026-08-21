@@ -7,8 +7,8 @@
 import {
   listCategories, addCategory, renameCategory, removeCategory, countByCategory,
   listVideos, addVideo, updateVideo, removeVideo, categoryName,
-  detectPlatform, platformName, embedUrl, embedBlocked, isPortrait, playable, posterOf,
-  mediaFresh, thumbUrl, normalizeUrl, videoCount
+  detectPlatform, platformName, embedUrl, embedBlocked, isPortrait, playable,
+  posterOf, postersOf, missingPoster, thumbUrl, normalizeUrl, videoCount
 } from './videos.js';
 import { needsResolve, lookup, refreshMedia, cachePoster, probe } from './preview.js';
 
@@ -227,8 +227,8 @@ function videoCard(v, repaint) {
   /* התמונה של הסרטון, כמו בתצוגה מקדימה של קישור בוואטסאפ. כשיש תמונה
      הכרטיס נפתח לרוחב והיא יושבת מעל הטקסט; כשאין, נשאר אריח צר עם שם
      הפלטפורמה, כדי שכרטיס בלי תמונה לא ייקח גובה של כרטיס עם תמונה. */
-  const src = posterOf(v);
-  if (src) card.classList.add('wide');
+  const sources = postersOf(v);
+  if (sources.length) card.classList.add('wide');
 
   const thumb = document.createElement('div');
   thumb.className = 'vthumb p-' + v.platform;
@@ -236,14 +236,16 @@ function videoCard(v, repaint) {
     card.classList.remove('wide');
     thumb.textContent = platformName(v.platform);
   };
-  if (src) {
+  if (sources.length) {
     const img = document.createElement('img');
-    img.src = src;
     img.alt = '';
     img.loading = 'lazy';
     img.referrerPolicy = 'no-referrer';
-    /* כתובת תמונה של פייסבוק פגה אחרי זמן — ואז חוזרים לאריח */
-    img.onerror = tile;
+    /* יורדים ברשימה: תמונה שמורה, אחריה הכתובת המקורית, ורק אם גם היא
+       נפלה — האריח. כתובת תמונה של פייסבוק פגה אחרי זמן. */
+    let at = 0;
+    img.onerror = () => { if (++at < sources.length) img.src = sources[at]; else tile(); };
+    img.src = sources[0];
     thumb.appendChild(img);
   } else {
     tile();
@@ -391,9 +393,13 @@ function videoCard(v, repaint) {
     play.onclick = async () => {
       if (card.querySelector('.vframe')) { close(); return; }
 
-      if (mediaFresh(v)) { showFile(v.media); return; }
+      /* מנגנים מיד ממה שכבר יש, בלי לפנות לרשת. קובץ ישן אינו סיבה
+         להמתנה: אם הכתובת שלו פגה, onerror מרענן ומנסה שוב — וזה קורה
+         תוך כדי, במקום להשהות כל לחיצה מראש. */
+      if (v.media) { showFile(v.media); return; }
+      if (embed) { showEmbed(embed); return; }
 
-      /* אין קובץ, או שהוא ישן מכדי לסמוך עליו — מנסים להשיג אחד */
+      /* רק כשאין לנו כלום — אז שווה לחכות */
       let lastLog = [];
       if (canFetch) {
         play.disabled = true;
@@ -408,14 +414,12 @@ function videoCard(v, repaint) {
           showFile(fresh.media);
           return;
         }
-        if (fresh.full && !embed) {
+        if (fresh.full) {
           updateVideo(v.id, { full: fresh.full });
           showEmbed(embedUrl(fresh.full));
           return;
         }
       }
-      if (embed) { showEmbed(embed); return; }
-      if (v.media) { showFile(v.media); return; }
       play.textContent = 'לא נטען — נסה שוב';
       /* הדיווח נכתב פעם אחת, גם אם לוחצים שוב ושוב */
       if (!body.querySelector('.vlog')) body.appendChild(report(lastLog));
@@ -482,6 +486,30 @@ function videoCard(v, repaint) {
   }
   card.append(thumb, body);
   return card;
+}
+
+/* השלמת תמונות חסרות, בשקט וברקע.
+   שלוש בכל פתיחה ולא הכול בבת אחת: ספרייה של שלושים סרטונים בלי תמונות
+   הייתה יורה שלושים בקשות ברגע אחד ונחסמת. אחרי כמה פתיחות הכול מושלם. */
+const BACKFILL = 3;
+
+async function backfillPosters(repaint) {
+  if (!autoOn()) return;
+  const todo = missingPoster().slice(0, BACKFILL);
+  let changed = false;
+  for (const v of todo) {
+    const found = await lookup(v.url);
+    if (!found.image) continue;
+    updateVideo(v.id, {
+      poster: await cachePoster(found.image),
+      posterUrl: found.image,
+      media: found.media || undefined,
+      full: found.full || undefined
+    });
+    changed = true;
+  }
+  /* המסך אולי כבר הוחלף בינתיים — מציירים מחדש רק אם הוא עדיין כאן */
+  if (changed && !$('videos').hidden) repaint();
 }
 
 /* מה כל שירות ענה. לא למשתמש הרגיל — אבל כשמשהו לא עובד בטלפון מסוים
@@ -580,6 +608,7 @@ export function mountVideos(prefill) {
       /* שם שהוקלד ידנית מנצח את מה שהפלטפורמה קוראת לסרטון */
       if (found.title && !fields.title) fields.title = found.title;
       fields.poster = await cachePoster(found.image);
+      fields.posterUrl = found.image || null;
       $('v-save').disabled = false;
       $('v-save').textContent = label;
     }
@@ -631,6 +660,7 @@ export function mountVideos(prefill) {
   $('v-managego').addEventListener('click', onManage);
 
   repaint();
+  backfillPosters(repaint);
   /* בספרייה מלאה הרשימה היא מה שרוצים לראות, ולכן הטופס מקופל. בספרייה
      ריקה, ובקישור שהגיע משיתוף, ההוספה היא כל הסיבה שנכנסת לכאן. */
   $('v-form').open = videoCount() === 0;

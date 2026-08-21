@@ -87,16 +87,18 @@ export function needsResolve(url) {
 /** מה שידוע על הקישור. השדות שלא נמצאו חוזרים null, והשאר עדיין שימושי. */
 export async function lookup(url) {
   const out = { full: null, title: null, image: thumbUrl(url), media: null, log: [] };
-  const wantFull = needsResolve(url);
-  /* media הוא מה שבאמת מנגן, ולכן הוא זה שקובע אם מספיק. כתובת מלאה
-     נחוצה רק כשאין קובץ ונופלים לנגן של הפלטפורמה. */
-  const enough = () => out.media && out.title && out.image;
+  /* מתי אפשר להפסיק: יש שם, יש תמונה, ויש **דרך אחת** לנגן — הקובץ
+     עצמו, או נגן משובץ שכבר עכשיו אפשר לבנות מהכתובת. קישור יוטיוב
+     נסגר כך אחרי בקשה אחת: אין לו og:video, ואין שום טעם להעיר בגללו
+     עוד שלושה שירותים ולהמתין להם. */
+  const playable = () => out.media || embedUrl(url) || (out.full && embedUrl(out.full));
+  const enough = () => out.title && out.image && playable();
 
   /* הספק הראשון לבדו, כי בדרך כלל הוא מספיק — ואז יצאה בקשה אחת בלבד.
      רק אם הוא לא סגר את העניין, נשלחים השאר, וביחד ולא בזה אחר זה:
      בטור, שני ספקים תקועים אכלו שש-עשרה שניות לפני שהשלישי בכלל התחיל. */
-  await Promise.all([visit(PROVIDERS[0], url, out)]);
-  if (!enough() && !(out.media && !wantFull)) {
+  await visit(PROVIDERS[0], url, out);
+  if (!enough()) {
     const rest = PROVIDERS.slice(1).map(p => visit(p, url, out));
     await Promise.race([
       Promise.all(rest),
@@ -124,7 +126,13 @@ async function visit(provider, url, out) {
       const clean = normalizeUrl(unwrap(got.full));
       if (clean && embedUrl(clean)) out.full = clean;
     }
-    if (!out.media && got.media) out.media = normalizeUrl(got.media);
+    if (!out.media && got.media) {
+      const file = normalizeUrl(got.media);
+      /* og:video אינו תמיד קובץ: ביוטיוב ובטיקטוק הוא דף נגן, וניסיון
+         לנגן דף HTML בתגית video נכשל בוודאות. מתקבל רק מה שנראה כמו
+         קובץ וידאו אמיתי — וזה בדיוק מה שפייסבוק ואינסטגרם נותנות. */
+      if (file && isVideoFile(file)) out.media = file;
+    }
     if (!out.title && got.title) out.title = clean_title(got.title);
     if (!out.image && got.image) out.image = normalizeUrl(got.image);
 
@@ -135,6 +143,12 @@ async function visit(provider, url, out) {
   } catch (e) {
     out.log.push(provider.id + ': ' + reason(e));
   }
+}
+
+const VIDEO_FILE = /\.(mp4|m4v|webm|mov|m3u8|mpd)$/i;
+
+function isVideoFile(url) {
+  try { return VIDEO_FILE.test(new URL(url).pathname); } catch (e) { return false; }
 }
 
 /* נוסח השגיאה עצמו, ולא "לא נגיש" סתמי. כשארבעה ספקים נופלים באותה
@@ -213,34 +227,73 @@ function unwrap(raw) {
 /* --- שמירת התמונה על המכשיר ---
    כתובת תמונה של פייסבוק ואינסטגרם נושאת חתימה שפגה אחרי זמן מה, וכעבור
    שבוע התמונה הייתה נעלמת מהספרייה. לכן היא מוקטנת ונשמרת כתמונה עצמה.
-   240 פיקסלים ואיכות 0.7 נותנים כ-12KB — קטן מספיק כדי שמאה סרטונים
-   ייכנסו לאחסון, וגדול מספיק לרוחב הכרטיס. */
 
-const POSTER_WIDTH = 240;
-const POSTER_MAX = 60 * 1024;
+   720 פיקסלים ולא פחות: הכרטיס תופס את כל רוחב המסך, ובטלפון עם צפיפות
+   של שלושה פיקסלים למסך זה כאלף פיקסלים אמיתיים. תמונה של 240 נראית
+   מרוחה בדיוק במקום שבו היא אמורה לספר מה הסרטון. כ-45KB לתמונה, ואם
+   האחסון יתמלא save() מוותרת על הישנות. */
+
+const POSTER_WIDTH = 720;
+const POSTER_MAX = 150 * 1024;
 
 export function cachePoster(src) {
   return new Promise(resolve => {
     if (!src || src.startsWith('data:')) { resolve(src || null); return; }
+
+    /* שרת תמונות שאינו עונה אינו סיבה לתקוע את השמירה. אחרי פסק הזמן
+       נשמרת הכתובת עצמה, והכרטיס ינסה לטעון אותה כשיוצג. */
+    let settled = false;
+    const finish = value => { if (!settled) { settled = true; clearTimeout(timer); resolve(value); } };
+    const timer = setTimeout(() => finish(src), TIMEOUT);
+
     const img = new Image();
     /* בלי crossOrigin הציור מלכלך את הבד ו-toDataURL נחסם. שרת שלא מרשה
        יפיל את הטעינה, ואז נשמרת הכתובת עצמה כמו שהיא. */
     img.crossOrigin = 'anonymous';
     img.referrerPolicy = 'no-referrer';
-    img.onload = () => {
+    img.onerror = () => finish(src);
+    img.onload = async () => {
+      /* onload אומר שהבייטים הגיעו, לא שהתמונה פוענחה. ציור לפני הפענוח
+         מייצר בד ריק, ובד ריק שנשמר כ-JPEG יוצא **שחור** — בדיוק התמונה
+         השחורה שהופיעה בכרטיסים. decode ממתין לפענוח בפועל. */
+      if (img.decode) { try { await img.decode(); } catch (e) { /* נמשיך ונבדוק */ } }
       try {
         const scale = Math.min(1, POSTER_WIDTH / img.naturalWidth);
         const canvas = document.createElement('canvas');
         canvas.width = Math.round(img.naturalWidth * scale);
         canvas.height = Math.round(img.naturalHeight * scale);
-        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-        const data = canvas.toDataURL('image/jpeg', 0.7);
-        resolve(data.length > POSTER_MAX ? src : data);
+        if (!canvas.width || !canvas.height) { finish(src); return; }
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        /* ואם למרות הכול יצא בד ריק — עדיף הכתובת המקורית על תמונה
+           שחורה שנשמרת לתמיד ומחליפה את התמונה האמיתית */
+        if (blank(ctx, canvas)) { finish(src); return; }
+        const data = canvas.toDataURL('image/jpeg', 0.72);
+        finish(data.length > POSTER_MAX ? src : data);
       } catch (e) {
-        resolve(src);   /* בד מלוכלך — נשמרת הכתובת */
+        finish(src);   /* בד מלוכלך — נשמרת הכתובת */
       }
     };
-    img.onerror = () => resolve(src);
     img.src = src;
   });
+}
+
+/* דגימה של תשע נקודות. תמונה אמיתית של מגרש או של אולם כמעט לעולם אינה
+   אחידה לגמרי, ובד שלא צויר עליו כלום הוא שקוף — כלומר אלפא אפס. */
+function blank(ctx, canvas) {
+  const xs = [0.1, 0.5, 0.9];
+  let opaque = 0;
+  let first = null;
+  let varied = false;
+  for (const x of xs) {
+    for (const y of xs) {
+      const px = ctx.getImageData(
+        Math.floor(canvas.width * x), Math.floor(canvas.height * y), 1, 1).data;
+      if (px[3] > 8) opaque++;
+      const key = px[0] + ',' + px[1] + ',' + px[2];
+      if (first === null) first = key;
+      else if (key !== first) varied = true;
+    }
+  }
+  return opaque === 0 || !varied;
 }
