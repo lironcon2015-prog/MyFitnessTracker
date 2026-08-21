@@ -405,32 +405,38 @@ h2 .term{color:inherit;border-bottom-width:2px}
 /* ===== שכבת הנגן =====
    מעל הדף ולא בתוך הכרטיס: ממורכזת מעצם הבנייה, אף פעם לא צריך לגלול
    אליה, והסרטון גדול בהרבה. z-index גבוה מ-99, שהוא שכבת הרעש של הנייר. */
-/* dvh ולא vh: באייפון vh נמדד לפי חלון שכולל את שורת הכתובת, כלומר גובה
-   גדול ממה שבאמת רואים — והמרכוז יוצא נמוך מהמרכז האמיתי. dvh הוא הגובה
-   הנראה בפועל, ו-vh נשאר כנפילה לדפדפנים ישנים.
-   overflow:auto ולא hidden: אם בכל זאת התוכן גבוה מהמסך, עדיף שאפשר יהיה
-   להגיע אליו מאשר שייחתך. */
-.vlayer{position:fixed;inset:0;z-index:120;display:flex;align-items:center;justify-content:center;
-  height:100vh;height:100dvh;overflow:auto;overscroll-behavior:contain;
-  padding:calc(12px + env(safe-area-inset-top)) 14px calc(12px + env(safe-area-inset-bottom));
+/* ===== שכבת הנגן =====
+   מעל הדף ולא בתוך הכרטיס: ממורכזת מעצם הבנייה, אף פעם לא צריך לגלול
+   אליה. z-index גבוה מ-99, שהוא שכבת הרעש של הנייר.
+
+   dvh ולא vh: באייפון vh נמדד לפי חלון שכולל את שורת הכתובת, כלומר גובה
+   גדול ממה שבאמת רואים. dvh הוא הגובה הנראה בפועל, ו-vh נשאר כנפילה. */
+.vlayer{position:fixed;inset:0;z-index:120;display:flex;align-items:stretch;justify-content:center;
+  height:100vh;height:100dvh;overflow:hidden;overscroll-behavior:contain;
+  padding:calc(10px + env(safe-area-inset-top)) 12px calc(10px + env(safe-area-inset-bottom));
   background:rgba(23,33,31,.96);animation:vfade .18s ease-out}
 @keyframes vfade{from{opacity:0}}
-.vbox{width:100%;max-width:660px;display:flex;flex-direction:column;gap:10px}
-.vbar{display:flex;align-items:center;gap:12px;color:var(--paper);
+
+/* הנגן ממלא את כל מה שנשאר בין הכותרת להערה, במקום לקבל מסגרת 16:9
+   קבועה. מסגרת קבועה נתנה על מסך ברוחב 390 חלון בגובה 204 פיקסלים —
+   ובחלון כזה פס הבקרה של אייפון נדחס וכפתור הניגון נדחף מחוץ למסך.
+   כשהנגן ממלא, הכפתור תמיד גדול ותמיד נראה, ולא משנה מה יחס הסרטון:
+   object-fit:contain שומר על הפריים שלם ומשלים בשחור. */
+.vbox{width:100%;max-width:660px;min-height:0;display:flex;flex-direction:column;gap:10px}
+.vbar{flex:0 0 auto;display:flex;align-items:center;gap:12px;color:var(--paper);
   font-family:'Heebo',sans-serif;font-weight:700;font-size:13.5px}
 .vbar span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.9}
 .vshut{flex:0 0 auto;width:44px;height:44px;font-size:26px;line-height:1;
   background:none;border:1px solid rgba(232,226,212,.35);color:var(--paper);cursor:pointer}
 .vshut:active{background:var(--paper);color:var(--ink)}
 .vshut:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
-.vbox video,.vbox iframe{width:100%;max-height:68vh;max-height:68dvh;border:0;display:block;background:#000}
-.vbox video{height:auto;aspect-ratio:16/9;object-fit:contain}
-.vbox iframe{aspect-ratio:16/9}
-/* רילס וטיקטוק הם לאורך — מסגרת רחבה משאירה שתי רצועות שחורות */
-.vbox iframe.tall{aspect-ratio:9/14;max-width:min(100%,42dvh);margin-inline:auto}
+.vbox video,.vbox iframe{flex:1 1 auto;min-height:0;width:100%;border:0;display:block;background:#000}
+.vbox video{object-fit:contain}
+/* רילס וטיקטוק הם לאורך — נגן משובץ ברוחב מלא היה מותח אותם לרוחב */
+.vbox iframe.tall{max-width:min(100%,56dvh);margin-inline:auto}
 
 /* דרך היציאה כשהפלטפורמה מסרבת לנגן — הדף לא יכול לדעת שזה קרה */
-.vout{margin:0;font-size:12.5px;line-height:1.5;color:rgba(232,226,212,.7);text-align:center}
+.vout{flex:0 0 auto;margin:0;font-size:12.5px;line-height:1.5;color:rgba(232,226,212,.7);text-align:center}
 .vout a{color:var(--paper);font-weight:600}
 .vauto{display:flex;gap:9px;align-items:flex-start;margin:16px 0 0;cursor:pointer}
 .vauto input{width:20px;height:20px;min-height:0;flex:0 0 auto;margin-top:2px;accent-color:var(--pink)}
