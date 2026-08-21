@@ -294,11 +294,16 @@ function videoCard(v, repaint) {
   open.textContent = 'פתח';
   acts.appendChild(open);
 
-  /* הנגן נטען רק בלחיצה — אחרת כל גלילה בספרייה הייתה מושכת נגנים.
+  /* הנגן נפתח כשכבה מעל הדף ולא בתוך הכרטיס.
+     ניסיתי קודם לפתוח אותו במקום, ואז לגלול אותו למרכז — וזה נכשל שוב
+     ושוב: בזמן הגלילה עוד אין לווידאו גובה, אחרי הטעינה הכול זז, ומתחת
+     לכרטיס יושבים עוד כרטיסים שמזיזים אותו. שכבה עוקפת את כל החישוב
+     הזה: היא ממורכזת מעצם הבנייה, אף פעם לא צריך לגלול אליה, והסרטון
+     גם גדול בהרבה על מסך טלפון. סגירה מחזירה בדיוק לאותו מקום.
+
      סדר הניסיונות: קודם קובץ הווידאו עצמו בנגן שלנו, ורק אם אין —
      הנגן המשובץ של הפלטפורמה. הקובץ עדיף בכל מובן: הוא מתנגן בלי
-     אפליקציה ובלי חשבון, אין לו דעה על קישור מקוצר, והגודל והמיקום
-     שלו בידינו. */
+     אפליקציה ובלי חשבון, ואין לו דעה על קישור מקוצר. */
   const embed = embedUrl(playable(v));
   const canFetch = autoOn() && FETCHABLE.has(v.platform);
   if (v.media || embed || canFetch) {
@@ -306,43 +311,6 @@ function videoCard(v, repaint) {
     play.type = 'button';
     play.className = 'vplay';
     play.textContent = 'נגן כאן';
-
-    const close = () => {
-      const open = card.querySelector('.vframe');
-      if (open) open.remove();
-      card.classList.remove('playing');
-      play.textContent = 'נגן כאן';
-    };
-
-    const frameFor = node => {
-      const frame = document.createElement('div');
-      frame.className = 'vframe' + (isPortrait(playable(v)) ? ' tall' : '');
-      frame.appendChild(node);
-
-      /* מה שקורה בתוך נגן משובץ שייך לפייסבוק, והדף אינו יכול לקרוא
-         אותו — גם לא כדי לדעת שהוצג "Video unavailable". לכן דרך
-         היציאה כתובה מראש ולא מחכה לזיהוי שאי אפשר לעשות. */
-      const out = document.createElement('p');
-      out.className = 'vout';
-      out.append('לא נטען? ');
-      const link = document.createElement('a');
-      link.href = v.url;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      link.textContent = 'פתח אותו בפלטפורמה';
-      out.appendChild(link);
-      out.append('.');
-      frame.appendChild(out);
-
-      /* בראש הכרטיס ולא בסופו: מתחת לכפתורים ולהערה הוא נוחת מתחת
-         לקצה המסך וצריך לגלול כדי בכלל לראות אותו. */
-      card.insertBefore(frame, card.firstChild);
-      card.classList.add('playing');
-      /* הנגן עצמו ולא המסגרת — למסגרת יש גם שורת הערה מתחת, ומרכוז
-         שלה מוריד את הסרטון מהמרכז */
-      center(node);
-      return frame;
-    };
 
     const showFile = src => {
       const el = document.createElement('video');
@@ -353,13 +321,6 @@ function videoCard(v, repaint) {
       el.autoplay = true;
       const still = posterOf(v);
       if (still) el.poster = still;
-      /* עד שיש מטא-דאטה אין לסרטון גובה אמיתי, ולכן המרכוז הראשון נעשה
-         על קופסה ריקה — ואז הסרטון מתרחף כלפי מטה והכפתור יוצא מהמסך.
-         עד אז שמורה מסגרת ברירת מחדל, וכשהגובה האמיתי ידוע מתקנים. */
-      el.addEventListener('loadedmetadata', () => {
-        el.classList.add('sized');
-        center(el);
-      }, { once: true });
       /* כתובת חתומה שפגה בינתיים — מרעננים פעם אחת ומנסים שוב, ורק
          אחר כך נופלים לנגן המשובץ */
       let retried = false;
@@ -367,7 +328,6 @@ function videoCard(v, repaint) {
         if (retried) { fallback(); return; }
         retried = true;
         const fresh = await refreshMedia(v.url);
-        /* אותה כתובת בדיוק תיכשל שוב — אין טעם בסיבוב נוסף */
         if (fresh.media && fresh.media !== src) {
           updateVideo(v.id, { media: fresh.media });
           el.src = fresh.media;
@@ -376,35 +336,31 @@ function videoCard(v, repaint) {
         }
         fallback();
       };
-      frameFor(el);
+      openOverlay(el, v);
     };
 
     const showEmbed = src => {
       const el = document.createElement('iframe');
       el.src = src;
       el.title = v.title;
-      el.loading = 'lazy';
       el.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
       el.allowFullscreen = true;
       el.referrerPolicy = 'strict-origin-when-cross-origin';
-      frameFor(el);
+      if (isPortrait(playable(v))) el.classList.add('tall');
+      openOverlay(el, v);
     };
 
     /* כישלון אינו נעילה: תקלת רשת רגעית לא צריכה להשאיר כפתור מת עד
-       שמרעננים את הדף. הכפתור חוזר להיות לחיץ ומזמין ניסיון נוסף. */
+       שמרעננים את הדף. */
     const fallback = () => {
-      close();
+      closeOverlay();
       if (embed) { showEmbed(embed); return; }
-      play.disabled = false;
       play.textContent = 'לא נטען — נסה שוב';
     };
 
     play.onclick = async () => {
-      if (card.querySelector('.vframe')) { close(); return; }
-
       /* מנגנים מיד ממה שכבר יש, בלי לפנות לרשת. קובץ ישן אינו סיבה
-         להמתנה: אם הכתובת שלו פגה, onerror מרענן ומנסה שוב — וזה קורה
-         תוך כדי, במקום להשהות כל לחיצה מראש. */
+         להמתנה: אם הכתובת שלו פגה, onerror מרענן ומנסה שוב תוך כדי. */
       if (v.media) { showFile(v.media); return; }
       if (embed) { showEmbed(embed); return; }
 
@@ -416,7 +372,7 @@ function videoCard(v, repaint) {
         const fresh = await refreshMedia(v.url);
         lastLog = fresh.log;
         play.disabled = false;
-        play.textContent = 'סגור';
+        play.textContent = 'נגן כאן';
         if (fresh.media) {
           updateVideo(v.id, { media: fresh.media, full: fresh.full || undefined });
           v.media = fresh.media;
@@ -497,10 +453,86 @@ function videoCard(v, repaint) {
   return card;
 }
 
-/* מרכוז במסך. block:'center' לבדו אינו מספיק כשהגובה עוד לא ידוע, ולכן
-   הוא נקרא גם אחרי שהוא נודע. */
-function center(node) {
-  node.scrollIntoView({ block: 'center', behavior: 'smooth' });
+/* --- שכבת הנגן ---
+   אחת בלבד בכל רגע, ולכן היא מודול ולא חלק מהכרטיס. */
+
+let overlay = null;
+let pushed = false;   // האם הוספנו צעד להיסטוריה עבור השכבה
+
+export function closeOverlay(fromBack) {
+  if (!overlay) return;
+  /* עצירה מפורשת: אלמנט שנמחק מה-DOM ממשיך לפעמים להשמיע */
+  const media = overlay.querySelector('video');
+  if (media) { media.pause(); media.removeAttribute('src'); media.load(); }
+  overlay.remove();
+  overlay = null;
+  document.body.classList.remove('noscroll');
+  document.removeEventListener('keydown', onKey);
+  window.removeEventListener('popstate', onBack);
+  /* סגירה בכפתור או ב-Escape מוחקת גם את הצעד שהוספנו, אחרת "אחורה"
+     היה נראה כאילו הוא לא עושה כלום */
+  if (pushed && !fromBack) history.back();
+  pushed = false;
+}
+
+function onKey(e) {
+  if (e.key === 'Escape') closeOverlay();
+}
+
+/* "אחורה" בטלפון סוגר את הנגן ולא יוצא מהמסך — זה מה שמצפים לו כשמשהו
+   פתוח מעל הדף. הצעד נוסף על אותה כתובת, כך שהניתוב אינו מרגיש בו. */
+function onBack() {
+  closeOverlay(true);
+}
+
+function openOverlay(node, video) {
+  closeOverlay();
+
+  overlay = document.createElement('div');
+  overlay.className = 'vlayer';
+  /* לחיצה על הרקע סוגרת — הדרך המהירה ביותר לצאת בטלפון */
+  overlay.onclick = e => { if (e.target === overlay) closeOverlay(); };
+
+  const box = document.createElement('div');
+  box.className = 'vbox';
+
+  const bar = document.createElement('div');
+  bar.className = 'vbar';
+  const name = document.createElement('span');
+  name.textContent = video.title;
+  const shut = document.createElement('button');
+  shut.type = 'button';
+  shut.className = 'vshut';
+  shut.setAttribute('aria-label', 'סגור');
+  shut.textContent = '×';
+  shut.onclick = closeOverlay;
+  bar.append(name, shut);
+
+  /* מה שקורה בתוך נגן משובץ שייך לפייסבוק, והדף אינו יכול לקרוא אותו —
+     גם לא כדי לדעת שהוצג "Video unavailable". לכן דרך היציאה כתובה
+     מראש ולא מחכה לזיהוי שאי אפשר לעשות. */
+  const out = document.createElement('p');
+  out.className = 'vout';
+  out.append('לא נטען? ');
+  const link = document.createElement('a');
+  link.href = video.url;
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  link.textContent = 'פתח אותו בפלטפורמה';
+  out.appendChild(link);
+
+  box.append(bar, node, out);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+  /* נעילת גלילה: בלעדיה הדף שמאחור זז מתחת לאצבע בזמן הצפייה */
+  document.body.classList.add('noscroll');
+  document.addEventListener('keydown', onKey);
+  try {
+    history.pushState({ vplayer: true }, '', location.hash);
+    pushed = true;
+    window.addEventListener('popstate', onBack);
+  } catch (e) { /* בלי היסטוריה — סוגרים בכפתור, ברקע או ב-Escape */ }
+  shut.focus();
 }
 
 /* השלמת תמונות חסרות, בשקט וברקע.
@@ -691,6 +723,7 @@ export function mountVideos(prefill) {
       $('v-cancel').removeEventListener('click', onCancel);
       $('v-check').removeEventListener('click', onCheck);
       $('v-managego').removeEventListener('click', onManage);
+      closeOverlay();
       managing = false;
       resetForm();
     }
