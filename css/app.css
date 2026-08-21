@@ -399,11 +399,18 @@ h2 .term{color:inherit;border-bottom-width:2px}
 .vacts a:active,.vacts button:active{background:var(--ink);color:var(--paper);border-color:var(--ink)}
 .vacts a:focus-visible,.vacts button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
 /* הנגן נטען רק בלחיצה, ולכן הוא יושב מתחת לכרטיס ותופס את כל רוחבו */
-.vframe{grid-column:1 / -1;margin-top:10px;border:1px solid var(--hair);background:var(--ink);
-  aspect-ratio:16/9}
+.vframe{grid-column:1 / -1;margin-top:10px;border:1px solid var(--hair);background:var(--ink)}
 /* רילס וטיקטוק הם לאורך — מסגרת רחבה הייתה משאירה שתי רצועות שחורות */
-.vframe.p-instagram,.vframe.p-tiktok{aspect-ratio:9/14;max-width:340px;margin-inline:auto;background:var(--paper)}
-.vframe iframe{width:100%;height:100%;border:0;display:block}
+.vframe.tall{max-width:340px;margin-inline:auto;background:var(--paper)}
+.vframe.tall iframe{aspect-ratio:9/14}
+.vframe iframe{width:100%;aspect-ratio:16/9;border:0;display:block}
+/* דרך היציאה כשהפלטפורמה מסרבת לנגן — הדף לא יכול לדעת שזה קרה */
+.vout{margin:0;padding:9px 11px;background:rgba(255,255,255,.42);border-top:1px solid var(--hair);
+  font-size:12.5px;line-height:1.5;color:var(--ink-soft)}
+.vout a{color:var(--blue);font-weight:600}
+/* למה אין כאן כפתור ניגון */
+.vwhy{margin:9px 0 0;font-size:12.5px;line-height:1.5;color:var(--ink-soft);
+  border-right:2px solid var(--hair);padding-right:9px}
 
 @media (max-width:380px){
   .vcard{grid-template-columns:72px 1fr;gap:10px}

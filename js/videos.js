@@ -260,6 +260,18 @@ export function embedUrl(url) {
     return 'https://www.instagram.com/' + kind + '/' + encodeURIComponent(m[2]) + '/embed';
   }
   if (platform === 'facebook') {
+    /* התוסף של פייסבוק פותח רק כתובת מלאה של סרטון. קישור מקוצר —
+       fb.watch או facebook.com/share/... — הוא הפניה, והתוסף אינו הולך
+       אחריה: הוא מחזיר "Video unavailable" גם כשהסרטון עצמו תקין.
+       ולכן במקרים האלה עדיף בלי כפתור ניגון מאשר עם מסך שחור. */
+    if (u.hostname.endsWith('fb.watch')) return null;
+    if (/^\/share\//.test(u.pathname)) return null;
+    const known = /\/videos\/\d+/.test(u.pathname)
+      || /\/reel\/\d+/.test(u.pathname)
+      || /\/posts\//.test(u.pathname)
+      || u.pathname.startsWith('/watch')
+      || u.pathname.startsWith('/video.php');
+    if (!known) return null;
     return 'https://www.facebook.com/plugins/video.php?href=' + encodeURIComponent(url) + '&show_text=false';
   }
   if (platform === 'tiktok') {
@@ -267,4 +279,35 @@ export function embedUrl(url) {
     return m ? 'https://www.tiktok.com/embed/v2/' + m[1] : null;
   }
   return null;
+}
+
+/* למה אין כפתור "נגן כאן". מוחזר רק כשהפלטפורמה בעצם יודעת לשבץ, אבל
+   הקישור המסוים הזה לא — כדי שההסבר יופיע בדיוק במקום שבו הכפתור חסר. */
+export function embedBlocked(url) {
+  if (embedUrl(url)) return null;
+  const platform = detectPlatform(url).id;
+  let u;
+  try { u = new URL(url); } catch (e) { return null; }
+
+  if (platform === 'facebook') {
+    if (u.hostname.endsWith('fb.watch') || /^\/share\//.test(u.pathname)) {
+      return 'קישור מקוצר של פייסבוק לא מתנגן בתוך הדף. פתח אותו, ואם תרצה ניגון כאן — העתק מהדפדפן את הכתובת המלאה של הסרטון.';
+    }
+    return 'פייסבוק מנגנת בתוך הדף רק סרטונים ציבוריים עם כתובת מלאה.';
+  }
+  if (platform === 'tiktok') return 'קישור מקוצר של טיקטוק לא מתנגן בתוך הדף.';
+  if (platform === 'instagram') return 'אינסטגרם מנגנת בתוך הדף רק פוסטים ורילסים ציבוריים.';
+  return null;
+}
+
+/* רילסים וטיקטוק הם לאורך — מסגרת רחבה הייתה משאירה שתי רצועות שחורות */
+export function isPortrait(url) {
+  const platform = detectPlatform(url).id;
+  if (platform === 'tiktok') return true;
+  try {
+    const path = new URL(url).pathname;
+    if (platform === 'instagram') return /\/(reel|reels)\//.test(path);
+    if (platform === 'facebook') return /\/reel\//.test(path);
+  } catch (e) { /* כתובת פגומה — מסגרת רגילה */ }
+  return false;
 }
