@@ -424,6 +424,14 @@ h2 .term{color:inherit;border-bottom-width:2px}
   color:var(--pink);text-decoration:underline}
 .vretry:disabled{color:var(--ink-soft);cursor:default;text-decoration:none}
 .vretry:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
+.vcheck{margin-top:12px;background:none;border:none;color:var(--ink-soft);font-family:'Heebo',sans-serif;
+  font-weight:700;font-size:12px;padding:6px 0;cursor:pointer;text-decoration:underline}
+.vcheck:disabled{cursor:default;opacity:.6}
+.vcheck:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
+.vcheckout{margin-top:6px;padding:9px 11px;border:1px solid var(--hair);background:rgba(255,255,255,.42)}
+.vcheckout ul{margin:0;padding-inline-start:0;padding-inline-end:16px;font-size:11.5px;line-height:1.7;
+  color:var(--ink-soft)}
+.vcheckout li{direction:ltr;text-align:right;unicode-bidi:plaintext}
 /* דיווח על מה שקרה מול שירותי התצוגה המקדימה */
 .vlog{margin-top:8px;font-size:11.5px;color:var(--ink-soft)}
 .vlog summary{cursor:pointer;font-family:'Heebo',sans-serif;font-weight:700;font-size:11.5px}
