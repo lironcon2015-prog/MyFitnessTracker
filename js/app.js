@@ -4,9 +4,14 @@
 import { mountBooklet } from './booklet.js';
 import { renderLibrary } from './library.js';
 import { mountQuiz, buildQuestions } from './quiz.js';
+import { mountVideos } from './videolib.js';
+import { videoCount } from './videos.js';
 import { migrateLegacy, dailyPicks } from './store.js';
 
 const $ = id => document.getElementById(id);
+
+/* קישור שהגיע משיתוף חיצוני, ממתין למסך הסרטונים */
+let shared = null;
 
 async function getJSON(url) {
   const res = await fetch(url, { cache: 'no-cache' });
@@ -22,6 +27,7 @@ function parseHash() {
   if (parts[0] === 'q' && parts[1]) return { view: 'quiz', id: parts[1], scenario: parts[2] || null };
   /* האימון הקצר. התרחישים נבחרים בכל כניסה מחדש ולכן אינם בכתובת */
   if (parts[0] === 't' && parts[1]) return { view: 'train', id: parts[1] };
+  if (parts[0] === 'v') return { view: 'videos' };
   if (parts[0] === 'x' && parts[1]) return { view: 'shared', data: parts[1] };
   return { view: 'library' };
 }
@@ -71,11 +77,21 @@ async function boot() {
   }
 
   function screens(active) {
-    ['library', 'booklet', 'quiz'].forEach(id => { $(id).hidden = id !== active; });
+    ['library', 'booklet', 'quiz', 'videos'].forEach(id => { $(id).hidden = id !== active; });
   }
 
   function show(route) {
     if (current) { current.destroy(); current = null; }
+
+    if (route.view === 'videos') {
+      screens('videos');
+      /* קישור ששותף לאפליקציה נצרך פעם אחת, כדי שרענון לא ימלא את הטופס שוב */
+      const prefill = shared;
+      shared = null;
+      current = mountVideos(prefill);
+      window.scrollTo(0, 0);
+      return;
+    }
 
     let booklet = null;
     if (route.view === 'booklet' || route.view === 'quiz' || route.view === 'train') {
@@ -131,16 +147,31 @@ async function boot() {
     } else {
       screens('library');
       renderLibrary(home, booklets, formations, openBooklet, openQuiz, openTrain, index.version);
+      const n = videoCount();
+      $('videosn').textContent = n ? ' · ' + n : '';
     }
     window.scrollTo(0, 0);
   }
 
   window.addEventListener('hashchange', () => show(parseHash()));
 
+  const params = new URLSearchParams(location.search);
+
+  /* שיתוף אל האפליקציה (share_target ב-manifest): באנדרואיד אפשר ללחוץ
+     "שתף" באינסטגרם או ביוטיוב ולבחור בתשיעיות, והקישור מגיע לכאן
+     כפרמטרים. פותחים את ספריית הסרטונים עם הטופס מלא מראש.
+     ?text= מגיע לפעמים כמשפט שהקישור בתוכו — הניקוי נעשה ב-videos.js. */
+  if (params.has('url') || params.has('text')) {
+    shared = { url: params.get('url') || params.get('text') || '', title: params.get('title') || '' };
+    history.replaceState(null, '', location.pathname + '#/v');
+  }
+
   /* ?b=<id> נתמך מהגרסה הקודמת. replaceState ולא location.replace,
      כדי לא לירות hashchange לפני שהמסך מוכן */
-  const legacy = new URLSearchParams(location.search).get('b');
+  const legacy = params.get('b');
   if (legacy && !location.hash) history.replaceState(null, '', '#/b/' + legacy);
+
+  $('videosgo').onclick = () => { location.hash = '#/v'; };
 
   document.documentElement.classList.remove('loading');
   $('state').style.display = 'none';
