@@ -13,7 +13,20 @@
 
 import { normalizeUrl, embedUrl, detectPlatform, thumbUrl } from './videos.js';
 
-const TIMEOUT = 10000;
+const TIMEOUT = 8000;
+/* תקרה לכל החיפוש. בלי זה, ארבעה ספקים תקועים היו מחזיקים את כפתור
+   השמירה ארבעים שניות — והמשתמש מחכה מול הטלפון כל הזמן הזה. */
+const BUDGET = 15000;
+
+/* AbortSignal.timeout קיים רק מ-Safari 16, ובאייפון ישן יותר הוא זורק
+   מיד — כלומר כל הספקים נכשלים בבת אחת עוד לפני שיצאה בקשה אחת.
+   AbortController קיים מאז ומתמיד, ולכן הפסק הזמן נבנה ידנית. */
+function withTimeout(url) {
+  const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+  const timer = setTimeout(() => { if (ctrl) ctrl.abort(); }, TIMEOUT);
+  const options = ctrl ? { signal: ctrl.signal } : {};
+  return fetch(url, options).finally(() => clearTimeout(timer));
+}
 
 const PROVIDERS = [
   {
@@ -72,12 +85,14 @@ export function needsResolve(url) {
 export async function lookup(url) {
   const out = { full: null, title: null, image: thumbUrl(url), log: [] };
   const wantFull = needsResolve(url);
+  const until = Date.now() + BUDGET;
 
   for (const provider of PROVIDERS) {
     /* יש כבר כל מה שצריך — אין סיבה להעיר עוד שירות */
     if (out.image && (!wantFull || out.full) && out.title) break;
+    if (Date.now() >= until) { out.log.push('נגמר הזמן — לא נוסו כל השירותים'); break; }
     try {
-      const res = await fetch(provider.build(url), { signal: AbortSignal.timeout(TIMEOUT) });
+      const res = await withTimeout(provider.build(url));
       if (!res.ok) { out.log.push(provider.id + ': ' + res.status); continue; }
       const got = await provider.read(res);
 
@@ -94,10 +109,36 @@ export async function lookup(url) {
         [out.full ? 'כתובת' : '', out.title ? 'שם' : '', out.image ? 'תמונה' : '']
           .filter(Boolean).join(' + ') || 'בלי כלום');
     } catch (e) {
-      out.log.push(provider.id + ': ' + (e && e.name === 'TimeoutError' ? 'לא ענה בזמן' : 'לא נגיש'));
+      out.log.push(provider.id + ': ' + reason(e));
     }
   }
   return out;
+}
+
+/* נוסח השגיאה עצמו, ולא "לא נגיש" סתמי. כשארבעה ספקים נופלים באותה
+   שנייה זו סיבה אחת משותפת ולא ארבע תקלות, וההבדל בין "Load failed"
+   (הרשת או הדומיין חסומים) לבין שם של פונקציה חסרה הוא כל האבחנה. */
+function reason(e) {
+  if (!e) return 'נכשל';
+  if (e.name === 'AbortError') return 'לא ענה בתוך ' + (TIMEOUT / 1000) + ' שניות';
+  return ((e.name || 'שגיאה') + ': ' + (e.message || '')).trim().slice(0, 90);
+}
+
+/** בדיקה יזומה: מה כל ספק עונה על כתובת ידועה. לאבחון כשמשהו לא עובד. */
+export async function probe() {
+  const target = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+  const lines = [];
+  for (const provider of PROVIDERS) {
+    const started = Date.now();
+    try {
+      const res = await withTimeout(provider.build(target));
+      const ms = Date.now() - started;
+      lines.push(provider.id + ': ' + (res.ok ? 'עונה' : 'שגיאה ' + res.status) + ' (' + ms + 'ms)');
+    } catch (e) {
+      lines.push(provider.id + ': ' + reason(e));
+    }
+  }
+  return lines;
 }
 
 /* --- שליפה מ-HTML גולמי --- */

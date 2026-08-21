@@ -10,7 +10,7 @@ import {
   detectPlatform, platformName, embedUrl, embedBlocked, isPortrait, playable, posterOf,
   thumbUrl, normalizeUrl, videoCount
 } from './videos.js';
-import { needsResolve, lookup, cachePoster } from './preview.js';
+import { needsResolve, lookup, cachePoster, probe } from './preview.js';
 
 const $ = id => document.getElementById(id);
 
@@ -520,6 +520,25 @@ export function mountVideos(prefill) {
   const onCancel = () => { resetForm(); fillCategorySelect($('v-cat'), defaultCat()); };
   $('v-cancel').addEventListener('click', onCancel);
 
+  const onCheck = async () => {
+    $('v-check').disabled = true;
+    $('v-check').textContent = 'בודק…';
+    const lines = await probe();
+    const box = $('v-checkout');
+    box.hidden = false;
+    box.textContent = '';
+    const list = document.createElement('ul');
+    lines.forEach(line => {
+      const li = document.createElement('li');
+      li.textContent = line;
+      list.appendChild(li);
+    });
+    box.appendChild(list);
+    $('v-check').disabled = false;
+    $('v-check').textContent = 'בדוק שוב';
+  };
+  $('v-check').addEventListener('click', onCheck);
+
   const onManage = () => {
     managing = !managing;
     $('v-managego').setAttribute('aria-expanded', String(managing));
@@ -541,6 +560,7 @@ export function mountVideos(prefill) {
       $('v-paste').removeEventListener('click', onPaste);
       $('v-formel').removeEventListener('submit', onSubmit);
       $('v-cancel').removeEventListener('click', onCancel);
+      $('v-check').removeEventListener('click', onCheck);
       $('v-managego').removeEventListener('click', onManage);
       managing = false;
       resetForm();
