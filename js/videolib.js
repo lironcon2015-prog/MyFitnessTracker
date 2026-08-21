@@ -338,7 +338,9 @@ function videoCard(v, repaint) {
          לקצה המסך וצריך לגלול כדי בכלל לראות אותו. */
       card.insertBefore(frame, card.firstChild);
       card.classList.add('playing');
-      frame.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      /* הנגן עצמו ולא המסגרת — למסגרת יש גם שורת הערה מתחת, ומרכוז
+         שלה מוריד את הסרטון מהמרכז */
+      center(node);
       return frame;
     };
 
@@ -351,6 +353,13 @@ function videoCard(v, repaint) {
       el.autoplay = true;
       const still = posterOf(v);
       if (still) el.poster = still;
+      /* עד שיש מטא-דאטה אין לסרטון גובה אמיתי, ולכן המרכוז הראשון נעשה
+         על קופסה ריקה — ואז הסרטון מתרחף כלפי מטה והכפתור יוצא מהמסך.
+         עד אז שמורה מסגרת ברירת מחדל, וכשהגובה האמיתי ידוע מתקנים. */
+      el.addEventListener('loadedmetadata', () => {
+        el.classList.add('sized');
+        center(el);
+      }, { once: true });
       /* כתובת חתומה שפגה בינתיים — מרעננים פעם אחת ומנסים שוב, ורק
          אחר כך נופלים לנגן המשובץ */
       let retried = false;
@@ -486,6 +495,12 @@ function videoCard(v, repaint) {
   }
   card.append(thumb, body);
   return card;
+}
+
+/* מרכוז במסך. block:'center' לבדו אינו מספיק כשהגובה עוד לא ידוע, ולכן
+   הוא נקרא גם אחרי שהוא נודע. */
+function center(node) {
+  node.scrollIntoView({ block: 'center', behavior: 'smooth' });
 }
 
 /* השלמת תמונות חסרות, בשקט וברקע.
